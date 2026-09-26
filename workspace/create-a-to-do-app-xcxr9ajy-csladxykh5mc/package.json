@@ -1,0 +1,8 @@
+{
+  "name": "taskmaster-pro",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "hono": "^4.6.0"
+  }
+}

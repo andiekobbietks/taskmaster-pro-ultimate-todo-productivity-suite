@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+dist/
+.think/
+*.log
+.DS_Store
+.env
+.env.*

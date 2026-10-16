@@ -1,0 +1,301 @@
+{
+  "_meta": {
+    "name": "taskmaster-chaos-fixtures",
+    "version": 1,
+    "purpose": "Deterministic edge-case data for QA and chaos testing. Everything here targets a documented behaviour of the API: trimming, JSON tag encoding, sort order, SQL-injection/XSS probes, unicode handling, and status codes.",
+    "howToRun": "Start an instance (npx wrangler dev), then: npm run seed -- --api http://localhost:8787",
+    "deterministic": "No wall-clock dependence in the payloads. Dates are fixed strings; only created_at is server-assigned at insert time.",
+    "caveat": "The API assigns created_at = Date.now() per request, so todos seeded later have a LATER created_at. Because the sort is created_at DESC, a later-seeded todo sorts BEFORE an earlier one when every other key ties."
+  },
+  "lists": [
+    { "key": "list-chaos", "name": "Chaos QA", "color": "#DC2626", "icon": "flame" },
+    { "key": "list-unicode", "name": "Unicode & Emoji 🌍 العربية 中文", "color": "#7C3AED", "icon": "globe" },
+    { "key": "list-deletable", "name": "Deletable Zone", "color": "#0891B2", "icon": "trash" }
+  ],
+  "todos": [
+    {
+      "key": "unicode-everywhere",
+      "title": "Unicode stress 🌍 العربية 中文 🚀 👩‍💻",
+      "description": "Combining marks: é, zero-width space:​, surrogate pair:🚀, and a bidi override.",
+      "priority": "high",
+      "due_date": "2026-10-20",
+      "list_id": "list-unicode",
+      "tags": ["unicode", "🌍", "中文", "unicode"],
+      "estimated_pomodoros": 2
+    },
+    {
+      "key": "oversized-title",
+      "title": "TITLE_OVERFLOW________________________________________________________________________________________________________",
+      "description": "Deliberately long title to probe column rendering, truncation, and any length limit.",
+      "priority": "medium",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["overflow"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "oversized-description",
+      "title": "Oversized description payload",
+      "description": "LOREM_IPSUM_BLOCK_BEGIN This is a long description used to test wrapping, storage limits, and whether any UI truncates gracefully rather than breaking layout. It repeats to reach a size that would expose an unbounded render or an unindexed full-text scan. LOREM_IPSUM_BLOCK_END",
+      "priority": "low",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["overflow", "rendering"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "xss-probe",
+      "title": "<img src=x onerror=alert('xss')> XSS probe",
+      "description": "<script>alert(document.cookie)</script> must never execute when rendered.",
+      "priority": "high",
+      "due_date": "2026-10-18",
+      "list_id": "list-chaos",
+      "tags": ["security", "xss"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "sql-probe",
+      "title": "Robert'); DROP TABLE todos;--",
+      "description": "Classic injection string. After seeding, GET /api/todos must still return rows, proving parameters are bound, not concatenated.",
+      "priority": "urgent",
+      "due_date": "2026-10-17",
+      "list_id": "list-chaos",
+      "tags": ["security", "sql-injection"],
+      "estimated_pomodoros": 3
+    },
+    {
+      "key": "quotes-and-backslashes",
+      "title": "O'Reilly said \"it works\" at C:\\path\\to\\file",
+      "description": "Single quotes, double quotes, and Windows-style backslashes round-trip through JSON tag encoding.",
+      "priority": "medium",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["escaping", "O'Reilly"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "control-characters",
+      "title": "Line one\nLine two\tTabbed",
+      "description": "Embedded newline and tab must survive the round trip.",
+      "priority": "low",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["whitespace"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "overdue",
+      "title": "Overdue task from the past",
+      "description": "due_date is far in the past. Must appear in status=active and sort early among unpinned items.",
+      "priority": "urgent",
+      "due_date": "2020-01-01",
+      "list_id": "list-chaos",
+      "tags": ["dates", "overdue"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "due-today",
+      "title": "Due today",
+      "description": "due_date equals 2026-10-16, the fixture authoring date. GET /api/stats only counts dueToday when the server clock is the same date.",
+      "priority": "high",
+      "due_date": "2026-10-16",
+      "list_id": "list-chaos",
+      "tags": ["dates"],
+      "estimated_pomodoros": 2
+    },
+    {
+      "key": "due-far-future",
+      "title": "Due in the year 2099",
+      "description": "Extreme future date sorts last among unpinned items.",
+      "priority": "low",
+      "due_date": "2099-12-31",
+      "list_id": "list-chaos",
+      "tags": ["dates"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "null-due-date",
+      "title": "No due date at all",
+      "description": "due_date is NULL. In SQLite, NULL sorts FIRST under ASC, so this appears BEFORE dated todos among unpinned items — that is the current behaviour to verify, not a bug to fix silently.",
+      "priority": "medium",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["dates", "null"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "duplicate-a",
+      "title": "Identical title for sort testing",
+      "description": "Same title as duplicate-b. Ties break on created_at DESC.",
+      "priority": "medium",
+      "due_date": "2026-10-21",
+      "list_id": "list-chaos",
+      "tags": ["duplicate"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "duplicate-b",
+      "title": "Identical title for sort testing",
+      "description": "Same title as duplicate-a. Seeded after it, so it has a later created_at and sorts first among the tie.",
+      "priority": "medium",
+      "due_date": "2026-10-21",
+      "list_id": "list-chaos",
+      "tags": ["duplicate"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "pinned-tie-1",
+      "title": "Pinned tie 1",
+      "description": "Pinned and shares due_date with pinned-tie-2. Pinned items always sort ahead of unpinned ones.",
+      "priority": "high",
+      "due_date": "2026-10-19",
+      "list_id": "list-chaos",
+      "tags": ["pinning"],
+      "estimated_pomodoros": 1,
+      "is_pinned": true
+    },
+    {
+      "key": "pinned-tie-2",
+      "title": "Pinned tie 2",
+      "description": "Pinned and shares due_date with pinned-tie-1.",
+      "priority": "high",
+      "due_date": "2026-10-19",
+      "list_id": "list-chaos",
+      "tags": ["pinning"],
+      "estimated_pomodoros": 1,
+      "is_pinned": true
+    },
+    {
+      "key": "unpinned-tie",
+      "title": "Unpinned with the same due date",
+      "description": "Same due_date as the pinned pair but unpinned, so it must sort after both.",
+      "priority": "high",
+      "due_date": "2026-10-19",
+      "list_id": "list-chaos",
+      "tags": ["pinning"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "all-priority-low",
+      "title": "Priority: low",
+      "description": "One todo per priority level so filters can be verified exhaustively.",
+      "priority": "low",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["priorities"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "all-priority-medium",
+      "title": "Priority: medium",
+      "description": "One todo per priority level.",
+      "priority": "medium",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["priorities"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "all-priority-high",
+      "title": "Priority: high",
+      "description": "One todo per priority level.",
+      "priority": "high",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["priorities"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "all-priority-urgent",
+      "title": "Priority: urgent",
+      "description": "One todo per priority level. urgent is a value the schema allows but the docs do not advertise.",
+      "priority": "urgent",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["priorities"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "numeric-tags",
+      "title": "Tag edge cases",
+      "description": "Empty tag, 500-character tag, and a numeric-looking tag.",
+      "priority": "low",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["", "42", "this-tag-is-deliberately-long"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "pomodoro-bounds-low",
+      "title": "Negative pomodoro estimate",
+      "description": "estimated_pomodoros is negative. The API stores it verbatim; verify nothing downstream divides by it.",
+      "priority": "low",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["pomodoro", "bounds"],
+      "estimated_pomodoros": -5
+    },
+    {
+      "key": "pomodoro-bounds-zero",
+      "title": "Zero pomodoro estimate",
+      "description": "estimated_pomodoros is zero.",
+      "priority": "low",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["pomodoro", "bounds"],
+      "estimated_pomodoros": 0
+    },
+    {
+      "key": "pomodoro-bounds-high",
+      "title": "Very large pomodoro estimate",
+      "description": "estimated_pomodoros is large to probe integer handling and any progress-bar math.",
+      "priority": "low",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["pomodoro", "bounds"],
+      "estimated_pomodoros": 99999
+    },
+    {
+      "key": "whitespace-trimmed",
+      "title": "   Whitespace that the API must trim   ",
+      "description": "POST trims title and description. The stored row must not keep the surrounding spaces.",
+      "priority": "medium",
+      "due_date": null,
+      "list_id": "list-chaos",
+      "tags": ["trimming"],
+      "estimated_pomodoros": 1
+    },
+    {
+      "key": "deletable-list-member",
+      "title": "Lives in the deletable list",
+      "description": "Deleting list-deletable must reassign this todo to 'inbox', not delete it.",
+      "priority": "medium",
+      "due_date": null,
+      "list_id": "list-deletable",
+      "tags": ["lists"],
+      "estimated_pomodoros": 1
+    }
+  ],
+  "negativeCases": [
+    {
+      "key": "reject-whitespace-title",
+      "payload": { "title": "   " },
+      "expectStatus": 400,
+      "reason": "A whitespace-only title must be rejected with 400, not stored as an empty row."
+    },
+    {
+      "key": "reject-missing-title",
+      "payload": { "description": "no title at all" },
+      "expectStatus": 400,
+      "reason": "A todo with no title field must be rejected with 400."
+    }
+  ],
+  "expectations": {
+    "sortOrder": "is_pinned DESC, due_date ASC, created_at DESC",
+    "nullDatesSortFirst": "SQLite sorts NULL ascending before real dates, so null-due-date appears before dated items among unpinned todos.",
+    "trimming": "whitespace-trimmed must be stored without surrounding spaces.",
+    "injectionSurvives": "After seeding, GET /api/todos must return all rows and the sql-probe todo must still exist — proving the DROP was treated as data.",
+    "listDeletionReassigns": "Deleting list-deletable must move deletable-list-member to list_id 'inbox'.",
+    "pinnedBeatsDates": "pinned-tie-1 and pinned-tie-2 must sort ahead of every unpinned todo regardless of due_date."
+  }
+}

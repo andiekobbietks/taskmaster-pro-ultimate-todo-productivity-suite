@@ -2,6 +2,13 @@
   "name": "taskmaster-pro",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "npx wrangler dev",
+    "deploy": "npx wrangler deploy",
+    "seed": "node scripts/seed.mjs",
+    "seed:validate": "node scripts/validate-seed.mjs",
+    "docs:readiness": "node docs/scripts/readiness.mjs"
+  },
   "dependencies": {
     "hono": "^4.6.0"
   }

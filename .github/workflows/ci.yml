@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Worker bundles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # A dry-run deploy bundles the Worker exactly as `wrangler deploy` would,
+      # but uploads nothing and needs no credentials. It fails on a broken
+      # import, a bad wrangler.json, or an asset path that no longer exists.
+      - name: Bundle the Worker (dry run)
+        run: npx --yes wrangler@4 deploy --dry-run --outdir dist
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-bundle
+          path: dist/
+          retention-days: 7
+
+  docs:
+    name: Docs match the code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # docs/READINESS.md and docs/readiness.json are generated from the feature,
+      # architecture, and SBOM inventories. This job re-derives them and fails if
+      # the committed copies drifted, so a claim about readiness can never
+      # silently disagree with the code.
+      #
+      # docs/readiness.json embeds a wall-clock "generated" timestamp, so it is
+      # compared with that single volatile line stripped; every other file under
+      # docs/ must match byte for byte.
+      - name: Regenerate the maturity checklist
+        run: node docs/scripts/readiness.mjs
+
+      - name: Fail if generated docs drifted
+        run: |
+          if ! git diff --exit-code -- docs/ ':!docs/readiness.json'; then
+            echo "::error::docs/ is out of date. Run 'node docs/scripts/readiness.mjs' and commit the result."
+            git --no-pager diff -- docs/
+            exit 1
+          fi
+
+          git show HEAD:docs/readiness.json | grep -v '"generated"' > /tmp/committed.json
+          grep -v '"generated"' docs/readiness.json > /tmp/regenerated.json
+          if ! diff -u /tmp/committed.json /tmp/regenerated.json; then
+            echo "::error::docs/readiness.json drifted beyond its timestamp. Regenerate and commit."
+            exit 1
+          fi
+
+  seed:
+    name: Seed fixtures are valid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Guards the fixtures the QA/chaos seeder depends on, so a malformed
+      # fixture is caught here instead of during someone's test session.
+      - name: Validate seed fixtures
+        run: node scripts/validate-seed.mjs

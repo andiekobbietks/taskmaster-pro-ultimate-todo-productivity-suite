@@ -6,6 +6,11 @@
 ![Hono](https://img.shields.io/badge/Hono-4.6-000000?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-ESM-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![SQLite](https://img.shields.io/badge/Storage-SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)
+[![CI](https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/actions/workflows/ci.yml/badge.svg)](https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite?sort=semver)](https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-16A34A?style=flat-square)](LICENSE)
+
+**Stage: Alpha** — the honest maturity answer, derived from the code rather than asserted, lives in [`docs/READINESS.md`](docs/READINESS.md).
 
 ## ✨ Features
 
@@ -16,25 +21,43 @@
 - **Due dates** — tasks sort by due date ahead of creation date
 - **Search** — full-text search across titles and descriptions
 - **Stats dashboard** — aggregated productivity stats at a glance
+- **Pomodoro tracking** — estimated and completed pomodoro counts per task
 
 ## 🗂 Project Structure
 
 ```
 .
+├── .github/workflows/
+│   ├── ci.yml            # Bundle check, docs-sync gate, seed validation
+│   └── release.yml       # Tag -> GitHub Release, notes pulled from CHANGELOG.md
+├── docs/                 # Self-describing, mostly GENERATED docs (see below)
+│   ├── scripts/readiness.mjs
+│   ├── READINESS.md      # Generated maturity checklist
+│   ├── features.json     # Feature inventory (source of truth)
+│   ├── architecture.json # Component inventory
+│   └── sbom.cyclonedx.json
 ├── public/
-│   ├── index.html      # Front-end SPA (served as static assets)
+│   ├── index.html        # Front-end SPA (served as static assets)
 │   └── style.css
+├── scripts/
+│   ├── seed.mjs          # Load QA/chaos fixtures into a running instance
+│   ├── validate-seed.mjs # Guard the fixtures (runs in CI)
+│   └── extract-changelog.mjs
+├── seed/
+│   └── chaos-fixtures.json
 ├── src/
-│   └── index.ts        # Durable Object + Hono REST API
+│   └── index.ts          # Durable Object + Hono REST API
+├── CHANGELOG.md
+├── SECURITY.md
 ├── package.json
-└── wrangler.json       # Cloudflare Workers configuration
+└── wrangler.json         # Cloudflare Workers configuration
 ```
 
 ## 🚀 Run Locally
 
 ```bash
 npm install
-npx wrangler dev
+npm run dev          # npx wrangler dev
 ```
 
 Wrangler serves the static assets from `public/` and runs the Durable Object API in-process.
@@ -51,17 +74,87 @@ All routes are handled inside the `App` Durable Object.
 | DELETE | `/api/todos/:id`       | Delete a todo                                  |
 | GET    | `/api/lists`           | List all lists                                 |
 | POST   | `/api/lists`           | Create a list                                  |
-| DELETE | `/api/lists/:id`       | Delete a list                                  |
+| DELETE | `/api/lists/:id`       | Delete a list (todos are reassigned to `inbox`)|
 | GET    | `/api/stats`           | Aggregated stats                               |
 
 Todos are returned sorted by `is_pinned DESC, due_date ASC, created_at DESC`.
 
-## ☁️ Deploy
+## ✅ Quality gates (CI)
+
+Every push to `main` and every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+| Job | What it proves |
+| --- | -------------- |
+| **Worker bundles** | `wrangler deploy --dry-run` bundles the Worker exactly as a real deploy would. Fails on a broken import, a bad `wrangler.json`, or a missing asset path. Needs no credentials and uploads nothing. |
+| **Docs match the code** | Regenerates `docs/READINESS.md` and `docs/readiness.json` from the inventories and fails if the committed copies drifted, so a readiness claim can never silently disagree with the code. |
+| **Seed fixtures are valid** | Validates `seed/chaos-fixtures.json` so a malformed fixture is caught before a test session, not during one. |
+
+> Continuous *delivery* (auto-deploy on merge) is deliberately not enabled: it needs a `CLOUDFLARE_API_TOKEN` repository secret. Add that secret and a deploy job is a few lines — see [`wrangler.json`](wrangler.json) and `npm run deploy`.
+
+## 🏷 Releases
+
+A release is a git tag. The tag drives everything:
 
 ```bash
-npx wrangler deploy
+# 1. Write the section in CHANGELOG.md (this is the single source of truth)
+# 2. Commit, then tag and push:
+git tag v1.1.0
+git push origin v1.1.0
 ```
+
+Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which extracts that version's section from `CHANGELOG.md` into the release notes and publishes the GitHub Release. Tagging a version that has no changelog section **fails loudly** rather than shipping empty notes.
+
+Releases are listed at [Releases](https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/releases).
+
+## 🔒 Security
+
+Read [`SECURITY.md`](SECURITY.md) first — it states plainly that **there is no authentication**, so a deployed instance must be treated as public and untrusted.
+
+- Report vulnerabilities privately via the **Security** tab → **Report a vulnerability**. Do not file public issues for security reports.
+- A machine-readable dependency inventory is at [`docs/sbom.cyclonedx.json`](docs/sbom.cyclonedx.json).
+- The runtime dependency surface is a single package: `hono`.
+
+## 🧪 Seed data for QA & chaos testing
+
+`seed/chaos-fixtures.json` is deterministic edge-case data — the payloads that tend to break a todo app — plus the assertions you should check afterwards.
+
+```bash
+npm run dev                 # in one terminal
+npm run seed                # in another, targets http://localhost:8787
+npm run seed -- --dry-run   # print the plan without touching anything
+npm run seed -- --api https://your-instance.example
+```
+
+What it covers: unicode/emoji/bidi text, oversized titles and descriptions, XSS and SQL-injection probes (stored as data, never executed), quotes and backslashes, past/today/far-future/null due dates, duplicate titles, pinned-vs-unpinned sort ties, every priority level, empty/long/numeric tags, and negative/zero/huge pomodoro estimates. It also sends two requests that **must be rejected** (a whitespace-only title and a missing title), turning the seeder into a smoke test.
+
+Two behaviours worth knowing, both documented in the fixture file:
+
+- `NULL` due dates sort **first** under SQLite's `ASC`, before real dates — that is current behaviour, not a bug to "fix" quietly.
+- The API assigns `created_at` at insert time, so later-seeded rows sort **earlier** when everything else ties.
+
+Run `npm run seed:validate` to check the fixtures without a running instance.
+
+## 📚 Self-describing docs
+
+`docs/` is mostly **generated**, which is the point: the descriptions are derived from the code instead of drifting away from it.
+
+- [`docs/READINESS.md`](docs/READINESS.md) — a maturity checklist that ticks itself, per stage (Alpha → Beta → GA → Enterprise) and per target customer.
+- `docs/features.json` / `docs/architecture.json` — the inventories that drive it.
+- `docs/sbom.cyclonedx.json` — the dependency bill of materials.
+- [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) — how to change things.
+
+After editing an inventory, run `npm run docs:readiness` and commit the result — CI enforces this.
+
+## 🔗 Connecting this repo to GitHub (and disconnecting)
+
+You are already reading this on GitHub, so the repository is the source of truth. If you later connect this project to a builder platform (bolt.new, Lovable, and similar), the contract those platforms use is:
+
+- **Connect** — authorize the platform's GitHub app, then either create a new repository or link this one. Sync is **two-way on the default branch** (`main`).
+- **Disconnect** — sync stops and **nothing is deleted**: this repository stays on GitHub with its full history, and your project continues to live wherever it was. Reconnecting generally **creates a new repository** rather than resuming the old link.
+- **Gotchas** — one Git provider per project at a time; renaming or moving the repository can break sync permanently.
+
+Because this repository already holds the history, the safe move is always: keep the GitHub repo, disconnect the platform, and pull.
 
 ## 📄 License
 
-MIT
+MIT — see [`LICENSE`](LICENSE).

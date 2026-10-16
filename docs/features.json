@@ -1,0 +1,445 @@
+{
+  "schema": "feature-inventory/1.0",
+  "project": "taskmaster-pro",
+  "version": "0.1.0-alpha",
+  "generated": "2026-10-16",
+  "verification": "Every status below was read from src/index.ts (312 lines) and public/index.html (821 lines). Line references are exact.",
+  "statusVocabulary": {
+    "implemented": "Backend route exists AND frontend calls it AND UI renders it",
+    "partial": "Works but with a known correctness or UX gap",
+    "stub": "Code path exists but is unreachable, dead, or non-functional",
+    "planned": "Referenced in comments/placeholder text only; no code"
+  },
+  "features": [
+    {
+      "id": "FEAT-001",
+      "name": "Create task",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "POST /api/todos",
+      "frontend": "handleCreateTodo() -> fetch('./api/todos')",
+      "evidence": "src/index.ts:58-99, public/index.html:171-207",
+      "dependsOn": ["COMP-002", "COMP-003", "COMP-004"],
+      "gaps": [],
+      "notes": "Title validated non-empty server-side. Returns 201 with full row."
+    },
+    {
+      "id": "FEAT-002",
+      "name": "List tasks with filters",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET /api/todos (status, priority, listId, search)",
+      "frontend": "fetchTodos() builds query string from filter state",
+      "evidence": "src/index.ts:12-56, public/index.html:120-143",
+      "dependsOn": ["COMP-002", "COMP-004"],
+      "gaps": [],
+      "notes": "Sorted by is_pinned DESC, due_date ASC, created_at DESC. Parameterised SQL throughout."
+    },
+    {
+      "id": "FEAT-003",
+      "name": "Update task (partial)",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "PATCH /api/todos/:id",
+      "frontend": "toggleComplete, togglePin, incrementPomodoro",
+      "evidence": "src/index.ts:101-168, public/index.html:209-258",
+      "dependsOn": ["COMP-002", "COMP-004"],
+      "gaps": ["No general-purpose edit UI - only 3 of the 8 supported fields are reachable from the frontend"],
+      "notes": "Dynamic SET clause built from present keys only; column names are hardcoded, so no injection."
+    },
+    {
+      "id": "FEAT-004",
+      "name": "Delete task",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "DELETE /api/todos/:id",
+      "frontend": "deleteTodo()",
+      "evidence": "src/index.ts:170-174, public/index.html:236-244",
+      "dependsOn": ["COMP-002", "COMP-004"],
+      "gaps": [
+        "Returns {success:true} even when no row matched - client cannot distinguish delete of missing item",
+        "No confirmation dialog before destructive delete"
+      ],
+      "notes": "Fix: return 404 when changes === 0."
+    },
+    {
+      "id": "FEAT-005",
+      "name": "Toggle complete + completed_at tracking",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "PATCH sets completed_at on rising edge, NULLs on falling edge",
+      "frontend": "toggleComplete()",
+      "evidence": "src/index.ts:121-130, public/index.html:209-221",
+      "dependsOn": ["COMP-004"],
+      "gaps": [],
+      "notes": "Edge detection via comparison against existing.completed. Correct."
+    },
+    {
+      "id": "FEAT-006",
+      "name": "Pin task to top",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "PATCH is_pinned; ORDER BY is_pinned DESC",
+      "frontend": "togglePin()",
+      "evidence": "src/index.ts:147-150, public/index.html:223-234",
+      "dependsOn": ["COMP-004"],
+      "gaps": [],
+      "notes": ""
+    },
+    {
+      "id": "FEAT-007",
+      "name": "Priority levels (urgent/high/medium/low)",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "priority column, GET filter",
+      "frontend": "getPriorityBadge(), priorityFilter select",
+      "evidence": "src/index.ts:28-31, public/index.html:285-292, 509-519",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "Priority is free-text in POST/PATCH - no server-side enum validation, so an invalid value is storable and renders as 'Low'"
+      ],
+      "notes": "4 levels rendered with distinct colour badges."
+    },
+    {
+      "id": "FEAT-008",
+      "name": "Due dates",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "due_date column, due_date ASC ordering, dueToday stat",
+      "frontend": "newDueDate input, due badge display, client-side 'today' filter",
+      "evidence": "src/index.ts:135-138, 212-213, public/index.html:134-137, 581-586",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "'today' filter runs client-side after fetching ALL todos - does not scale, and disagrees with the server-side dueToday count",
+        "No overdue indication; a past-due task looks identical to a future one",
+        "due_date stored as TEXT with no format validation"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "FEAT-009",
+      "name": "Tags on tasks",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "tags TEXT column, JSON-serialised array",
+      "frontend": "newTagsStr comma-split, tag badges on card",
+      "evidence": "src/index.ts:52, 75, 143-146, public/index.html:175-178, 597-602",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "Tags stored as a JSON string in a TEXT column - not normalised, not indexable, cannot be queried relationally"
+      ],
+      "notes": "Normalised lower-cased on create."
+    },
+    {
+      "id": "FEAT-010",
+      "name": "Filter by tag",
+      "status": "stub",
+      "maturity": "phantom-feature",
+      "backend": "tag query param READ at src/index.ts:16 but NEVER added to the SQL query",
+      "frontend": "no UI control exists",
+      "evidence": "src/index.ts:16 (declared), absent from query builder lines 19-43",
+      "dependsOn": [],
+      "gaps": [
+        "CRITICAL: accepting ?tag=x silently returns unfiltered results - the API lies to its caller",
+        "No frontend surface at all"
+      ],
+      "notes": "Either implement in the query builder or remove the param read. Silently ignoring it is the worst option."
+    },
+    {
+      "id": "FEAT-011",
+      "name": "Lists / projects",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "GET/POST/DELETE /api/lists",
+      "frontend": "sidebar list nav, createList() modal",
+      "evidence": "src/index.ts:177-203, public/index.html:260-277, 445-459, 756-813",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "No rename or edit of an existing list (create + delete only)",
+        "No reordering despite sort_order column existing",
+        "id generated via slug + 4 random chars - collision-prone and not user-controllable"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "FEAT-012",
+      "name": "Delete list reassigns its tasks",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "UPDATE todos SET list_id='inbox' WHERE list_id=:id",
+      "frontend": "n/a (server-side cascade)",
+      "evidence": "src/index.ts:195-203",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "Guard checks id==='default' but no list with id 'default' is ever created - the check for 'inbox' is the only one that can ever fire"
+      ],
+      "notes": "Prevents orphaned tasks. Good instinct."
+    },
+    {
+      "id": "FEAT-013",
+      "name": "Search title + description",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "GET ?search= LIKE '%term%' on title OR description",
+      "frontend": "searchQuery state, encodeURIComponent applied",
+      "evidence": "src/index.ts:38-41, public/index.html:307-316",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "LIKE wildcards (% and _) in user input are NOT escaped - a search for '100%' matches everything containing '100'",
+        "No debounce - fires a request per keystroke",
+        "No index; full table scan per keystroke"
+      ],
+      "notes": "Parameterised so no SQL injection, but wildcard semantics are unescaped."
+    },
+    {
+      "id": "FEAT-014",
+      "name": "Stats & analytics",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET /api/stats",
+      "frontend": "sidebar counters + productivity widget",
+      "evidence": "src/index.ts:206-226, public/index.html:463-484",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "Six separate COUNT(*) scans of the whole table on every stats fetch",
+        "No time-series/history - only an instantaneous snapshot"
+      ],
+      "notes": "total, completed, active, highPriority, dueToday, pomodoros."
+    },
+    {
+      "id": "FEAT-015",
+      "name": "Pomodoro timer",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "none (pure client state)",
+      "frontend": "timerSeconds/timerMode/timerActive, setInterval countdown",
+      "evidence": "public/index.html:86-118, 318-335",
+      "dependsOn": [],
+      "gaps": [
+        "Timer state is NOT persisted - refresh or tab close loses the running session entirely",
+        "Uses alert() for completion - blocks the main thread and looks unfinished",
+        "Not tied to visibility; keeps ticking in a backgrounded tab with no notification",
+        "Work/break lengths hardcoded at 25/5 with no configuration"
+      ],
+      "notes": "Counts down, auto-switches to alert on zero, increments pomodoro_count on work completion."
+    },
+    {
+      "id": "FEAT-016",
+      "name": "Pomodoro count per task",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "PATCH pomodoro_count",
+      "frontend": "incrementPomodoro() called from timer completion",
+      "evidence": "src/index.ts:151-154, public/index.html:246-258",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "Read-modify-write from the client ((todo.pomodoro_count||0)+1) - two concurrent timers silently lose an increment"
+      ],
+      "notes": "Should be a server-side atomic increment."
+    },
+    {
+      "id": "FEAT-017",
+      "name": "Estimated pomodoros",
+      "status": "stub",
+      "maturity": "phantom-feature",
+      "backend": "estimated_pomodoros column + POST field",
+      "frontend": "newPomodoros state declared (line 78) but NO input field renders it",
+      "evidence": "src/index.ts:67, 86, 254; public/index.html:78 (state) - absent from the form at lines 658-750",
+      "dependsOn": [],
+      "gaps": [
+        "UI control does not exist - value is always the default 1",
+        "Column exists and is written on every create, carrying dead data"
+      ],
+      "notes": "Add the form field or drop the column."
+    },
+    {
+      "id": "FEAT-018",
+      "name": "View tabs (All / Today / Active / Completed)",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "status query param",
+      "frontend": "sidebar Overview buttons with live counts",
+      "evidence": "public/index.html:363-427",
+      "dependsOn": ["FEAT-002", "FEAT-014"],
+      "gaps": [],
+      "notes": "Counts sourced from /api/stats, not from the filtered fetch."
+    },
+    {
+      "id": "FEAT-019",
+      "name": "'Upcoming' view",
+      "status": "planned",
+      "maturity": "not-started",
+      "backend": "none",
+      "frontend": "mentioned in comments only",
+      "evidence": "public/index.html:66 (state comment), 497 (title ternary) - no setActiveTab('upcoming') call exists anywhere",
+      "dependsOn": [],
+      "gaps": [
+        "Header ternary renders a title for a view the user can never reach"
+      ],
+      "notes": "Dead code path."
+    },
+    {
+      "id": "FEAT-020",
+      "name": "Dark mode",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "none",
+      "frontend": "darkMode state toggles .dark on documentElement",
+      "evidence": "public/index.html:93-101, 338-344",
+      "dependsOn": ["COMP-009"],
+      "gaps": [
+        "Preference NOT persisted - resets to light on every reload",
+        "Does not read prefers-color-scheme, so system-dark users get a light flash"
+      ],
+      "notes": "Tailwind darkMode:'class' configured correctly."
+    },
+    {
+      "id": "FEAT-021",
+      "name": "Create list with colour",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "POST /api/lists",
+      "frontend": "createList() + 6-colour picker",
+      "evidence": "src/index.ts:182-193, public/index.html:766-810",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "icon param accepted server-side, never selectable or rendered"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "FEAT-022",
+      "name": "Seeded demo data",
+      "status": "implemented",
+      "maturity": "needs-fix",
+      "backend": "seedDefaults() - 4 lists, 4 tasks on first run",
+      "frontend": "n/a",
+      "evidence": "src/index.ts:262-307",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "No opt-out; every new deployment is polluted with 4 fake tasks and 3 fake lists",
+        "Runs in the constructor - re-checked per DO instantiation"
+      ],
+      "notes": "Acceptable for demo, disqualifying for beta testers who want a clean slate."
+    },
+    {
+      "id": "FEAT-023",
+      "name": "Empty states",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "n/a",
+      "frontend": "No tasks found card with CTA",
+      "evidence": "public/index.html:533-549",
+      "dependsOn": [],
+      "gaps": [],
+      "notes": "Good UX touch - has icon, copy, and a call to action."
+    },
+    {
+      "id": "FEAT-024",
+      "name": "Responsive layout",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "n/a",
+      "frontend": "sm:/md:/lg: breakpoints throughout",
+      "evidence": "public/index.html:307 (search hidden sm:block), 350 (sidebar hidden lg:flex), 319 (timer hidden md:flex)",
+      "dependsOn": [],
+      "gaps": [
+        "CRITICAL: sidebar is hidden below lg with NO drawer, menu button, or alternative nav - on mobile you cannot switch lists or views at all",
+        "Menu icon is imported (line 58) but never rendered - the affordance was intended and never built"
+      ],
+      "notes": "Effectively desktop-only despite responsive styling."
+    },
+    {
+      "id": "FEAT-025",
+      "name": "Error handling / user feedback",
+      "status": "stub",
+      "maturity": "phantom-feature",
+      "backend": "returns 400/404 JSON errors",
+      "frontend": "every catch block only calls console.error",
+      "evidence": "public/index.html:140-142, 204-206, 218-220, 242-243, 256-257, 274-276",
+      "dependsOn": [],
+      "gaps": [
+        "CRITICAL: a failed request leaves the UI silently stale - no toast, no retry, no visible failure",
+        "Server error responses (400/404) are never surfaced to the user"
+      ],
+      "notes": "The single biggest beta blocker after auth."
+    },
+    {
+      "id": "FEAT-026",
+      "name": "⌘K keyboard shortcut",
+      "status": "planned",
+      "maturity": "not-started",
+      "backend": "none",
+      "frontend": "advertised in search placeholder text only",
+      "evidence": "public/index.html:311 (placeholder string) - no keydown listener exists",
+      "dependsOn": [],
+      "gaps": [
+        "UI promises a shortcut that does not exist"
+      ],
+      "notes": "Either wire a keydown handler or remove the hint."
+    },
+    {
+      "id": "FEAT-027",
+      "name": "Authentication / access control",
+      "status": "planned",
+      "maturity": "not-started",
+      "backend": "none - no auth, no tokens, no session",
+      "frontend": "none",
+      "evidence": "grep for auth|bearer|token|session|cookie across repo returns only the word 'session' in an alert() string",
+      "dependsOn": [],
+      "gaps": [
+        "BLOCKER: any holder of the URL has full read/write access to all data"
+      ],
+      "notes": "Beta cannot ship without this unless access is gated at the Cloudflare layer."
+    },
+    {
+      "id": "FEAT-028",
+      "name": "Data export",
+      "status": "planned",
+      "maturity": "not-started",
+      "backend": "none",
+      "frontend": "none",
+      "evidence": "absent",
+      "dependsOn": [],
+      "gaps": [
+        "Testers have no way to extract their data; user-owned-data expectation unmet for beta"
+      ],
+      "notes": "A single GET /api/export returning JSON would suffice."
+    },
+    {
+      "id": "FEAT-029",
+      "name": "Automated tests",
+      "status": "planned",
+      "maturity": "not-started",
+      "backend": "none",
+      "frontend": "none",
+      "evidence": "glob for *test*/*spec* across repo returns no files",
+      "dependsOn": [],
+      "gaps": [
+        "BLOCKER: no regression safety net; every change is unverified"
+      ],
+      "notes": "vitest + Workers pool is the platform-native choice."
+    },
+    {
+      "id": "FEAT-030",
+      "name": "CI/CD pipeline",
+      "status": "planned",
+      "maturity": "not-started",
+      "backend": "none",
+      "frontend": "none",
+      "evidence": "no .github/ directory, no workflow files",
+      "dependsOn": ["FEAT-029"],
+      "gaps": [
+        "No typecheck, no test gate, no automated deploy"
+      ],
+      "notes": ""
+    }
+  ],
+  "summary": {
+    "total": 30,
+    "byStatus": { "implemented": 9, "partial": 11, "stub": 3, "planned": 7 },
+    "phantomFeatures": ["FEAT-010", "FEAT-017", "FEAT-025", "FEAT-026"],
+    "betaBlockers": ["FEAT-027", "FEAT-025", "FEAT-029", "FEAT-024", "FEAT-010"],
+    "assessment": "The product is beta-shaped; the engineering is alpha. 20 of 30 features are usable today, but 4 are phantoms that appear to work and do not, which is worse than absent."
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-16T00:00:00Z",
+    "component": {
+      "type": "application",
+      "name": "taskmaster-pro",
+      "version": "0.1.0-alpha",
+      "description": "Ultimate todo & productivity suite built on Cloudflare Workers, Hono and SQLite Durable Objects."
+    },
+    "tools": [{ "vendor": "manual", "name": "hand-verified inventory", "version": "1.0" }],
+    "properties": [
+      { "name": "release-stage", "value": "alpha" },
+      { "name": "sbom-scope", "value": "runtime + build-time + browser runtime dependencies" }
+    ]
+  },
+  "components": [
+    {
+      "bom-ref": "DEP-001",
+      "type": "library",
+      "name": "hono",
+      "version": "4.6.0",
+      "purl": "pkg:npm/hono@4.6.0",
+      "scope": "required",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "supplier": { "name": "npm registry" },
+      "delivery": "npm (bundled at build time by @cloudflare/worker-bundler)",
+      "integrity": "pinned in package.json, resolved by lockfile",
+      "properties": [
+        { "name": "dep-id", "value": "DEP-001" },
+        { "name": "role", "value": "HTTP router / server framework" },
+        { "name": "used-by", "value": "COMP-003" },
+        { "name": "risk", "value": "low" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-002",
+      "type": "library",
+      "name": "react",
+      "version": "18.3.1",
+      "purl": "pkg:npm/react@18.3.1",
+      "scope": "required",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "supplier": { "name": "esm.sh CDN" },
+      "delivery": "CDN (importmap, ?external=react,react-dom)",
+      "integrity": "NO - version pinned but no SRI hash",
+      "externalReferences": [{ "type": "distribution", "url": "https://esm.sh/react@18.3.1" }],
+      "properties": [
+        { "name": "dep-id", "value": "DEP-002" },
+        { "name": "role", "value": "UI rendering library" },
+        { "name": "used-by", "value": "COMP-007" },
+        { "name": "risk", "value": "medium - CDN single point of failure, no SRI" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-003",
+      "type": "library",
+      "name": "react-dom",
+      "version": "18.3.1",
+      "purl": "pkg:npm/react-dom@18.3.1",
+      "scope": "required",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "supplier": { "name": "esm.sh CDN" },
+      "delivery": "CDN (importmap, ?external=react,react-dom)",
+      "integrity": "NO - version pinned but no SRI hash",
+      "externalReferences": [{ "type": "distribution", "url": "https://esm.sh/react-dom@18.3.1" }],
+      "properties": [
+        { "name": "dep-id", "value": "DEP-003" },
+        { "name": "role", "value": "DOM renderer" },
+        { "name": "used-by", "value": "COMP-007" },
+        { "name": "risk", "value": "medium" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-004",
+      "type": "library",
+      "name": "react/jsx-runtime",
+      "version": "18.3.1",
+      "purl": "pkg:npm/react@18.3.1",
+      "scope": "required",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "supplier": { "name": "esm.sh CDN" },
+      "delivery": "CDN (importmap, required by automatic JSX runtime)",
+      "integrity": "NO - no SRI hash",
+      "properties": [
+        { "name": "dep-id", "value": "DEP-004" },
+        { "name": "role", "value": "automatic JSX runtime (emitted by Babel)" },
+        { "name": "used-by", "value": "COMP-007, COMP-008" },
+        { "name": "risk", "value": "medium" },
+        { "name": "note", "value": "Correctly mapped in importmap - omission here is the classic cause of blank-page React apps" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-005",
+      "type": "library",
+      "name": "lucide-react",
+      "version": "0.400.0",
+      "purl": "pkg:npm/lucide-react@0.400.0",
+      "scope": "required",
+      "licenses": [{ "license": { "id": "ISC" } }],
+      "supplier": { "name": "esm.sh CDN" },
+      "delivery": "CDN (importmap, ?external=react,react-dom)",
+      "integrity": "NO - no SRI hash",
+      "externalReferences": [{ "type": "distribution", "url": "https://esm.sh/lucide-react@0.400.0" }],
+      "properties": [
+        { "name": "dep-id", "value": "DEP-005" },
+        { "name": "role", "value": "icon set (24 icons imported)" },
+        { "name": "used-by", "value": "COMP-007" },
+        { "name": "risk", "value": "medium" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-006",
+      "type": "library",
+      "name": "@babel/standalone",
+      "version": "UNPINNED",
+      "purl": "pkg:npm/@babel/standalone",
+      "scope": "required",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "supplier": { "name": "unpkg CDN" },
+      "delivery": "CDN (script tag, no version suffix)",
+      "integrity": "NO - version NOT pinned, no SRI",
+      "externalReferences": [{ "type": "distribution", "url": "https://unpkg.com/@babel/standalone/babel.min.js" }],
+      "properties": [
+        { "name": "dep-id", "value": "DEP-006" },
+        { "name": "role", "value": "in-browser JSX transpilation" },
+        { "name": "used-by", "value": "COMP-008" },
+        { "name": "risk", "value": "HIGH - unpinned. Whatever unpkg serves as 'latest' is executed with full page privilege." },
+        { "name": "remediation", "value": "Pin exact version + SRI hash, or remove by pre-compiling JSX" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-007",
+      "type": "library",
+      "name": "tailwindcss (Play CDN)",
+      "version": "UNPINNED",
+      "purl": "pkg:npm/tailwindcss",
+      "scope": "required",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "supplier": { "name": "cdn.tailwindcss.com" },
+      "delivery": "CDN (script tag, no version suffix)",
+      "integrity": "NO - version NOT pinned, no SRI",
+      "externalReferences": [{ "type": "distribution", "url": "https://cdn.tailwindcss.com" }],
+      "properties": [
+        { "name": "dep-id", "value": "DEP-007" },
+        { "name": "role", "value": "utility CSS framework (runtime JIT in browser)" },
+        { "name": "used-by", "value": "COMP-009" },
+        { "name": "risk", "value": "HIGH - unpinned, and the vendor marks this CDN as not-for-production" },
+        { "name": "remediation", "value": "Compile Tailwind to a static stylesheet at build time" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-008",
+      "type": "font",
+      "name": "Inter",
+      "version": "variable (wght 400-700)",
+      "scope": "optional",
+      "licenses": [{ "license": { "id": "OFL-1.1" } }],
+      "supplier": { "name": "Google Fonts" },
+      "delivery": "CDN (fonts.googleapis.com stylesheet)",
+      "integrity": "NO",
+      "properties": [
+        { "name": "dep-id", "value": "DEP-008" },
+        { "name": "role", "value": "sans-serif UI typeface" },
+        { "name": "used-by", "value": "COMP-012" },
+        { "name": "risk", "value": "low - but loads external CSS; also blocked in EU/GDPR contexts by default" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-009",
+      "type": "font",
+      "name": "JetBrains Mono",
+      "version": "variable (wght 400-500)",
+      "scope": "optional",
+      "licenses": [{ "license": { "id": "OFL-1.1" } }],
+      "supplier": { "name": "Google Fonts" },
+      "delivery": "CDN (fonts.googleapis.com stylesheet)",
+      "integrity": "NO",
+      "properties": [
+        { "name": "dep-id", "value": "DEP-009" },
+        { "name": "role", "value": "monospace typeface (timer, counters)" },
+        { "name": "used-by", "value": "COMP-012" },
+        { "name": "risk", "value": "low" }
+      ]
+    },
+    {
+      "bom-ref": "DEP-010",
+      "type": "platform",
+      "name": "cloudflare:workers",
+      "version": "platform-runtime",
+      "scope": "required",
+      "licenses": [{ "name": "Proprietary (Cloudflare ToS)" }],
+      "supplier": { "name": "Cloudflare" },
+      "delivery": "platform-provided ESM external, resolved at runtime",
+      "properties": [
+        { "name": "dep-id", "value": "DEP-010" },
+        { "name": "role", "value": "DurableObject base class, runtime primitives" },
+        { "name": "used-by", "value": "COMP-001, COMP-002" },
+        { "name": "risk", "value": "low - always external, never bundled" },
+        { "name": "note", "value": "Not a package; listed for completeness. Cannot be added to package.json per platform rules." }
+      ]
+    }
+  ],
+  "dependencies": [
+    { "ref": "DEP-001", "dependsOn": [] },
+    { "ref": "DEP-002", "dependsOn": ["DEP-004"] },
+    { "ref": "DEP-003", "dependsOn": ["DEP-002"] },
+    { "ref": "DEP-004", "dependsOn": ["DEP-002", "DEP-003"] },
+    { "ref": "DEP-005", "dependsOn": ["DEP-002", "DEP-003"] },
+    { "ref": "DEP-006", "dependsOn": ["DEP-004"] },
+    { "ref": "DEP-007", "dependsOn": [] },
+    { "ref": "DEP-008", "dependsOn": [] },
+    { "ref": "DEP-009", "dependsOn": [] },
+    { "ref": "DEP-010", "dependsOn": [] }
+  ],
+  "vulnerabilities": [],
+  "summary": {
+    "totalDependencies": 10,
+    "npmBundled": 1,
+    "cdnLoaded": 8,
+    "platformProvided": 1,
+    "unpinned": 2,
+    "withSRI": 0,
+    "note": "8 of 10 dependencies are fetched at page load from third-party CDNs with no Subresource Integrity. Two of those are not version-pinned at all (DEP-006, DEP-007) and are the highest-priority supply-chain items to fix before any external beta."
+  }
+}

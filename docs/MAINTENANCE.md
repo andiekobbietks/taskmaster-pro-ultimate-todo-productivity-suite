@@ -47,87 +47,52 @@ readiness: stage=Alpha gates 3/19 pass
 
 ## Updating a dependency
 
-This is the operation most likely to break the app silently, so it has a fixed procedure.
+Every dependency is now an npm package, and almost all of them are bundled ahead of time. A dependency change is therefore a **build** change, not a runtime change, which makes the failure modes different and cheaper to catch.
 
-**The trap this repo already fell into:** both third-party scripts were unpinned. The browser executed whatever the CDN served as "latest" at page load — with full page privilege and no integrity check. That is now fixed, and the fix is fragile in a specific way you must respect.
+**Procedure:**
 
-### Step 1 — pin to a version that exists *on that CDN*
+1. Update the pin in `package.json`, then `npm install`.
+2. Rebuild: `npm run build`. esbuild fails loudly on a broken import; the Tailwind CLI fails loudly on a class it cannot resolve.
+3. Check the bundle sizes moved in a direction you expect — `public/assets/app.js` and `public/assets/app.css`.
+4. Open the page and confirm it **renders**. A build that succeeds but renders nothing is possible, and React version skew (two React copies breaking `useContext`) is the usual cause.
+5. Update the `DEP-*` entry in `docs/sbom.cyclonedx.json`, then re-run `npm run docs:readiness` and commit the result.
 
-The npm registry and a CDN's available versions are **not the same list**. This is not theoretical — it happened while writing the current pins:
+### The trap this repo already fell into — and why it cannot repeat the same way
 
-- npm said `tailwindcss` latest **3.4.19**
-- `cdn.tailwindcss.com/3.4.19` returned **731 bytes** of `console.error("Unknown Tailwind version…")`
-- The real latest on that CDN was **3.4.17**
+Until 2026-10-17 the app loaded its front-end libraries from CDNs, and for a while both scripts were unpinned: the browser executed whatever the vendor served as "latest" at page load, with full page privilege and no integrity check. Pinning with SRI fixed that, but the fix was fragile in two ways this repo hit for real:
 
-Had that gone unnoticed, every page load would have silently lost all styling. **Always confirm the pinned URL returns the real file, not an error stub.**
+- **A CDN and npm do not carry the same versions.** npm listed `tailwindcss` 3.4.19; `cdn.tailwindcss.com/3.4.19` returned 731 bytes of `console.error("Unknown Tailwind version…")`. Pinning that URL would have silently killed every page's styling.
+- **An SRI hash must match the exact bytes served.** That requires `Accept-Encoding: identity`, and the URL, the `integrity` attribute and the explanatory comment have to be updated in one atomic edit.
 
-```powershell
-$r = Invoke-WebRequest -Uri 'https://cdn.tailwindcss.com/3.4.17' -UseBasicParsing
-Write-Output "bytes: $($r.Content.Length)"   # expect ~407000, not ~700
-```
-
-### Step 2 — compute a fresh SRI hash
-
-```powershell
-$r = Invoke-WebRequest -Uri '<pinned-url>' -UseBasicParsing -Headers @{ 'Accept-Encoding' = 'identity' }
-$bytes = if ($r.Content -is [string]) { [System.Text.Encoding]::UTF8.GetBytes($r.Content) } else { $r.Content }
-$sha = [System.Security.Cryptography.SHA384]::Create()
-'sha384-' + [Convert]::ToBase64String($sha.ComputeHash($bytes))
-```
-
-`Accept-Encoding: identity` matters — otherwise a compressed response yields a hash that matches the transfer encoding, not the file, and the browser rejects it.
-
-### Step 3 — update all three together
-
-1. The `src=` URL (version suffix)
-2. The `integrity=` attribute
-3. The comment above it explaining *why* that version
-
-Leaving a stale `integrity` against a new URL means the browser blocks the script and the app dies on load. That is the correct behaviour — it is the whole point — but it means your edit must be atomic.
-
-### Step 4 — verify in a browser
-
-Open the page with devtools → Network. Both scripts must show **200**, not blocked. Then confirm the app renders. An SRI failure is silent in the HTML but loud in the console.
+**The build step removed the entire class of problem**: there is no third-party script tag left to pin, hash or get wrong. If you ever reintroduce one, reintroduce it with SRI and record it in the SBOM — but prefer bundling it.
 
 ### Known remaining exposure
 
-These are pinned by version but carry **no SRI**, because importmap entries and Google Fonts stylesheets do not accept an `integrity` attribute the same way:
-
 | ID | Component | Exposure |
 |---|---|---|
-| `DEP-002`–`DEP-005` | react, react-dom, jsx-runtime, lucide-react (esm.sh) | Version-pinned; no integrity check |
-| `DEP-008`–`DEP-009` | Inter, JetBrains Mono (Google Fonts) | No version pin; privacy-filterable |
-
-The proper fix for the esm.sh entries is the same as the build-step item below: bundle them locally so they stop being third-party at runtime.
+| `DEP-008`, `DEP-009` | Inter, JetBrains Mono (Google Fonts) | No version pin and no integrity attribute — font stylesheets do not accept one. Carries no script privilege; the fix is self-hosting the woff2 files. |
 
 ---
 
-## The two structural fixes, in order
+## Structural fixes
 
-These are not on the daily loop. They are the projects that reduce your ongoing maintenance burden, and they must be done in this order.
+These are not on the daily loop. They are the projects that reduce your ongoing maintenance burden, and they build on each other in order.
 
-### 1. Add a build step (removes `COMP-008`, `COMP-009`)
+### 1. Build step — **DONE (2026-10-17)**
 
-Today the browser transpiles ~40KB of JSX with Babel **and** JITs the entire Tailwind stylesheet, on every single page load. This is why the unpinned CDNs were dangerous in the first place — a build step makes them unnecessary rather than merely pinned.
+Landed as `COMP-017`: `npm run build` runs esbuild (`src/app.jsx` → `public/assets/app.js`) and the Tailwind CLI (`src/tailwind.css` → `public/assets/app.css`). `npm run dev` and `npm run deploy` both run the build first, and CI asserts that both outputs exist before it will pass.
 
-Target state:
+What it bought:
 
-- **Babel** → replaced by an esbuild/Vite compile. `type="text/babel"` script becomes a compiled `app.js`.
-- **Tailwind Play CDN** → replaced by a compiled `styles.css` containing only the utilities actually used. The Play CDN is explicitly vendor-marked as not-for-production.
-- **esm.sh imports** → bundled into the output, no longer third-party at runtime.
+- Removed `@babel/standalone` and the Tailwind Play CDN entirely, and moved react / react-dom / lucide-react off esm.sh onto npm — six CDN dependencies gone in one move.
+- Removed the first-paint compile cost: the browser no longer transpiles ~40KB of JSX or JITs the whole stylesheet on every load.
+- The app now works offline and behind restrictive networks, apart from the two Google Fonts requests.
 
-This is the single highest-leverage change. It simultaneously:
+**One consequence to respect: `public/assets/` is build output and is deliberately not committed.** A fresh clone serves a blank page until `npm run build` runs. `npm run dev` handles that for you; a bare `npx wrangler dev` will not.
 
-- removes two `high` supply-chain risks (`DEP-006`, `DEP-007`)
-- removes the first-paint compile cost
-- makes the app work offline / behind restrictive networks
-- converts three of the eight CDN dependencies into build-time-only dependencies
+### 2. Decompose `COMP-006` — the next one
 
-**But** it requires introducing tooling (a `package.json` build script, a bundler) to a repo that currently has none. That is a real change to how you work, so it is deliberately *not* done as part of the pinning fix.
-
-### 2. Decompose `COMP-006`
-
-One 821-line `App()` function holds 24 `useState` hooks, all data fetching, all rendering, and the timer. It is at the limit of what one scope can hold. Once a build step exists, splitting it into components is cheap; doing it *before* a build step means editing a 40KB inline `<script>` block by hand. Order matters.
+One 800-line `App()` function holds 24 `useState` hooks, all data fetching, all rendering, and the timer. It is at the limit of what one scope can hold. The build step removed the earlier objection (editing a 40KB inline `<script>` block by hand), so splitting it is now ordinary work: extract `Sidebar`, `TodoItem` and the two modals into their own modules and leave `App` holding state and effects.
 
 ---
 

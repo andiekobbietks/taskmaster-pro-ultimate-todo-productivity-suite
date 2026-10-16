@@ -225,8 +225,18 @@ export class App extends DurableObject {
       });
     });
 
-    // Seed sample data if empty
-    this.seedDefaults();
+    // Seed sample data ONLY when explicitly enabled.
+    //
+    // This used to run unconditionally on an empty database, which meant every
+    // new deployment shipped with four demo todos the owner never asked for and
+    // could not switch off. Demo data is a development convenience, so it is
+    // opt-in: set SEED_DEMO_DATA=true (see .dev.vars.example for local dev).
+    //
+    // Anyone who wants richer data should use `npm run seed`, which posts the
+    // QA/chaos fixtures in seed/chaos-fixtures.json instead.
+    if (env?.SEED_DEMO_DATA === "true") {
+      this.seedDefaults();
+    }
   }
 
   private initDb() {

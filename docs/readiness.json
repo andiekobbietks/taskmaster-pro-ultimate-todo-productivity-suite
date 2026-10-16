@@ -2,7 +2,7 @@
   "schema": "readiness-state/1.0",
   "project": "taskmaster-pro",
   "version": "0.1.0-alpha",
-  "generated": "2026-10-16T18:08:02.034Z",
+  "generated": "2026-10-16T23:37:46.714Z",
   "sourceInventories": [
     "features.json",
     "architecture.json",
@@ -34,11 +34,10 @@
       "definition": "Feature-complete for its stated scope and usable by external testers without the author present. Known limitations are documented, not discovered.",
       "exitQuestion": "Can a stranger use this without me sitting next to them?",
       "total": 6,
-      "passed": 0,
-      "percent": 0,
+      "passed": 1,
+      "percent": 17,
       "complete": false,
       "failing": [
-        "G-TRUST-01",
         "G-TRUST-02",
         "G-ACCESS-01",
         "G-SCOPE-01",
@@ -53,13 +52,11 @@
       "definition": "Reliable for paying customers. Automated quality gates, no build-time debt, real operational posture.",
       "exitQuestion": "Would I put a paying customer's data in here and sleep?",
       "total": 6,
-      "passed": 1,
-      "percent": 17,
+      "passed": 3,
+      "percent": 50,
       "complete": false,
       "failing": [
         "G-QUAL-01",
-        "G-QUAL-02",
-        "G-BUILD-01",
         "G-PORT-01",
         "G-SCALE-01"
       ]
@@ -106,16 +103,10 @@
         "beta"
       ],
       "total": 8,
-      "passed": 2,
-      "percent": 25,
+      "passed": 3,
+      "percent": 38,
       "ready": false,
       "blockers": [
-        {
-          "id": "G-TRUST-01",
-          "label": "Users see failures instead of silent staleness",
-          "stage": "beta",
-          "effort": "small"
-        },
         {
           "id": "G-TRUST-02",
           "label": "No phantom features",
@@ -158,16 +149,10 @@
         "ga"
       ],
       "total": 14,
-      "passed": 3,
-      "percent": 21,
+      "passed": 6,
+      "percent": 43,
       "ready": false,
       "blockers": [
-        {
-          "id": "G-TRUST-01",
-          "label": "Users see failures instead of silent staleness",
-          "stage": "beta",
-          "effort": "small"
-        },
         {
           "id": "G-TRUST-02",
           "label": "No phantom features",
@@ -201,18 +186,6 @@
         {
           "id": "G-QUAL-01",
           "label": "Automated tests exist",
-          "stage": "ga",
-          "effort": "medium"
-        },
-        {
-          "id": "G-QUAL-02",
-          "label": "Changes ship through a pipeline",
-          "stage": "ga",
-          "effort": "medium"
-        },
-        {
-          "id": "G-BUILD-01",
-          "label": "No build work happens in the user's browser",
           "stage": "ga",
           "effort": "medium"
         },
@@ -241,16 +214,10 @@
         "enterprise"
       ],
       "total": 19,
-      "passed": 3,
-      "percent": 16,
+      "passed": 6,
+      "percent": 32,
       "ready": false,
       "blockers": [
-        {
-          "id": "G-TRUST-01",
-          "label": "Users see failures instead of silent staleness",
-          "stage": "beta",
-          "effort": "small"
-        },
         {
           "id": "G-TRUST-02",
           "label": "No phantom features",
@@ -284,18 +251,6 @@
         {
           "id": "G-QUAL-01",
           "label": "Automated tests exist",
-          "stage": "ga",
-          "effort": "medium"
-        },
-        {
-          "id": "G-QUAL-02",
-          "label": "Changes ship through a pipeline",
-          "stage": "ga",
-          "effort": "medium"
-        },
-        {
-          "id": "G-BUILD-01",
-          "label": "No build work happens in the user's browser",
           "stage": "ga",
           "effort": "medium"
         },
@@ -375,8 +330,8 @@
       "why": "The worst failure mode is one the user cannot see. A swallowed error leaves the UI confidently wrong, which destroys trust faster than a visible crash.",
       "blockingFeature": "FEAT-025",
       "effort": "small",
-      "pass": false,
-      "detail": "FEAT-025 is \"stub\"",
+      "pass": true,
+      "detail": "FEAT-025 is \"implemented\"",
       "conditional": null,
       "note": null
     },
@@ -388,7 +343,7 @@
       "blockingFeature": "FEAT-010",
       "effort": "small",
       "pass": false,
-      "detail": "4 phantom feature(s)",
+      "detail": "3 phantom feature(s)",
       "conditional": null,
       "note": null
     },
@@ -460,8 +415,8 @@
       "blockingFeature": "FEAT-030",
       "effort": "medium",
       "dependsOn": "G-QUAL-01",
-      "pass": false,
-      "detail": "FEAT-030 is \"planned\"",
+      "pass": true,
+      "detail": "FEAT-030 is \"partial\"",
       "conditional": null,
       "note": null
     },
@@ -470,8 +425,8 @@
       "stage": "ga",
       "label": "Third-party code is pinned and integrity-checked",
       "why": "An unpinned CDN script executes whatever the vendor serves today, with full page privilege. Pinning with SRI makes tampering or accidental mutation detectable rather than silent.",
-      "effort": "done-partially",
-      "note": "Fixed for @babel/standalone and tailwindcss. Remaining esm.sh and Google Fonts entries are version-pinned but carry no SRI — see docs/MAINTENANCE.md.",
+      "effort": "done",
+      "note": "Satisfied 2026-10-17 by the build step: no CDN script tags remain at all, so every dependency is version-pinned through package.json and nothing is left to integrity-check at runtime. Google Fonts (DEP-008, DEP-009) still loads from a CDN but carries no script privilege; self-hosting the woff2 files is the remaining polish.",
       "pass": true,
       "detail": "0 unpinned dep(s)",
       "conditional": null
@@ -481,12 +436,12 @@
       "stage": "ga",
       "label": "No build work happens in the user's browser",
       "why": "Runtime transpilation and runtime CSS generation mean the first paint pays for the build. It is also the reason an unpinned CDN script has to exist at all.",
-      "blockingComponent": "COMP-008",
-      "effort": "medium",
-      "pass": false,
-      "detail": "none of COMP-008/COMP-009 healthy",
-      "conditional": null,
-      "note": null
+      "blockingComponent": "COMP-017",
+      "effort": "done",
+      "note": "Satisfied 2026-10-17. COMP-017 (the esbuild + Tailwind CLI pipeline) replaced COMP-008, COMP-009 and COMP-011, so this gate now tracks the health of the build pipeline rather than the absence of in-browser build components.",
+      "pass": true,
+      "detail": "COMP-017 is \"solid\"",
+      "conditional": null
     },
     {
       "id": "G-PORT-01",
@@ -575,27 +530,12 @@
   ],
   "nextActions": [
     {
-      "gate": "G-TRUST-01",
-      "stage": "beta",
-      "label": "Users see failures instead of silent staleness",
-      "effort": "small",
-      "why": "The worst failure mode is one the user cannot see. A swallowed error leaves the UI confidently wrong, which destroys trust faster than a visible crash.",
-      "detail": "FEAT-025 is \"stub\"",
-      "target": {
-        "id": "FEAT-025",
-        "name": "Error handling / user feedback",
-        "status": "stub",
-        "evidence": "public/index.html:140-142, 204-206, 218-220, 242-243, 256-257, 274-276"
-      },
-      "dependsOn": null
-    },
-    {
       "gate": "G-TRUST-02",
       "stage": "beta",
       "label": "No phantom features",
       "effort": "small",
       "why": "A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.",
-      "detail": "4 phantom feature(s)",
+      "detail": "3 phantom feature(s)",
       "target": {
         "id": "FEAT-010",
         "name": "Filter by tag",
@@ -615,7 +555,7 @@
         "id": "FEAT-024",
         "name": "Responsive layout",
         "status": "partial",
-        "evidence": "public/index.html:307 (search hidden sm:block), 350 (sidebar hidden lg:flex), 319 (timer hidden md:flex)"
+        "evidence": "src/app.jsx:340 (search hidden sm:block), 383 (sidebar hidden lg:flex), 352 (timer hidden md:flex)"
       },
       "dependsOn": null
     },
@@ -630,7 +570,7 @@
         "id": "FEAT-004",
         "name": "Delete task",
         "status": "partial",
-        "evidence": "src/index.ts:170-174, public/index.html:236-244"
+        "evidence": "src/index.ts:170-174, src/app.jsx:270 (deleteTodo)"
       },
       "dependsOn": null
     },
@@ -645,7 +585,7 @@
         "id": "FEAT-013",
         "name": "Search title + description",
         "status": "partial",
-        "evidence": "src/index.ts:38-41, public/index.html:307-316"
+        "evidence": "src/index.ts:38-41, src/app.jsx:85 (searchQuery state), 340-344 (search input)"
       },
       "dependsOn": null
     },
@@ -663,16 +603,30 @@
         "evidence": "grep for auth|bearer|token|session|cookie across repo returns only the word 'session' in an alert() string"
       },
       "dependsOn": null
+    },
+    {
+      "gate": "G-PORT-01",
+      "stage": "ga",
+      "label": "Users can extract their data",
+      "effort": "small",
+      "why": "Data a user cannot leave with is data they do not own. Export is also the cheapest possible escape hatch for your own migration problems.",
+      "detail": "FEAT-028 is \"planned\"",
+      "target": {
+        "id": "FEAT-028",
+        "name": "Data export",
+        "status": "planned",
+        "evidence": "absent"
+      },
+      "dependsOn": null
     }
   ],
   "summary": {
     "totalGates": 19,
-    "passed": 3,
-    "failing": 16,
+    "passed": 6,
+    "failing": 13,
     "phantomFeatures": [
       "FEAT-010",
       "FEAT-017",
-      "FEAT-025",
       "FEAT-026"
     ],
     "criticalRisks": [

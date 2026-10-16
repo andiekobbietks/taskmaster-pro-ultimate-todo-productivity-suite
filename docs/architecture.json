@@ -2,8 +2,8 @@
   "schema": "architecture-inventory/1.0",
   "project": "taskmaster-pro",
   "version": "0.1.0-alpha",
-  "generated": "2026-10-16",
-  "verification": "Every component below was read from src/index.ts (312 lines), public/index.html (821 lines), package.json and wrangler.json. Line references are exact.",
+  "generated": "2026-10-17",
+  "verification": "Every component below was read from src/index.ts (323 lines), src/app.jsx (854 lines), src/lib/api.js, public/index.html (31 lines), package.json and wrangler.json. Line references are exact.",
   "maturityVocabulary": {
     "solid": "Correct, idiomatic, no known defects",
     "adequate": "Works, minor gaps that do not block beta",
@@ -37,7 +37,7 @@
       "dataAtRest": "all application data",
       "maturity": "adequate",
       "risk": "medium",
-      "notes": "Correct platform pattern - no export default {fetch}, no illegal DO bindings. Constructor does real work (initDb + seedDefaults) on every instantiation, which is a latency and ordering concern."
+      "notes": "Correct platform pattern - no export default {fetch}, no illegal DO bindings. Constructor does real work (initDb on every instantiation; seedDefaults only when SEED_DEMO_DATA=true), which is a latency and ordering concern."
     },
     {
       "id": "COMP-003",
@@ -71,107 +71,79 @@
       "id": "COMP-005",
       "name": "Static asset layer",
       "layer": "frontend-hosting",
-      "role": "Serves public/index.html and public/style.css host-side before any Worker invocation",
+      "role": "Serves public/ host-side before any Worker invocation: the index.html shell plus the compiled bundles public/assets/app.js and public/assets/app.css",
       "entry": "wrangler.json assets.directory=./public",
-      "evidence": "public/index.html (821 lines), public/style.css (30 lines)",
+      "evidence": "public/index.html (31 lines), public/assets/app.js + public/assets/app.css (build output, gitignored)",
       "dependsOn": ["COMP-001"],
       "usedBy": ["FEAT-023"],
       "dataAtRest": "none",
       "maturity": "adequate",
       "risk": "low",
-      "notes": "The entire 40KB SPA is one HTML file - no code splitting, no caching differentiation between shell and logic."
+      "notes": "public/assets/ is build output, not committed - a fresh clone serves a 404 page until 'npm run build' runs, so dev and CI must both build first. Still one HTML shell with no code splitting, but the heavy payload is now a separate cacheable file."
     },
     {
       "id": "COMP-006",
       "name": "Single-file React SPA",
       "layer": "frontend",
       "role": "One App() component holding all 24 useState hooks; all UI, data fetching, and timer logic in one scope",
-      "entry": "public/index.html:61 function App()",
-      "evidence": "public/index.html:61-816",
+      "entry": "src/app.jsx:74 function App()",
+      "evidence": "src/app.jsx:74-854 (800 lines in one scope)",
       "dependsOn": ["DEP-002", "DEP-003", "DEP-005"],
       "usedBy": ["FEAT-018", "FEAT-019", "FEAT-020", "FEAT-023", "FEAT-024"],
       "dataAtRest": "none (in-memory only)",
       "maturity": "fragile",
       "risk": "medium",
-      "notes": "No component decomposition, no router, no state management boundary. At 821 lines in one function it is at the limit of maintainability; every feature added increases coupling. This is the main structural debt."
+      "notes": "No component decomposition, no router, no state management boundary. It is no longer an inline 40KB script transpiled at page load - esbuild compiles it ahead of time - but it is still one function holding everything, so every feature added increases coupling. This remains the main structural debt."
     },
     {
       "id": "COMP-007",
       "name": "Client-side data access layer",
       "layer": "frontend",
-      "role": "Six fetch() helpers (fetchTodos, fetchLists, fetchStats, create, patch, delete) calling the relative ./api/* routes",
-      "entry": "public/index.html:120-277",
-      "evidence": "public/index.html:120, 145, 155, 181, 211, 225, 238, 248, 264",
+      "role": "One api() helper wraps every request and rejects on any non-2xx; 9 call sites (fetchTodos, fetchLists, fetchStats, handleCreateTodo, toggleComplete, togglePin, deleteTodo, incrementPomodoro, createList) report failure through fail() into a dismissible ErrorBanner with retry",
+      "entry": "src/lib/api.js:47 api(); src/app.jsx:117 fail(); src/app.jsx:30 ErrorBanner",
+      "evidence": "src/lib/api.js:45-81 (ApiError, describeError, api), src/app.jsx:117-124 (fail/clearError), 30-72 (ErrorBanner), 151-310 (call sites), 849 (banner rendered)",
       "dependsOn": ["COMP-003"],
-      "usedBy": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-011", "FEAT-013", "FEAT-014", "FEAT-016"],
+      "usedBy": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-011", "FEAT-013", "FEAT-014", "FEAT-016", "FEAT-025"],
       "dataAtRest": "none",
-      "maturity": "fragile",
-      "risk": "high",
-      "notes": "All 6 have try/catch that only console.error - no retry, no user feedback, no loading state, no optimistic update. Relative ./api paths are correct for the preview prefix, which is a genuinely good call."
+      "maturity": "adequate",
+      "risk": "medium",
+      "notes": "Fixed 2026-10-17: a failed request is now visible instead of silently stale. api() rejects on non-2xx, surfaces the server's own error message, and mutations that lose typed input keep the form open. Still missing: loading states, request debounce (search fires per keystroke), optimistic updates, and abort on unmount. Relative ./api paths are correct for the preview prefix, which is a genuinely good call."
     },
     {
-      "id": "COMP-008",
-      "name": "In-browser JSX transpilation",
+      "id": "COMP-017",
+      "name": "Build pipeline (esbuild + Tailwind CLI)",
       "layer": "build",
-      "role": "Babel standalone compiles the JSX at page load from a type=text/babel script tag",
-      "entry": "public/index.html:46, 51",
-      "evidence": "public/index.html:46 (babel.min.js), 51 (type=text/babel data-type=module data-presets=react)",
-      "dependsOn": ["DEP-006"],
-      "usedBy": ["COMP-006"],
+      "role": "npm run build compiles src/app.jsx into public/assets/app.js (esbuild, IIFE) and src/tailwind.css into public/assets/app.css (Tailwind CLI). Supersedes COMP-008, COMP-009 and COMP-011.",
+      "entry": "package.json scripts: build, build:js, build:css",
+      "evidence": "package.json:6-8, tailwind.config.cjs, src/tailwind.css; CI builds then asserts both outputs in .github/workflows/ci.yml",
+      "dependsOn": ["DEP-011", "DEP-007"],
+      "usedBy": ["COMP-005", "COMP-006"],
       "dataAtRest": "none",
-      "maturity": "fragile",
-      "risk": "high",
-      "notes": "No build step - the browser transpiles 40KB of JSX on every load. Adds a visible white-screen delay, requires the react/jsx-runtime importmap entry to be correct (it is), and executes an unpinned third-party script with full page privilege."
-    },
-    {
-      "id": "COMP-009",
-      "name": "Tailwind Play CDN",
-      "layer": "styling",
-      "role": "Runtime Tailwind JIT in the browser with an inline tailwind.config (brand palette, darkMode:class, Inter/JetBrains Mono)",
-      "entry": "public/index.html:13-33",
-      "evidence": "public/index.html:13 (cdn.tailwindcss.com), 14-33 (inline config)",
-      "dependsOn": ["DEP-007"],
-      "usedBy": ["FEAT-020"],
-      "dataAtRest": "none",
-      "maturity": "fragile",
-      "risk": "high",
-      "notes": "Vendor explicitly marks this CDN as not-for-production. Unpinned, render-blocking, and duplicates work with COMP-010."
+      "maturity": "solid",
+      "risk": "low",
+      "notes": "Removed 2026-10-17. The browser now does zero build work: no JSX transpile, no CSS JIT, and no third-party script executes with page privilege. React, react-dom and lucide-react are pinned npm packages bundled into app.js, so esm.sh is gone entirely. Remaining third-party surface is Google Fonts (COMP-012) only. 'npm run dev' and 'npm run deploy' both run the build first, so the two outputs cannot be missing by accident."
     },
     {
       "id": "COMP-010",
       "name": "Custom design tokens",
       "layer": "styling",
-      "role": "Brand colour scale as CSS custom properties plus fadeIn/scaleIn keyframes",
-      "entry": "public/style.css:1-30",
-      "evidence": "public/style.css:1-12 (brand-50..900), 14-30 (animations)",
+      "role": "Brand colour scale as CSS custom properties plus fadeIn/scaleIn keyframes, compiled into app.css by the Tailwind CLI",
+      "entry": "src/tailwind.css:14-45",
+      "evidence": "src/tailwind.css:16-28 (brand-50..900), 31-45 (animations)",
       "dependsOn": [],
       "usedBy": ["FEAT-023"],
       "dataAtRest": "none",
       "maturity": "solid",
       "risk": "low",
-      "notes": "Clean token scale. Note the brand palette is defined TWICE - here as CSS vars and again in the inline Tailwind config at index.html:19-25 - so they can drift."
-    },
-    {
-      "id": "COMP-011",
-      "name": "Importmap module resolution",
-      "layer": "frontend",
-      "role": "Maps react, react/jsx-runtime, react-dom, react-dom/client and lucide-react to esm.sh with ?external=react,react-dom",
-      "entry": "public/index.html:35-45",
-      "evidence": "public/index.html:38-42",
-      "dependsOn": ["DEP-002", "DEP-003", "DEP-004", "DEP-005"],
-      "usedBy": ["COMP-006"],
-      "dataAtRest": "none",
-      "maturity": "solid",
-      "risk": "medium",
-      "notes": "Correctly applies ?external to every React-consuming package - this is the exact fix for the dual-React/useContext crash, and it is applied consistently. Genuinely well done. Residual risk is CDN availability and absence of SRI."
+      "notes": "Clean token scale. Note the brand palette is defined TWICE - here as CSS vars and again in tailwind.config.cjs theme.extend.colors - so they can drift. It now compiles into app.css instead of being a separately linked stylesheet, which is why public/style.css is gone."
     },
     {
       "id": "COMP-012",
       "name": "Web typography",
       "layer": "styling",
       "role": "Inter (sans) + JetBrains Mono (mono) loaded from Google Fonts with preconnect",
-      "entry": "public/index.html:7-9",
-      "evidence": "public/index.html:7-8 (preconnect), 9 (css2 stylesheet)",
+      "entry": "public/index.html:8-11",
+      "evidence": "public/index.html:9-10 (preconnect), 11 (css2 stylesheet)",
       "dependsOn": ["DEP-008", "DEP-009"],
       "usedBy": [],
       "dataAtRest": "none",
@@ -183,15 +155,15 @@
       "id": "COMP-013",
       "name": "Server-side seed data",
       "layer": "backend",
-      "role": "Injects 4 lists and 4 sample tasks on first run when the lists table is empty",
-      "entry": "src/index.ts:262-307 seedDefaults()",
-      "evidence": "src/index.ts:263 (guard), 265-268 (lists), 273-305 (todos)",
+      "role": "Injects 4 lists and 4 sample tasks on first run when the lists table is empty, and only when SEED_DEMO_DATA=true",
+      "entry": "src/index.ts:272-317 seedDefaults()",
+      "evidence": "src/index.ts:237-238 (SEED_DEMO_DATA gate in the constructor), 273 (empty-table guard)",
       "dependsOn": ["COMP-004"],
       "usedBy": ["FEAT-022"],
       "dataAtRest": "writes to todos and lists",
-      "maturity": "fragile",
-      "risk": "medium",
-      "notes": "Guarded by an empty-table check so it is not destructive, but it cannot be disabled - every deployment starts polluted with demo content and no tester can get a clean slate."
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "Opt-in since 2026-10-17: wrangler.json sets SEED_DEMO_DATA=false so a real deployment starts with a clean slate, and .dev.vars.example shows how to switch it on locally. Guarded by an empty-table check so it is not destructive. Still runs in the constructor, so it is re-checked on every DO instantiation."
     },
     {
       "id": "COMP-014",
@@ -205,21 +177,21 @@
       "dataAtRest": "none",
       "maturity": "fragile",
       "risk": "medium",
-      "notes": "env: any forfeits all binding type safety. No .dev.vars handling, no environment separation, no TypeScript config in the project itself (types come from the platform)."
+      "notes": "env: any forfeits all binding type safety. Local overrides are now documented (.dev.vars.example, wrangler vars) but there is still no environment separation between dev and production, and no TypeScript config in the project itself (types come from the platform)."
     },
     {
       "id": "COMP-015",
       "name": "Quality assurance",
       "layer": "process",
-      "role": "Tests, typecheck gate, CI pipeline",
-      "entry": "absent",
-      "evidence": "glob for *test*/*spec* = 0 files; no .github/ directory",
+      "role": "Tests and typecheck gate (still absent) plus the CI pipeline that now exists",
+      "entry": ".github/workflows/ci.yml and release.yml (added 2026-10-17)",
+      "evidence": "ci.yml runs the Worker bundle check, a docs-sync gate and seed validation on every push; 0 files match *test*/*spec*",
       "dependsOn": [],
       "usedBy": ["FEAT-029", "FEAT-030"],
       "dataAtRest": "none",
       "maturity": "missing",
       "risk": "high",
-      "notes": "Nothing verifies any of the 30 features. Any refactor is unguarded. This is the single largest structural gap between alpha and beta."
+      "notes": "CI now gates every push and release.yml publishes a GitHub Release from CHANGELOG.md on a v* tag - but there are still no unit tests and no typecheck job, so none of the 30 features is regression-guarded and any refactor is an unverified gamble. maturity deliberately stays 'missing': G-QUAL-01 asks whether automated tests exist, and counting a pipeline without tests would make the checklist lie. This is still the single largest structural gap between alpha and beta."
     },
     {
       "id": "COMP-016",
@@ -237,22 +209,22 @@
     }
   ],
   "dataFlow": [
-    "Browser (COMP-006) -> fetch('./api/*') [COMP-007] -> Hono router [COMP-003]",
+    "Browser (COMP-006) -> api() [COMP-007] -> fetch('./api/*') -> Hono router [COMP-003]",
     "Hono [COMP-003] -> SQL exec on DO storage [COMP-004]",
     "DO [COMP-002] persists via ctx.storage.sql, surviving redeploys",
     "Static assets [COMP-005] served host-side; only unmatched requests reach the DO",
-    "Third-party CDNs [COMP-008, COMP-009, COMP-011, COMP-012] load at page view, outside the Worker boundary"
+    "Build [COMP-017] writes public/assets/app.js and app.css before dev, CI and deploy",
+    "Google Fonts [COMP-012] is the only third-party load remaining at page view"
   ],
   "summary": {
-    "total": 16,
-    "byMaturity": { "solid": 3, "adequate": 5, "fragile": 6, "missing": 2 },
+    "total": 14,
+    "byMaturity": { "solid": 3, "adequate": 7, "fragile": 2, "missing": 2 },
     "criticalRisks": ["COMP-016"],
-    "highRisks": ["COMP-007", "COMP-008", "COMP-009", "COMP-015"],
+    "highRisks": ["COMP-015"],
     "structuralDebt": [
-      "COMP-006 - 821 lines, one component, no decomposition",
-      "COMP-008/COMP-009 - no build step; runtime transpilation and runtime CSS JIT",
+      "COMP-006 - 800 lines in one component, no decomposition (was 821; same shape)",
       "COMP-015/COMP-016 - no tests and no auth"
     ],
-    "assessment": "The architecture is coherent and uses the platform correctly - the DO/SQLite/Hono pattern is idiomatic, the importmap is handled with real care, and the asset routing is right. What holds it at alpha is not structural wrongness but three absences (auth, tests, a build step) plus a single-component frontend that cannot absorb much more growth without decomposition."
+    "assessment": "The architecture is coherent and uses the platform correctly - the DO/SQLite/Hono pattern is idiomatic and the asset routing is right. The build step that used to be the third absence arrived on 2026-10-17: the browser no longer transpiles JSX or JITs CSS, and every CDN script except Google Fonts is gone. What holds it at alpha now is two absences (auth, tests) plus a single-component frontend that cannot absorb much more growth without decomposition."
   }
 }

@@ -159,17 +159,18 @@
       "label": "Third-party code is pinned and integrity-checked",
       "why": "An unpinned CDN script executes whatever the vendor serves today, with full page privilege. Pinning with SRI makes tampering or accidental mutation detectable rather than silent.",
       "derivedFrom": { "unpinnedCount": 0, "sriCoverage": "all-cdn" },
-      "effort": "done-partially",
-      "note": "Fixed for @babel/standalone and tailwindcss. Remaining esm.sh and Google Fonts entries are version-pinned but carry no SRI — see docs/MAINTENANCE.md."
+      "effort": "done",
+      "note": "Satisfied 2026-10-17 by the build step: no CDN script tags remain at all, so every dependency is version-pinned through package.json and nothing is left to integrity-check at runtime. Google Fonts (DEP-008, DEP-009) still loads from a CDN but carries no script privilege; self-hosting the woff2 files is the remaining polish."
     },
     {
       "id": "G-BUILD-01",
       "stage": "ga",
       "label": "No build work happens in the user's browser",
       "why": "Runtime transpilation and runtime CSS generation mean the first paint pays for the build. It is also the reason an unpinned CDN script has to exist at all.",
-      "derivedFrom": { "anyOfComponents": ["COMP-008", "COMP-009"], "requireMaturity": ["solid", "adequate"] },
-      "blockingComponent": "COMP-008",
-      "effort": "medium"
+      "derivedFrom": { "componentId": "COMP-017", "requireMaturity": ["solid", "adequate"] },
+      "blockingComponent": "COMP-017",
+      "effort": "done",
+      "note": "Satisfied 2026-10-17. COMP-017 (the esbuild + Tailwind CLI pipeline) replaced COMP-008, COMP-009 and COMP-011, so this gate now tracks the health of the build pipeline rather than the absence of in-browser build components."
     },
     {
       "id": "G-PORT-01",

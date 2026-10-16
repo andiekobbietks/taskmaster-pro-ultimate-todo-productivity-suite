@@ -2,6 +2,9 @@
   "name": "taskmaster-pro",
   "main": "src/index.ts",
   "compatibility_date": "2025-04-01",
+  "vars": {
+    "SEED_DEMO_DATA": "false"
+  },
   "assets": {
     "directory": "./public",
     "html_handling": "auto-trailing-slash",

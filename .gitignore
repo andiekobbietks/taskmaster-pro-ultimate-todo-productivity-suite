@@ -8,3 +8,10 @@ dist/
 .env.*
 release-notes.md
 package-lock.json
+
+# Build output from `npm run build` (esbuild + Tailwind CLI). Rebuilt in CI, so
+# it is never committed.
+public/assets/
+
+# Local wrangler overrides. Commit the example, never the real file.
+.dev.vars

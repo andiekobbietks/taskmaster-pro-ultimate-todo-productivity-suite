@@ -29,6 +29,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # The front end is now compiled: esbuild bundles src/app.jsx and the
+      # Tailwind CLI emits public/assets/app.css. Neither wrangler nor this
+      # workflow can serve the app without them, so build before bundling.
+      - name: Build the front end
+        run: npm run build
+
+      - name: Assert build output exists
+        run: |
+          test -s public/assets/app.js  || { echo "::error::public/assets/app.js was not produced"; exit 1; }
+          test -s public/assets/app.css || { echo "::error::public/assets/app.css was not produced"; exit 1; }
+
       # A dry-run deploy bundles the Worker exactly as `wrangler deploy` would,
       # but uploads nothing and needs no credentials. It fails on a broken
       # import, a bad wrangler.json, or an asset path that no longer exists.

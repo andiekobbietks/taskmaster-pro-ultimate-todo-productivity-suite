@@ -1,0 +1,13 @@
+# Local development overrides for `wrangler dev`.
+#
+# Copy this file to `.dev.vars` (which is gitignored) and edit as needed:
+#
+#   cp .dev.vars.example .dev.vars
+#
+# Anything here overrides the `vars` block in wrangler.json, but ONLY for local
+# development — it is never deployed and never committed.
+
+# Demo data is now opt-in. wrangler.json sets SEED_DEMO_DATA=false, so a real
+# deployment starts empty. Set it to true here if you want the four built-in
+# sample todos and lists while developing locally.
+SEED_DEMO_DATA=true

@@ -22,13 +22,14 @@
 - **Search** — full-text search across titles and descriptions
 - **Stats dashboard** — aggregated productivity stats at a glance
 - **Pomodoro tracking** — estimated and completed pomodoro counts per task
+- **Visible failures** — every request reports errors in the UI with a retry, instead of leaving the screen silently stale
 
 ## 🗂 Project Structure
 
 ```
 .
 ├── .github/workflows/
-│   ├── ci.yml            # Bundle check, docs-sync gate, seed validation
+│   ├── ci.yml            # Front-end build, Worker bundle check, docs-sync gate, seed validation
 │   └── release.yml       # Tag -> GitHub Release, notes pulled from CHANGELOG.md
 ├── docs/                 # Self-describing, mostly GENERATED docs (see below)
 │   ├── scripts/readiness.mjs
@@ -37,8 +38,8 @@
 │   ├── architecture.json # Component inventory
 │   └── sbom.cyclonedx.json
 ├── public/
-│   ├── index.html        # Front-end SPA (served as static assets)
-│   └── style.css
+│   ├── index.html        # SPA shell - no inline scripts
+│   └── assets/           # BUILD OUTPUT (app.js + app.css) - gitignored, rebuilt by npm run build
 ├── scripts/
 │   ├── seed.mjs          # Load QA/chaos fixtures into a running instance
 │   ├── validate-seed.mjs # Guard the fixtures (runs in CI)
@@ -46,7 +47,12 @@
 ├── seed/
 │   └── chaos-fixtures.json
 ├── src/
+│   ├── app.jsx           # The whole front end, compiled by esbuild
+│   ├── lib/api.js        # Every request goes through here, with visible error handling
+│   ├── tailwind.css      # Tailwind entry + design tokens, compiled to app.css
 │   └── index.ts          # Durable Object + Hono REST API
+├── .dev.vars.example     # Template for local-only overrides (copy to .dev.vars)
+├── tailwind.config.cjs
 ├── CHANGELOG.md
 ├── SECURITY.md
 ├── package.json
@@ -57,10 +63,17 @@
 
 ```bash
 npm install
-npm run dev          # npx wrangler dev
+npm run build   # esbuild + Tailwind CLI -> public/assets/
+npm run dev     # build, then npx wrangler dev
 ```
 
-Wrangler serves the static assets from `public/` and runs the Durable Object API in-process.
+Wrangler serves the static assets from `public/` and runs the Durable Object API in-process. **`public/assets/` is build output and is not committed**, so a fresh clone serves a blank page until the build runs — `npm run dev` does that for you, but a bare `npx wrangler dev` will not.
+
+Local-only overrides live in `.dev.vars`, which is gitignored and never deployed:
+
+```bash
+cp .dev.vars.example .dev.vars   # then edit; SEED_DEMO_DATA=true gives you demo data locally
+```
 
 ## 🔌 API
 
@@ -85,7 +98,7 @@ Every push to `main` and every pull request runs [`.github/workflows/ci.yml`](.g
 
 | Job | What it proves |
 | --- | -------------- |
-| **Worker bundles** | `wrangler deploy --dry-run` bundles the Worker exactly as a real deploy would. Fails on a broken import, a bad `wrangler.json`, or a missing asset path. Needs no credentials and uploads nothing. |
+| **Builds + Worker bundles** | `npm run build` produces both front-end assets, then `wrangler deploy --dry-run` bundles the Worker exactly as a real deploy would. Fails on a broken import, a bad `wrangler.json`, a missing asset path, or a front-end build that no longer compiles. Needs no credentials and uploads nothing. |
 | **Docs match the code** | Regenerates `docs/READINESS.md` and `docs/readiness.json` from the inventories and fails if the committed copies drifted, so a readiness claim can never silently disagree with the code. |
 | **Seed fixtures are valid** | Validates `seed/chaos-fixtures.json` so a malformed fixture is caught before a test session, not during one. |
 
@@ -112,7 +125,7 @@ Read [`SECURITY.md`](SECURITY.md) first — it states plainly that **there is no
 
 - Report vulnerabilities privately via the **Security** tab → **Report a vulnerability**. Do not file public issues for security reports.
 - A machine-readable dependency inventory is at [`docs/sbom.cyclonedx.json`](docs/sbom.cyclonedx.json).
-- The runtime dependency surface is a single package: `hono`.
+- The browser loads no third-party script at all: React, react-dom, lucide-react and the compiled Tailwind stylesheet are bundled from npm at build time. The only remaining third-party request is Google Fonts (two typefaces), which executes no code.
 
 ## 🧪 Seed data for QA & chaos testing
 
@@ -134,6 +147,14 @@ Two behaviours worth knowing, both documented in the fixture file:
 
 Run `npm run seed:validate` to check the fixtures without a running instance.
 
+### The four built-in demo todos are opt-in
+
+The Worker used to inject four sample tasks and three sample lists into every new deployment with no way to stop it. That is now **off by default**:
+
+- `wrangler.json` sets `SEED_DEMO_DATA=false`, so a real deployment starts with a clean slate.
+- To get the demo data locally, copy `.dev.vars.example` to `.dev.vars` and set `SEED_DEMO_DATA=true`.
+- For richer data than the four samples, use `npm run seed` — it posts the QA/chaos fixtures above.
+
 ## 📚 Self-describing docs
 
 `docs/` is mostly **generated**, which is the point: the descriptions are derived from the code instead of drifting away from it.
@@ -141,6 +162,7 @@ Run `npm run seed:validate` to check the fixtures without a running instance.
 - [`docs/READINESS.md`](docs/READINESS.md) — a maturity checklist that ticks itself, per stage (Alpha → Beta → GA → Enterprise) and per target customer.
 - `docs/features.json` / `docs/architecture.json` — the inventories that drive it.
 - `docs/sbom.cyclonedx.json` — the dependency bill of materials.
+- [`docs/INVENTORIES.md`](docs/INVENTORIES.md) — the same inventories in readable form.
 - [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) — how to change things.
 
 After editing an inventory, run `npm run docs:readiness` and commit the result — CI enforces this.

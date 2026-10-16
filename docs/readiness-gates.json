@@ -1,0 +1,239 @@
+{
+  "schema": "readiness-gates/1.0",
+  "project": "taskmaster-pro",
+  "_purpose": "Declarative stage gates. docs/scripts/readiness.mjs derives live status from features.json, architecture.json and sbom.cyclonedx.json and ticks each gate automatically. Edit THIS file to change what a stage means; do not edit the generated docs/readiness.json.",
+
+  "stages": [
+    {
+      "id": "alpha",
+      "name": "Alpha",
+      "ordinal": 1,
+      "definition": "Works for its creator. Rough edges expected. No promises on data, security or stability. Testing is internal.",
+      "exitQuestion": "Can I demo this to myself without it falling over?"
+    },
+    {
+      "id": "beta",
+      "name": "Beta",
+      "ordinal": 2,
+      "definition": "Feature-complete for its stated scope and usable by external testers without the author present. Known limitations are documented, not discovered.",
+      "exitQuestion": "Can a stranger use this without me sitting next to them?"
+    },
+    {
+      "id": "ga",
+      "name": "General Availability",
+      "ordinal": 3,
+      "definition": "Reliable for paying customers. Automated quality gates, no build-time debt, real operational posture.",
+      "exitQuestion": "Would I put a paying customer's data in here and sleep?"
+    },
+    {
+      "id": "enterprise",
+      "name": "Enterprise Ready",
+      "ordinal": 4,
+      "definition": "Meets organisational procurement and security review. Identity federation, auditability, compliance evidence, contractual guarantees.",
+      "exitQuestion": "Would a security reviewer sign this off?"
+    }
+  ],
+
+  "icps": [
+    {
+      "id": "personal",
+      "name": "Personal / solo use",
+      "description": "One operator, private deployment, data is theirs alone. Auth is optional because the deployment itself is the boundary.",
+      "requiredStages": ["alpha"]
+    },
+    {
+      "id": "team",
+      "name": "Team / shared beta",
+      "description": "A small group shares one deployment. Access control and reliable feedback become mandatory because users are not the author.",
+      "requiredStages": ["alpha", "beta"]
+    },
+    {
+      "id": "saas",
+      "name": "Paid SaaS customers",
+      "description": "Strangers pay for reliability. Build hygiene, operational tooling and data portability stop being nice-to-haves.",
+      "requiredStages": ["alpha", "beta", "ga"]
+    },
+    {
+      "id": "enterprise",
+      "name": "Enterprise procurement",
+      "description": "Sold into an organisation that must satisfy its own security and compliance obligations.",
+      "requiredStages": ["alpha", "beta", "ga", "enterprise"]
+    }
+  ],
+
+  "gates": [
+    {
+      "id": "G-CORE-01",
+      "stage": "alpha",
+      "label": "Core CRUD loop works",
+      "why": "Without create, read, update and delete the product is a mock-up, not an app.",
+      "derivedFrom": { "allOf": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"], "requireStatus": ["implemented", "partial"] },
+      "blockingFeature": "FEAT-001",
+      "effort": "done"
+    },
+    {
+      "id": "G-CORE-02",
+      "stage": "alpha",
+      "label": "Data persists beyond the process",
+      "why": "State must survive a restart, or the app is a toy.",
+      "derivedFrom": { "anyOfComponents": ["COMP-004"], "requireMaturity": ["solid", "adequate"] },
+      "effort": "done"
+    },
+    {
+      "id": "G-TRUST-01",
+      "stage": "beta",
+      "label": "Users see failures instead of silent staleness",
+      "why": "The worst failure mode is one the user cannot see. A swallowed error leaves the UI confidently wrong, which destroys trust faster than a visible crash.",
+      "derivedFrom": { "featureId": "FEAT-025", "requireStatus": ["implemented", "partial"] },
+      "blockingFeature": "FEAT-025",
+      "effort": "small"
+    },
+    {
+      "id": "G-TRUST-02",
+      "stage": "beta",
+      "label": "No phantom features",
+      "why": "A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.",
+      "derivedFrom": { "phantomCount": 0 },
+      "blockingFeature": "FEAT-010",
+      "effort": "small"
+    },
+    {
+      "id": "G-ACCESS-01",
+      "stage": "beta",
+      "label": "Access control exists",
+      "why": "The moment a link is shared, anyone holding the URL has full read and write. Single-tenant-by-architecture is not access control.",
+      "derivedFrom": { "featureId": "FEAT-027", "requireStatus": ["implemented", "partial"] },
+      "blockingFeature": "FEAT-027",
+      "effort": "medium",
+      "conditional": "Not required for the personal ICP — a private deployment is its own boundary."
+    },
+    {
+      "id": "G-SCOPE-01",
+      "stage": "beta",
+      "label": "The product works on the device it is used on",
+      "why": "A responsive layout that hides navigation on small screens is not responsive. It silently becomes desktop-only.",
+      "derivedFrom": { "featureId": "FEAT-024", "requireStatus": ["implemented"] },
+      "blockingFeature": "FEAT-024",
+      "effort": "small"
+    },
+    {
+      "id": "G-SAFE-01",
+      "stage": "beta",
+      "label": "Destructive actions are survivable",
+      "why": "Data loss in a productivity tool is unrecoverable by the user. Deletion must confirm, and must report honestly when it removed nothing.",
+      "derivedFrom": { "anyOfFeatures": ["FEAT-004", "FEAT-028"], "requireStatus": ["implemented"] },
+      "blockingFeature": "FEAT-004",
+      "effort": "small"
+    },
+    {
+      "id": "G-SAFE-02",
+      "stage": "beta",
+      "label": "User input cannot alter query semantics",
+      "why": "Parameterised SQL prevents injection but not LIKE-wildcard semantics. Unescaped wildcards mean a search for '100%' silently matches everything.",
+      "derivedFrom": { "featureId": "FEAT-013", "requireStatus": ["implemented"] },
+      "blockingFeature": "FEAT-013",
+      "effort": "small"
+    },
+    {
+      "id": "G-QUAL-01",
+      "stage": "ga",
+      "label": "Automated tests exist",
+      "why": "Without a regression net every future change is an unverified gamble. This is the gate that makes the later gates affordable.",
+      "derivedFrom": { "componentId": "COMP-015", "requireMaturity": ["solid", "adequate", "fragile"] },
+      "blockingComponent": "COMP-015",
+      "effort": "medium"
+    },
+    {
+      "id": "G-QUAL-02",
+      "stage": "ga",
+      "label": "Changes ship through a pipeline",
+      "why": "Manual deploys do not scale past one operator and do not gate quality. The pipeline is what makes 'it works on my machine' irrelevant.",
+      "derivedFrom": { "featureId": "FEAT-030", "requireStatus": ["implemented", "partial"] },
+      "blockingFeature": "FEAT-030",
+      "effort": "medium",
+      "dependsOn": "G-QUAL-01"
+    },
+    {
+      "id": "G-SUPPLY-01",
+      "stage": "ga",
+      "label": "Third-party code is pinned and integrity-checked",
+      "why": "An unpinned CDN script executes whatever the vendor serves today, with full page privilege. Pinning with SRI makes tampering or accidental mutation detectable rather than silent.",
+      "derivedFrom": { "unpinnedCount": 0, "sriCoverage": "all-cdn" },
+      "effort": "done-partially",
+      "note": "Fixed for @babel/standalone and tailwindcss. Remaining esm.sh and Google Fonts entries are version-pinned but carry no SRI — see docs/MAINTENANCE.md."
+    },
+    {
+      "id": "G-BUILD-01",
+      "stage": "ga",
+      "label": "No build work happens in the user's browser",
+      "why": "Runtime transpilation and runtime CSS generation mean the first paint pays for the build. It is also the reason an unpinned CDN script has to exist at all.",
+      "derivedFrom": { "anyOfComponents": ["COMP-008", "COMP-009"], "requireMaturity": ["solid", "adequate"] },
+      "blockingComponent": "COMP-008",
+      "effort": "medium"
+    },
+    {
+      "id": "G-PORT-01",
+      "stage": "ga",
+      "label": "Users can extract their data",
+      "why": "Data a user cannot leave with is data they do not own. Export is also the cheapest possible escape hatch for your own migration problems.",
+      "derivedFrom": { "featureId": "FEAT-028", "requireStatus": ["implemented", "partial"] },
+      "blockingFeature": "FEAT-028",
+      "effort": "small"
+    },
+    {
+      "id": "G-SCALE-01",
+      "stage": "ga",
+      "label": "Read paths are bounded",
+      "why": "An unpaginated SELECT grows with the dataset. What is fine at 50 rows is a timeout at 50,000, and it fails on the day it matters most.",
+      "derivedFrom": { "featureId": "FEAT-031", "requireStatus": ["implemented", "partial"] },
+      "blockingFeature": "FEAT-031",
+      "effort": "small"
+    },
+    {
+      "id": "G-OPS-01",
+      "stage": "enterprise",
+      "label": "Federated identity (SSO/SAML/OIDC)",
+      "why": "Enterprises do not create separate credentials for every tool. No federation means no procurement.",
+      "derivedFrom": { "featureId": "FEAT-027", "requireStatus": ["implemented"] },
+      "blockingFeature": "FEAT-027",
+      "effort": "large"
+    },
+    {
+      "id": "G-OPS-02",
+      "stage": "enterprise",
+      "label": "Audit log of who changed what",
+      "why": "An auditor asks who deleted the record. Without an audit trail the answer is a guess.",
+      "derivedFrom": { "featureId": "FEAT-027", "requireStatus": ["implemented"] },
+      "blockingFeature": "FEAT-027",
+      "effort": "large"
+    },
+    {
+      "id": "G-OPS-03",
+      "stage": "enterprise",
+      "label": "Monitoring, alerting and a documented recovery path",
+      "why": "Enterprises buy the promise that someone will know before they do. An unmonitored system makes that promise falsely.",
+      "derivedFrom": { "componentId": "COMP-015", "requireMaturity": ["solid"] },
+      "blockingComponent": "COMP-015",
+      "effort": "large"
+    },
+    {
+      "id": "G-OPS-04",
+      "stage": "enterprise",
+      "label": "Tenancy isolation is enforced, not incidental",
+      "why": "Isolation that relies on 'one deployment per customer' does not survive multi-tenancy, and does not survive a review that asks how you prevent cross-tenant reads.",
+      "derivedFrom": { "componentId": "COMP-016", "requireMaturity": ["solid", "adequate"] },
+      "blockingComponent": "COMP-016",
+      "effort": "large"
+    },
+    {
+      "id": "G-COMP-01",
+      "stage": "enterprise",
+      "label": "Documented compliance posture",
+      "why": "A security questionnaire arrives before the contract does. Answering it from scratch each time is how deals stall.",
+      "derivedFrom": { "hardcoded": false, "anyOfFeatures": ["FEAT-027"], "requireStatus": ["implemented"] },
+      "blockingFeature": "FEAT-027",
+      "effort": "large",
+      "note": "Placeholder — no compliance artefacts exist yet (SOC 2 / ISO 27001 / DPA / sub-processor list)."
+    }
+  ]
+}

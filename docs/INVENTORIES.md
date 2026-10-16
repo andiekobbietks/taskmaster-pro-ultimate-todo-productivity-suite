@@ -16,7 +16,7 @@ Three linked inventories share one tagging vocabulary. Every entry was verified 
 
 ## 1. Dependency SBOM — `DEP-*`
 
-10 dependencies. **8 of 10 are fetched at page load from third-party CDNs with no Subresource Integrity.**
+10 dependencies. **8 of 10 are fetched at page load from third-party CDNs.** Two of those were unpinned with no integrity check — both are now fixed (pinned + SRI); six remain version-pinned without SRI because importmap and font entries don't accept `integrity`.
 
 | ID | Component | Version | Source | License | Risk |
 |---|---|---|---|---|---|
@@ -25,13 +25,17 @@ Three linked inventories share one tagging vocabulary. Every entry was verified 
 | `DEP-003` | react-dom | 18.3.1 | esm.sh | MIT | medium |
 | `DEP-004` | react/jsx-runtime | 18.3.1 | esm.sh | MIT | medium |
 | `DEP-005` | lucide-react | 0.400.0 | esm.sh | ISC | medium |
-| `DEP-006` | @babel/standalone | **unpinned** | unpkg | MIT | **high** |
-| `DEP-007` | tailwindcss (Play CDN) | **unpinned** | cdn.tailwindcss.com | MIT | **high** |
+| `DEP-006` | @babel/standalone | 7.29.10 *(pinned+SRI)* | unpkg | MIT | ~~high~~ → low |
+| `DEP-007` | tailwindcss (Play CDN) | 3.4.17 *(pinned+SRI)* | cdn.tailwindcss.com | MIT | ~~high~~ → low |
 | `DEP-008` | Inter | variable | Google Fonts | OFL-1.1 | low |
 | `DEP-009` | JetBrains Mono | variable | Google Fonts | OFL-1.1 | low |
 | `DEP-010` | cloudflare:workers | platform | runtime external | proprietary | low |
 
-**The two that matter:** `DEP-006` and `DEP-007` carry no version at all — the browser executes whatever those CDNs serve *today*, with full page privilege. For a private demo that is a tolerable risk. For a public beta where strangers run your app, it is the first thing to fix: pin exact versions with SRI hashes, or eliminate both by adding a build step.
+**The two that mattered — now fixed.** `DEP-006` and `DEP-007` previously carried no version at all: the browser executed whatever those CDNs served *today*, with full page privilege and no integrity check. Both are now pinned with sha384 SRI (`DEP-006` → Babel 7.29.10, `DEP-007` → Tailwind 3.4.17).
+
+Note the version choice: **Babel 8 and Tailwind 4 were deliberately rejected.** This app uses the v7 `data-presets="react"` API and the v3 `tailwind.config` global object; both newer majors are incompatible. Also note that the Play CDN's latest is `3.4.17` while npm's latest 3.x is `3.4.19` — requesting `3.4.19` from that CDN returns a 731-byte error stub, which would have silently killed all styling. This is why `docs/MAINTENANCE.md` requires confirming the pinned URL returns the real file.
+
+The remaining CDN entries (`DEP-002`–`DEP-005` esm.sh, `DEP-008`–`DEP-009` Google Fonts) are version-pinned but carry no SRI — importmap and font entries do not accept `integrity`. The complete fix is the build step tracked as `COMP-008`/`COMP-009`, which removes the runtime CDN dependency entirely.
 
 **Correctly handled:** `DEP-010` (`cloudflare:workers`) is always external and never bundled, per platform rules.
 
@@ -39,7 +43,7 @@ Three linked inventories share one tagging vocabulary. Every entry was verified 
 
 ## 2. Feature inventory — `FEAT-*`
 
-30 features. **9 implemented · 11 partial · 3 stub · 7 planned.**
+31 features. **9 implemented · 11 partial · 3 stub · 8 planned.**
 
 The uncomfortable category is **phantom features** — code that looks like it works and doesn't. Four of them:
 
@@ -95,8 +99,8 @@ A phantom is worse than an absent feature: absent is honest, phantom misleads th
 **What holds it at alpha:**
 
 - **`COMP-016` (critical)** — tenancy relies on the architectural fact that one DO instance serves one deployment. That is single-tenant by *structure*, not by *access control*. It protects a private deploy; it cannot support a shared beta.
-- **`COMP-015` (high)** — zero tests, no CI. Nothing verifies any of the 30 features.
-- **`COMP-008` + `COMP-009` (high)** — no build step. The browser transpiles 40KB of JSX and JITs the entire CSS framework on every load. Both ship unpinned third-party code.
+- **`COMP-015` (high)** — zero tests, no CI. Nothing verifies any of the 31 features.
+- **`COMP-008` + `COMP-009` (high)** — no build step. The browser transpiles 40KB of JSX and JITs the entire CSS framework on every load. Both load third-party code at runtime; the versions are now pinned and integrity-checked, but the correct end state is to remove the runtime dependency entirely.
 - **`COMP-006`** — 821 lines in a single function with 24 `useState` hooks, no component decomposition, no router. At the limit of maintainability; every added feature increases coupling.
 
 ### Data flow
@@ -118,17 +122,17 @@ Third-party CDNs (COMP-008, COMP-009, COMP-011, COMP-012)
 
 ## The cross-reference that matters
 
-Follow `DEP-006` (@babel/standalone, unpinned) through the graph:
+Follow `DEP-006` (@babel/standalone) through the graph:
 
 ```
 DEP-006  ──loads──▶  COMP-008  (in-browser JSX transpilation)
                         │
                         └─enables─▶  COMP-006  (the entire SPA)
                                         │
-                                        └─carries─▶  all 30 FEAT-* entries
+                                        └─carries─▶  all 31 FEAT-* entries
 ```
 
-One unpinned CDN script sits upstream of every feature in the product. That is what the cross-linked IDs buy you: a supply-chain line item and a product capability turn out to be the same fact viewed from two ends.
+A third-party script sits upstream of every feature in the product. That is what the cross-linked IDs buy you: a supply-chain line item and a product capability turn out to be the same fact viewed from two ends. Pinning and SRI make that dependency *verifiable*; the build step is what finally makes it *disappear*.
 
 ---
 

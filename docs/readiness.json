@@ -1,0 +1,682 @@
+{
+  "schema": "readiness-state/1.0",
+  "project": "taskmaster-pro",
+  "version": "0.1.0-alpha",
+  "generated": "2026-10-16T18:08:02.034Z",
+  "sourceInventories": [
+    "features.json",
+    "architecture.json",
+    "sbom.cyclonedx.json",
+    "readiness-gates.json"
+  ],
+  "currentStage": {
+    "id": "alpha",
+    "name": "Alpha",
+    "ordinal": 1
+  },
+  "stages": [
+    {
+      "id": "alpha",
+      "name": "Alpha",
+      "ordinal": 1,
+      "definition": "Works for its creator. Rough edges expected. No promises on data, security or stability. Testing is internal.",
+      "exitQuestion": "Can I demo this to myself without it falling over?",
+      "total": 2,
+      "passed": 2,
+      "percent": 100,
+      "complete": true,
+      "failing": []
+    },
+    {
+      "id": "beta",
+      "name": "Beta",
+      "ordinal": 2,
+      "definition": "Feature-complete for its stated scope and usable by external testers without the author present. Known limitations are documented, not discovered.",
+      "exitQuestion": "Can a stranger use this without me sitting next to them?",
+      "total": 6,
+      "passed": 0,
+      "percent": 0,
+      "complete": false,
+      "failing": [
+        "G-TRUST-01",
+        "G-TRUST-02",
+        "G-ACCESS-01",
+        "G-SCOPE-01",
+        "G-SAFE-01",
+        "G-SAFE-02"
+      ]
+    },
+    {
+      "id": "ga",
+      "name": "General Availability",
+      "ordinal": 3,
+      "definition": "Reliable for paying customers. Automated quality gates, no build-time debt, real operational posture.",
+      "exitQuestion": "Would I put a paying customer's data in here and sleep?",
+      "total": 6,
+      "passed": 1,
+      "percent": 17,
+      "complete": false,
+      "failing": [
+        "G-QUAL-01",
+        "G-QUAL-02",
+        "G-BUILD-01",
+        "G-PORT-01",
+        "G-SCALE-01"
+      ]
+    },
+    {
+      "id": "enterprise",
+      "name": "Enterprise Ready",
+      "ordinal": 4,
+      "definition": "Meets organisational procurement and security review. Identity federation, auditability, compliance evidence, contractual guarantees.",
+      "exitQuestion": "Would a security reviewer sign this off?",
+      "total": 5,
+      "passed": 0,
+      "percent": 0,
+      "complete": false,
+      "failing": [
+        "G-OPS-01",
+        "G-OPS-02",
+        "G-OPS-03",
+        "G-OPS-04",
+        "G-COMP-01"
+      ]
+    }
+  ],
+  "icps": [
+    {
+      "id": "personal",
+      "name": "Personal / solo use",
+      "description": "One operator, private deployment, data is theirs alone. Auth is optional because the deployment itself is the boundary.",
+      "requiredStages": [
+        "alpha"
+      ],
+      "total": 2,
+      "passed": 2,
+      "percent": 100,
+      "ready": true,
+      "blockers": []
+    },
+    {
+      "id": "team",
+      "name": "Team / shared beta",
+      "description": "A small group shares one deployment. Access control and reliable feedback become mandatory because users are not the author.",
+      "requiredStages": [
+        "alpha",
+        "beta"
+      ],
+      "total": 8,
+      "passed": 2,
+      "percent": 25,
+      "ready": false,
+      "blockers": [
+        {
+          "id": "G-TRUST-01",
+          "label": "Users see failures instead of silent staleness",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-TRUST-02",
+          "label": "No phantom features",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-ACCESS-01",
+          "label": "Access control exists",
+          "stage": "beta",
+          "effort": "medium"
+        },
+        {
+          "id": "G-SCOPE-01",
+          "label": "The product works on the device it is used on",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-SAFE-01",
+          "label": "Destructive actions are survivable",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-SAFE-02",
+          "label": "User input cannot alter query semantics",
+          "stage": "beta",
+          "effort": "small"
+        }
+      ]
+    },
+    {
+      "id": "saas",
+      "name": "Paid SaaS customers",
+      "description": "Strangers pay for reliability. Build hygiene, operational tooling and data portability stop being nice-to-haves.",
+      "requiredStages": [
+        "alpha",
+        "beta",
+        "ga"
+      ],
+      "total": 14,
+      "passed": 3,
+      "percent": 21,
+      "ready": false,
+      "blockers": [
+        {
+          "id": "G-TRUST-01",
+          "label": "Users see failures instead of silent staleness",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-TRUST-02",
+          "label": "No phantom features",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-ACCESS-01",
+          "label": "Access control exists",
+          "stage": "beta",
+          "effort": "medium"
+        },
+        {
+          "id": "G-SCOPE-01",
+          "label": "The product works on the device it is used on",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-SAFE-01",
+          "label": "Destructive actions are survivable",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-SAFE-02",
+          "label": "User input cannot alter query semantics",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-QUAL-01",
+          "label": "Automated tests exist",
+          "stage": "ga",
+          "effort": "medium"
+        },
+        {
+          "id": "G-QUAL-02",
+          "label": "Changes ship through a pipeline",
+          "stage": "ga",
+          "effort": "medium"
+        },
+        {
+          "id": "G-BUILD-01",
+          "label": "No build work happens in the user's browser",
+          "stage": "ga",
+          "effort": "medium"
+        },
+        {
+          "id": "G-PORT-01",
+          "label": "Users can extract their data",
+          "stage": "ga",
+          "effort": "small"
+        },
+        {
+          "id": "G-SCALE-01",
+          "label": "Read paths are bounded",
+          "stage": "ga",
+          "effort": "small"
+        }
+      ]
+    },
+    {
+      "id": "enterprise",
+      "name": "Enterprise procurement",
+      "description": "Sold into an organisation that must satisfy its own security and compliance obligations.",
+      "requiredStages": [
+        "alpha",
+        "beta",
+        "ga",
+        "enterprise"
+      ],
+      "total": 19,
+      "passed": 3,
+      "percent": 16,
+      "ready": false,
+      "blockers": [
+        {
+          "id": "G-TRUST-01",
+          "label": "Users see failures instead of silent staleness",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-TRUST-02",
+          "label": "No phantom features",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-ACCESS-01",
+          "label": "Access control exists",
+          "stage": "beta",
+          "effort": "medium"
+        },
+        {
+          "id": "G-SCOPE-01",
+          "label": "The product works on the device it is used on",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-SAFE-01",
+          "label": "Destructive actions are survivable",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-SAFE-02",
+          "label": "User input cannot alter query semantics",
+          "stage": "beta",
+          "effort": "small"
+        },
+        {
+          "id": "G-QUAL-01",
+          "label": "Automated tests exist",
+          "stage": "ga",
+          "effort": "medium"
+        },
+        {
+          "id": "G-QUAL-02",
+          "label": "Changes ship through a pipeline",
+          "stage": "ga",
+          "effort": "medium"
+        },
+        {
+          "id": "G-BUILD-01",
+          "label": "No build work happens in the user's browser",
+          "stage": "ga",
+          "effort": "medium"
+        },
+        {
+          "id": "G-PORT-01",
+          "label": "Users can extract their data",
+          "stage": "ga",
+          "effort": "small"
+        },
+        {
+          "id": "G-SCALE-01",
+          "label": "Read paths are bounded",
+          "stage": "ga",
+          "effort": "small"
+        },
+        {
+          "id": "G-OPS-01",
+          "label": "Federated identity (SSO/SAML/OIDC)",
+          "stage": "enterprise",
+          "effort": "large"
+        },
+        {
+          "id": "G-OPS-02",
+          "label": "Audit log of who changed what",
+          "stage": "enterprise",
+          "effort": "large"
+        },
+        {
+          "id": "G-OPS-03",
+          "label": "Monitoring, alerting and a documented recovery path",
+          "stage": "enterprise",
+          "effort": "large"
+        },
+        {
+          "id": "G-OPS-04",
+          "label": "Tenancy isolation is enforced, not incidental",
+          "stage": "enterprise",
+          "effort": "large"
+        },
+        {
+          "id": "G-COMP-01",
+          "label": "Documented compliance posture",
+          "stage": "enterprise",
+          "effort": "large"
+        }
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "G-CORE-01",
+      "stage": "alpha",
+      "label": "Core CRUD loop works",
+      "why": "Without create, read, update and delete the product is a mock-up, not an app.",
+      "blockingFeature": "FEAT-001",
+      "effort": "done",
+      "pass": true,
+      "detail": "all 4 ready",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-CORE-02",
+      "stage": "alpha",
+      "label": "Data persists beyond the process",
+      "why": "State must survive a restart, or the app is a toy.",
+      "effort": "done",
+      "pass": true,
+      "detail": "satisfied by COMP-004",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-TRUST-01",
+      "stage": "beta",
+      "label": "Users see failures instead of silent staleness",
+      "why": "The worst failure mode is one the user cannot see. A swallowed error leaves the UI confidently wrong, which destroys trust faster than a visible crash.",
+      "blockingFeature": "FEAT-025",
+      "effort": "small",
+      "pass": false,
+      "detail": "FEAT-025 is \"stub\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-TRUST-02",
+      "stage": "beta",
+      "label": "No phantom features",
+      "why": "A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.",
+      "blockingFeature": "FEAT-010",
+      "effort": "small",
+      "pass": false,
+      "detail": "4 phantom feature(s)",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-ACCESS-01",
+      "stage": "beta",
+      "label": "Access control exists",
+      "why": "The moment a link is shared, anyone holding the URL has full read and write. Single-tenant-by-architecture is not access control.",
+      "blockingFeature": "FEAT-027",
+      "effort": "medium",
+      "conditional": "Not required for the personal ICP — a private deployment is its own boundary.",
+      "pass": false,
+      "detail": "FEAT-027 is \"planned\"",
+      "note": null
+    },
+    {
+      "id": "G-SCOPE-01",
+      "stage": "beta",
+      "label": "The product works on the device it is used on",
+      "why": "A responsive layout that hides navigation on small screens is not responsive. It silently becomes desktop-only.",
+      "blockingFeature": "FEAT-024",
+      "effort": "small",
+      "pass": false,
+      "detail": "FEAT-024 is \"partial\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-SAFE-01",
+      "stage": "beta",
+      "label": "Destructive actions are survivable",
+      "why": "Data loss in a productivity tool is unrecoverable by the user. Deletion must confirm, and must report honestly when it removed nothing.",
+      "blockingFeature": "FEAT-004",
+      "effort": "small",
+      "pass": false,
+      "detail": "none of FEAT-004/FEAT-028 ready",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-SAFE-02",
+      "stage": "beta",
+      "label": "User input cannot alter query semantics",
+      "why": "Parameterised SQL prevents injection but not LIKE-wildcard semantics. Unescaped wildcards mean a search for '100%' silently matches everything.",
+      "blockingFeature": "FEAT-013",
+      "effort": "small",
+      "pass": false,
+      "detail": "FEAT-013 is \"partial\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-QUAL-01",
+      "stage": "ga",
+      "label": "Automated tests exist",
+      "why": "Without a regression net every future change is an unverified gamble. This is the gate that makes the later gates affordable.",
+      "blockingComponent": "COMP-015",
+      "effort": "medium",
+      "pass": false,
+      "detail": "COMP-015 is \"missing\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-QUAL-02",
+      "stage": "ga",
+      "label": "Changes ship through a pipeline",
+      "why": "Manual deploys do not scale past one operator and do not gate quality. The pipeline is what makes 'it works on my machine' irrelevant.",
+      "blockingFeature": "FEAT-030",
+      "effort": "medium",
+      "dependsOn": "G-QUAL-01",
+      "pass": false,
+      "detail": "FEAT-030 is \"planned\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-SUPPLY-01",
+      "stage": "ga",
+      "label": "Third-party code is pinned and integrity-checked",
+      "why": "An unpinned CDN script executes whatever the vendor serves today, with full page privilege. Pinning with SRI makes tampering or accidental mutation detectable rather than silent.",
+      "effort": "done-partially",
+      "note": "Fixed for @babel/standalone and tailwindcss. Remaining esm.sh and Google Fonts entries are version-pinned but carry no SRI — see docs/MAINTENANCE.md.",
+      "pass": true,
+      "detail": "0 unpinned dep(s)",
+      "conditional": null
+    },
+    {
+      "id": "G-BUILD-01",
+      "stage": "ga",
+      "label": "No build work happens in the user's browser",
+      "why": "Runtime transpilation and runtime CSS generation mean the first paint pays for the build. It is also the reason an unpinned CDN script has to exist at all.",
+      "blockingComponent": "COMP-008",
+      "effort": "medium",
+      "pass": false,
+      "detail": "none of COMP-008/COMP-009 healthy",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-PORT-01",
+      "stage": "ga",
+      "label": "Users can extract their data",
+      "why": "Data a user cannot leave with is data they do not own. Export is also the cheapest possible escape hatch for your own migration problems.",
+      "blockingFeature": "FEAT-028",
+      "effort": "small",
+      "pass": false,
+      "detail": "FEAT-028 is \"planned\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-SCALE-01",
+      "stage": "ga",
+      "label": "Read paths are bounded",
+      "why": "An unpaginated SELECT grows with the dataset. What is fine at 50 rows is a timeout at 50,000, and it fails on the day it matters most.",
+      "blockingFeature": "FEAT-031",
+      "effort": "small",
+      "pass": false,
+      "detail": "FEAT-031 is \"planned\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-OPS-01",
+      "stage": "enterprise",
+      "label": "Federated identity (SSO/SAML/OIDC)",
+      "why": "Enterprises do not create separate credentials for every tool. No federation means no procurement.",
+      "blockingFeature": "FEAT-027",
+      "effort": "large",
+      "pass": false,
+      "detail": "FEAT-027 is \"planned\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-OPS-02",
+      "stage": "enterprise",
+      "label": "Audit log of who changed what",
+      "why": "An auditor asks who deleted the record. Without an audit trail the answer is a guess.",
+      "blockingFeature": "FEAT-027",
+      "effort": "large",
+      "pass": false,
+      "detail": "FEAT-027 is \"planned\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-OPS-03",
+      "stage": "enterprise",
+      "label": "Monitoring, alerting and a documented recovery path",
+      "why": "Enterprises buy the promise that someone will know before they do. An unmonitored system makes that promise falsely.",
+      "blockingComponent": "COMP-015",
+      "effort": "large",
+      "pass": false,
+      "detail": "COMP-015 is \"missing\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-OPS-04",
+      "stage": "enterprise",
+      "label": "Tenancy isolation is enforced, not incidental",
+      "why": "Isolation that relies on 'one deployment per customer' does not survive multi-tenancy, and does not survive a review that asks how you prevent cross-tenant reads.",
+      "blockingComponent": "COMP-016",
+      "effort": "large",
+      "pass": false,
+      "detail": "COMP-016 is \"missing\"",
+      "conditional": null,
+      "note": null
+    },
+    {
+      "id": "G-COMP-01",
+      "stage": "enterprise",
+      "label": "Documented compliance posture",
+      "why": "A security questionnaire arrives before the contract does. Answering it from scratch each time is how deals stall.",
+      "blockingFeature": "FEAT-027",
+      "effort": "large",
+      "note": "Placeholder — no compliance artefacts exist yet (SOC 2 / ISO 27001 / DPA / sub-processor list).",
+      "pass": false,
+      "detail": "none of FEAT-027 ready",
+      "conditional": null
+    }
+  ],
+  "nextActions": [
+    {
+      "gate": "G-TRUST-01",
+      "stage": "beta",
+      "label": "Users see failures instead of silent staleness",
+      "effort": "small",
+      "why": "The worst failure mode is one the user cannot see. A swallowed error leaves the UI confidently wrong, which destroys trust faster than a visible crash.",
+      "detail": "FEAT-025 is \"stub\"",
+      "target": {
+        "id": "FEAT-025",
+        "name": "Error handling / user feedback",
+        "status": "stub",
+        "evidence": "public/index.html:140-142, 204-206, 218-220, 242-243, 256-257, 274-276"
+      },
+      "dependsOn": null
+    },
+    {
+      "gate": "G-TRUST-02",
+      "stage": "beta",
+      "label": "No phantom features",
+      "effort": "small",
+      "why": "A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.",
+      "detail": "4 phantom feature(s)",
+      "target": {
+        "id": "FEAT-010",
+        "name": "Filter by tag",
+        "status": "stub",
+        "evidence": "src/index.ts:16 (declared), absent from query builder lines 19-43"
+      },
+      "dependsOn": null
+    },
+    {
+      "gate": "G-SCOPE-01",
+      "stage": "beta",
+      "label": "The product works on the device it is used on",
+      "effort": "small",
+      "why": "A responsive layout that hides navigation on small screens is not responsive. It silently becomes desktop-only.",
+      "detail": "FEAT-024 is \"partial\"",
+      "target": {
+        "id": "FEAT-024",
+        "name": "Responsive layout",
+        "status": "partial",
+        "evidence": "public/index.html:307 (search hidden sm:block), 350 (sidebar hidden lg:flex), 319 (timer hidden md:flex)"
+      },
+      "dependsOn": null
+    },
+    {
+      "gate": "G-SAFE-01",
+      "stage": "beta",
+      "label": "Destructive actions are survivable",
+      "effort": "small",
+      "why": "Data loss in a productivity tool is unrecoverable by the user. Deletion must confirm, and must report honestly when it removed nothing.",
+      "detail": "none of FEAT-004/FEAT-028 ready",
+      "target": {
+        "id": "FEAT-004",
+        "name": "Delete task",
+        "status": "partial",
+        "evidence": "src/index.ts:170-174, public/index.html:236-244"
+      },
+      "dependsOn": null
+    },
+    {
+      "gate": "G-SAFE-02",
+      "stage": "beta",
+      "label": "User input cannot alter query semantics",
+      "effort": "small",
+      "why": "Parameterised SQL prevents injection but not LIKE-wildcard semantics. Unescaped wildcards mean a search for '100%' silently matches everything.",
+      "detail": "FEAT-013 is \"partial\"",
+      "target": {
+        "id": "FEAT-013",
+        "name": "Search title + description",
+        "status": "partial",
+        "evidence": "src/index.ts:38-41, public/index.html:307-316"
+      },
+      "dependsOn": null
+    },
+    {
+      "gate": "G-ACCESS-01",
+      "stage": "beta",
+      "label": "Access control exists",
+      "effort": "medium",
+      "why": "The moment a link is shared, anyone holding the URL has full read and write. Single-tenant-by-architecture is not access control.",
+      "detail": "FEAT-027 is \"planned\"",
+      "target": {
+        "id": "FEAT-027",
+        "name": "Authentication / access control",
+        "status": "planned",
+        "evidence": "grep for auth|bearer|token|session|cookie across repo returns only the word 'session' in an alert() string"
+      },
+      "dependsOn": null
+    }
+  ],
+  "summary": {
+    "totalGates": 19,
+    "passed": 3,
+    "failing": 16,
+    "phantomFeatures": [
+      "FEAT-010",
+      "FEAT-017",
+      "FEAT-025",
+      "FEAT-026"
+    ],
+    "criticalRisks": [
+      "COMP-016"
+    ]
+  }
+}

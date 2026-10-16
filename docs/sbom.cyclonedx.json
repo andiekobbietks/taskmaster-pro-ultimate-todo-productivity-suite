@@ -115,40 +115,44 @@
       "bom-ref": "DEP-006",
       "type": "library",
       "name": "@babel/standalone",
-      "version": "UNPINNED",
-      "purl": "pkg:npm/@babel/standalone",
+      "version": "7.29.10",
+      "purl": "pkg:npm/@babel/standalone@7.29.10",
       "scope": "required",
       "licenses": [{ "license": { "id": "MIT" } }],
       "supplier": { "name": "unpkg CDN" },
-      "delivery": "CDN (script tag, no version suffix)",
-      "integrity": "NO - version NOT pinned, no SRI",
-      "externalReferences": [{ "type": "distribution", "url": "https://unpkg.com/@babel/standalone/babel.min.js" }],
+      "delivery": "CDN (script tag, version-pinned, SRI enforced)",
+      "integrity": "YES - sha384-DvKInD++yy7A2BLvCHTGeQpbzHFQ/fygXywfI/wco5cjKN4A+mE48ib8UE8FiW0o",
+      "externalReferences": [{ "type": "distribution", "url": "https://unpkg.com/@babel/standalone@7.29.10/babel.min.js" }],
       "properties": [
         { "name": "dep-id", "value": "DEP-006" },
         { "name": "role", "value": "in-browser JSX transpilation" },
         { "name": "used-by", "value": "COMP-008" },
-        { "name": "risk", "value": "HIGH - unpinned. Whatever unpkg serves as 'latest' is executed with full page privilege." },
-        { "name": "remediation", "value": "Pin exact version + SRI hash, or remove by pre-compiling JSX" }
+        { "name": "risk", "value": "low - RESOLVED. Was HIGH/unpinned; now pinned to 7.x with SRI + crossorigin." },
+        { "name": "remediation-applied", "value": "Pinned to latest 7.x. Babel 8 rejected: this app uses the v7 data-presets=react API." },
+        { "name": "residual-risk", "value": "Still a runtime CDN dependency. Eliminate entirely with a build step (COMP-008)." },
+        { "name": "pinned-on", "value": "2026-10-16" }
       ]
     },
     {
       "bom-ref": "DEP-007",
       "type": "library",
       "name": "tailwindcss (Play CDN)",
-      "version": "UNPINNED",
-      "purl": "pkg:npm/tailwindcss",
+      "version": "3.4.17",
+      "purl": "pkg:npm/tailwindcss@3.4.17",
       "scope": "required",
       "licenses": [{ "license": { "id": "MIT" } }],
       "supplier": { "name": "cdn.tailwindcss.com" },
-      "delivery": "CDN (script tag, no version suffix)",
-      "integrity": "NO - version NOT pinned, no SRI",
-      "externalReferences": [{ "type": "distribution", "url": "https://cdn.tailwindcss.com" }],
+      "delivery": "CDN (script tag, version-pinned, SRI enforced)",
+      "integrity": "YES - sha384-igm5BeiBt36UU4gqwWS7imYmelpTsZlQ45FZf+XBn9MuJbn4nQr7yx1yFydocC/K",
+      "externalReferences": [{ "type": "distribution", "url": "https://cdn.tailwindcss.com/3.4.17" }],
       "properties": [
         { "name": "dep-id", "value": "DEP-007" },
         { "name": "role", "value": "utility CSS framework (runtime JIT in browser)" },
         { "name": "used-by", "value": "COMP-009" },
-        { "name": "risk", "value": "HIGH - unpinned, and the vendor marks this CDN as not-for-production" },
-        { "name": "remediation", "value": "Compile Tailwind to a static stylesheet at build time" }
+        { "name": "risk", "value": "low - RESOLVED. Was HIGH/unpinned; now pinned to 3.4.17 with SRI + crossorigin." },
+        { "name": "remediation-applied", "value": "Pinned to latest 3.x on the Play CDN. Tailwind 4 rejected: CSS-first config, drops the tailwind.config global this app uses. NOTE the Play CDN latest (3.4.17) differs from npm latest 3.x (3.4.19) - 3.4.19 on this CDN returns an error stub." },
+        { "name": "residual-risk", "value": "Vendor marks Play CDN as not-for-production. Eliminate with a build step (COMP-009)." },
+        { "name": "pinned-on", "value": "2026-10-16" }
       ]
     },
     {
@@ -221,8 +225,8 @@
     "npmBundled": 1,
     "cdnLoaded": 8,
     "platformProvided": 1,
-    "unpinned": 2,
-    "withSRI": 0,
-    "note": "8 of 10 dependencies are fetched at page load from third-party CDNs with no Subresource Integrity. Two of those are not version-pinned at all (DEP-006, DEP-007) and are the highest-priority supply-chain items to fix before any external beta."
+    "unpinned": 0,
+    "withSRI": 2,
+    "note": "Previously 2 of 10 dependencies were unpinned with no SRI (DEP-006 @babel/standalone, DEP-007 tailwindcss Play CDN) - both executed with full page privilege. RESOLVED 2026-10-16: pinned to latest compatible major with sha384 SRI + crossorigin. Babel 8 and Tailwind 4 were rejected as incompatible with this app's APIs. Residual: DEP-002..005 (esm.sh) and DEP-008..009 (Google Fonts) remain version-pinned but without SRI, since importmap/font entries do not accept integrity. All CDN runtime deps should be eliminated by the build step tracked as COMP-008/COMP-009."
   }
 }

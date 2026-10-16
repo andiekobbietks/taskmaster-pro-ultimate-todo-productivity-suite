@@ -10,7 +10,15 @@
   
   <link rel="stylesheet" href="/style.css">
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind Play CDN — PINNED to 3.4.17 with SRI.
+       Previously unpinned: served whatever version was "latest" at page load,
+       executed with full page privilege and no integrity check.
+       Pinned to the newest Tailwind 3.x because this app uses the v3
+       `tailwind.config` global object; v4 is CSS-first and would break it.
+       TODO(prod): replace with a build-time compiled stylesheet — see docs/MAINTENANCE.md -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"
+          integrity="sha384-igm5BeiBt36UU4gqwWS7imYmelpTsZlQ45FZf+XBn9MuJbn4nQr7yx1yFydocC/K"
+          crossorigin="anonymous"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -43,7 +51,17 @@
     }
   }
   </script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- @babel/standalone — PINNED to 7.29.10 with SRI.
+       Previously unpinned: `https://unpkg.com/@babel/standalone/babel.min.js`
+       resolved to whatever unpkg served as "latest" at page load.
+       Pinned to the newest 7.x because this app uses the v7
+       `data-presets="react"` attribute; Babel 8 has breaking changes.
+       NOTE: this transpiles ~40KB of JSX in the browser on every load —
+       the correct long-term fix is a build step, not a pinned CDN.
+       See docs/MAINTENANCE.md -->
+  <script src="https://unpkg.com/@babel/standalone@7.29.10/babel.min.js"
+          integrity="sha384-DvKInD++yy7A2BLvCHTGeQpbzHFQ/fygXywfI/wco5cjKN4A+mE48ib8UE8FiW0o"
+          crossorigin="anonymous"></script>
 </head>
 <body class="bg-[#F8FAFC] dark:bg-[#0A0E1A] text-[#0F172A] dark:text-[#F1F5F9] font-sans antialiased selection:bg-brand-500/20 selection:text-brand-600">
   <div id="root"></div>

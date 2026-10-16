@@ -421,6 +421,22 @@
       "notes": "vitest + Workers pool is the platform-native choice."
     },
     {
+      "id": "FEAT-031",
+      "name": "Pagination / bounded reads",
+      "status": "planned",
+      "maturity": "not-started",
+      "backend": "GET /api/todos performs SELECT * with no LIMIT or cursor",
+      "frontend": "fetchTodos() fetches the entire filtered set in one request",
+      "evidence": "src/index.ts:19 (SELECT * FROM todos), 45 (exec with no LIMIT); public/index.html:120-143 (no paging state)",
+      "dependsOn": ["COMP-004"],
+      "gaps": [
+        "BLOCKER-for-GA: unbounded SELECT grows with dataset size. Fine at 50 rows, a timeout at 50,000.",
+        "No LIMIT, no OFFSET, no cursor, no infinite-scroll trigger",
+        "Client holds the entire task list in one useState array"
+      ],
+      "notes": "Tracked separately from FEAT-002 because listing works correctly at small scale - the gap only appears under load, which makes it easy to miss."
+    },
+    {
       "id": "FEAT-030",
       "name": "CI/CD pipeline",
       "status": "planned",
@@ -436,10 +452,10 @@
     }
   ],
   "summary": {
-    "total": 30,
-    "byStatus": { "implemented": 9, "partial": 11, "stub": 3, "planned": 7 },
+    "total": 31,
+    "byStatus": { "implemented": 9, "partial": 11, "stub": 3, "planned": 8 },
     "phantomFeatures": ["FEAT-010", "FEAT-017", "FEAT-025", "FEAT-026"],
     "betaBlockers": ["FEAT-027", "FEAT-025", "FEAT-029", "FEAT-024", "FEAT-010"],
-    "assessment": "The product is beta-shaped; the engineering is alpha. 20 of 30 features are usable today, but 4 are phantoms that appear to work and do not, which is worse than absent."
+    "assessment": "The product is beta-shaped; the engineering is alpha. 20 of 31 features are usable today, but 4 are phantoms that appear to work and do not, which is worse than absent."
   }
 }

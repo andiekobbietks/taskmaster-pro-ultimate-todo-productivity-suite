@@ -22,7 +22,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+
+      # No lockfile is committed by design, so this resolves fresh rather than
+      # using `npm ci`.
+      - name: Install dependencies
+        run: npm install
 
       # A dry-run deploy bundles the Worker exactly as `wrangler deploy` would,
       # but uploads nothing and needs no credentials. It fails on a broken
@@ -45,7 +50,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # docs/READINESS.md and docs/readiness.json are generated from the feature,
       # architecture, and SBOM inventories. This job re-derives them and fails if
@@ -81,7 +86,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # Guards the fixtures the QA/chaos seeder depends on, so a malformed
       # fixture is caught here instead of during someone's test session.

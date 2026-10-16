@@ -7,3 +7,4 @@ dist/
 .env
 .env.*
 release-notes.md
+package-lock.json

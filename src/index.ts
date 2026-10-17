@@ -74,7 +74,11 @@ export class App extends DurableObject {
       const createdAt = Date.now();
       const tagsJson = JSON.stringify(tags);
 
-      const res = this.ctx.storage.sql.exec(
+      // Drain the cursor before reading back. A write whose cursor is never
+      // consumed is not reliably applied before the next statement runs, so the
+      // readback used to throw "Expected exactly one result from SQL query, but
+      // got no results" even though the row had in fact been inserted.
+      this.ctx.storage.sql.exec(
         `INSERT INTO todos (title, description, priority, due_date, list_id, tags, estimated_pomodoros, created_at, completed, is_pinned) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
         title.trim(),
@@ -85,9 +89,10 @@ export class App extends DurableObject {
         tagsJson,
         estimated_pomodoros,
         createdAt
-      );
+      ).toArray();
 
-      const newId = res.lastRowId;
+      // lastRowId is not reliably populated on the cursor, so ask SQLite directly.
+      const newId = this.ctx.storage.sql.exec("SELECT last_insert_rowid() AS id").one().id;
       const created = this.ctx.storage.sql.exec("SELECT * FROM todos WHERE id = ?", newId).one();
       
       return c.json({
@@ -155,7 +160,7 @@ export class App extends DurableObject {
 
       if (updates.length > 0) {
         params.push(id);
-        this.ctx.storage.sql.exec(`UPDATE todos SET ${updates.join(", ")} WHERE id = ?`, ...params);
+        this.ctx.storage.sql.exec(`UPDATE todos SET ${updates.join(", ")} WHERE id = ?`, ...params).toArray();
       }
 
       const updated = this.ctx.storage.sql.exec("SELECT * FROM todos WHERE id = ?", id).one();
@@ -169,7 +174,7 @@ export class App extends DurableObject {
 
     this.app.delete("/api/todos/:id", (c) => {
       const id = c.req.param("id");
-      this.ctx.storage.sql.exec("DELETE FROM todos WHERE id = ?", id);
+      this.ctx.storage.sql.exec("DELETE FROM todos WHERE id = ?", id).toArray();
       return c.json({ success: true });
     });
 
@@ -187,7 +192,7 @@ export class App extends DurableObject {
       this.ctx.storage.sql.exec(
         "INSERT INTO lists (id, name, color, icon, sort_order) VALUES (?, ?, ?, ?, (SELECT COUNT(*) FROM lists))",
         id, name.trim(), color, icon
-      );
+      ).toArray();
       const created = this.ctx.storage.sql.exec("SELECT * FROM lists WHERE id = ?", id).one();
       return c.json(created, 201);
     });
@@ -197,8 +202,8 @@ export class App extends DurableObject {
       if (id === "default" || id === "inbox") {
         return c.json({ error: "Cannot delete default lists" }, 400);
       }
-      this.ctx.storage.sql.exec("DELETE FROM lists WHERE id = ?", id);
-      this.ctx.storage.sql.exec("UPDATE todos SET list_id = 'inbox' WHERE list_id = ?", id);
+      this.ctx.storage.sql.exec("DELETE FROM lists WHERE id = ?", id).toArray();
+      this.ctx.storage.sql.exec("UPDATE todos SET list_id = 'inbox' WHERE list_id = ?", id).toArray();
       return c.json({ success: true });
     });
 
@@ -320,3 +325,36 @@ export class App extends DurableObject {
     return this.app.fetch(request);
   }
 }
+
+interface Env {
+  APP: DurableObjectNamespace;
+  ASSETS: Fetcher;
+  SEED_DEMO_DATA?: string;
+}
+
+/**
+ * Worker entrypoint.
+ *
+ * The whole API lives inside the `App` Durable Object, which owns the SQLite
+ * storage via `ctx.storage.sql`. Without this wrapper there is no `default`
+ * export, so Wrangler fails with "No matching export ... for import 'default'"
+ * and every /api/* path is unreachable.
+ *
+ * Traffic is split here: /api/* goes to the single App instance, everything
+ * else is served from static assets. `run_worker_first` in wrangler.json keeps
+ * SPA fallback from swallowing /api/* before the Worker sees it.
+ */
+const worker = {
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+    const { pathname } = new URL(request.url);
+
+    if (pathname.startsWith("/api/")) {
+      const id = env.APP.idFromName("taskmaster");
+      return env.APP.get(id).fetch(request);
+    }
+
+    return env.ASSETS.fetch(request);
+  },
+};
+
+export default worker;

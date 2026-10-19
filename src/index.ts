@@ -1,6 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
 import { Hono } from "hono";
 
+/**
+ * Escape LIKE metacharacters so a search for "100%" matches a literal "100%"
+ * instead of turning into a match-everything wildcard.
+ */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export class App extends DurableObject {
   private app = new Hono();
 
@@ -35,9 +43,18 @@ export class App extends DurableObject {
         params.push(listId);
       }
 
+      // `tag` is advertised in the README and on the API surface; wire it to the
+      // query rather than reading it and dropping it on the floor. `tags` is a
+      // JSON array in a TEXT column, so match an exact element, not a substring.
+      if (tag) {
+        query += " AND EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ?)";
+        params.push(tag);
+      }
+
       if (search) {
-        query += " AND (title LIKE ? OR description LIKE ?)";
-        params.push(`%${search}%`, `%${search}%`);
+        const pattern = `%${escapeLike(search)}%`;
+        query += " AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')";
+        params.push(pattern, pattern);
       }
 
       query += " ORDER BY is_pinned DESC, due_date ASC, created_at DESC";

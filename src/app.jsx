@@ -13,7 +13,7 @@
  * ("users see failures instead of silent staleness") exists to prevent.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CheckCircle2, Circle, Plus, Trash2, Pin, Calendar, Tag, Search,

@@ -1,5 +1,39 @@
 # Version History
 
+## The short version, without any jargon
+
+**The first released version of this app was broken, and nobody noticed for
+nineteen days.**
+
+`v1.0.0` shipped on 16 October 2026. It could not load or save a single task — the
+part of the system that stores the data was never switched on properly. The app
+looked fine: the page loaded, the buttons worked, there were no error messages. It
+just quietly returned nothing.
+
+**How it stayed hidden.** Four separate safety checks were added during those
+nineteen days, and **all four passed**. That is the uncomfortable part. Each check
+was looking at a different thing — the instructions were checked against the
+generated output, the practice data was checked for formatting, the interface was
+checked for errors, and the app was checked for missing files. None of them asked
+the only question that mattered: *does saving a task actually work?*
+
+The fault was not inside any one piece of code. Every file on its own was correct.
+The fault lived in the gap **between** two files — one said the data store existed,
+the other never told the system to use it — and no single-file check can see a
+problem that only exists in the relationship between two files.
+
+**What changed.** A new check now compares files against each other specifically
+to look for that kind of gap. It runs automatically on every proposed change. If it
+had existed on 27 September, the very first attempt would have failed immediately
+and none of the six intervening commits would have been needed.
+
+**Where things stand now:** zero known problems of this kind. First working
+release is `v1.0.1`.
+
+---
+
+## The detail
+
 Every version this project has ever been through, in order, with the state of
 `scripts/tier1-check.mjs` at that commit. The checker is run against each
 historical tree so this table is derived from the code, not remembered.

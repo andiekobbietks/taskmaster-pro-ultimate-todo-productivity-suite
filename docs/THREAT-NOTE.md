@@ -9,6 +9,70 @@ the mitigations in §5 are in place.
 
 ---
 
+## Read this first — no technical knowledge needed
+
+**What this document is.** Before the Irene Vera Foundation puts its real work into
+TaskMaster, someone went through every way the system could be misused, lost, or
+turned against the charity. This is that review. It was written on 19 October 2026,
+before any code existed.
+
+**The short version: don't put real data in yet.** Nothing here is a criticism of
+anyone's work. It is an ordinary safety check, and it produced six specific things
+to settle first. Until they are done, TaskMaster should only be used with made-up
+practice data.
+
+**The six things to settle**
+
+1. **Choose one login system, not two.** The plan had both Cloudflare Access and
+   Supabase handling sign-in. Two systems means two places to disagree about who
+   someone is, and when they disagree there is no clear answer to which one is
+   right. Recommendation: use Cloudflare Access only for now, and add Supabase
+   later only if a genuine limitation turns up.
+
+2. **Today, everyone can edit everyone's tasks.** There are no separate "can view"
+   and "can edit" permissions. Anyone signed in can change any item on the list.
+   That may be perfectly fine for a small team — but it should be a decision on
+   record, not an accident discovered later.
+
+3. **The record of who did what must be impossible to change.** For a charity, being
+   able to show a trustee that a decision was made, when, and by whom is the entire
+   point. So that record must be append-only: the system can add to it, but nobody
+   — not even an administrator — can edit or delete an entry. Otherwise the record
+   can be quietly rewritten, which makes it *worse* than having no record at all,
+   because it looks trustworthy.
+
+4. **The system should record who did what, not the person.** When someone ticks a
+   task complete, the app should take that from the signed-in account rather than
+   from a box in the request. Otherwise a name can be typed in by hand, and the
+   record stops being evidence of anything.
+
+5. **Personal information needs care.** Team members are in Wales, so UK data
+   protection law applies. Task titles can easily contain personal information.
+   Collect only what is needed, and decide how long finished tasks are kept before
+   loading anything real.
+
+6. **Everything runs through one shared database.** If it slows down or fails, it
+   affects everyone at once, with no spare copy to fall back on. The current list
+   request reads every row with no limit — fine at five people, a problem during
+   grant-deadline week. Fix: add a limit and an index before real data goes in.
+
+**One more, for later.** If TaskMaster ever gains AI features, grant information
+would be sent to an outside AI provider and could end up in their logs. A charity's
+funding pipeline sitting inside a third party's system is a legal problem, not a
+computer one. Rule to follow: never put grant or personal data into an AI prompt.
+
+**What this document is not.** This is a review of an internal team tool. It is not
+a compliance certificate. Before the charity could use this with funders or the
+public, it would still need data processing agreements, a list of outside
+suppliers, and a written retention policy. No application can supply those — they
+are organisational decisions, not software ones.
+
+**How to read the rest.** Sections 1–5 are the detailed version of the above, in
+technical language, for whoever builds the system. The numbered decisions in
+Section 5 are the actual instructions — each is a specific, settled choice.
+
+---
+
 ## 1. Boundaries
 
 | # | boundary | trusts |

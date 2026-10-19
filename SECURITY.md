@@ -1,5 +1,10 @@
 # Security Policy
 
+> **The one thing you must know before putting this online: there are no user
+> accounts.** Anyone who can find the web address can read, change or delete
+> everything stored in it. Treat any live instance as public. The rest of this
+> file is the detail behind that warning.
+
 ## Supported versions
 
 This project is **Alpha**. Only the newest published release is supported — there

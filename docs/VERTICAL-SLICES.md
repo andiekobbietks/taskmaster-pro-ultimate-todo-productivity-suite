@@ -1,5 +1,35 @@
 # Feature Catalogue — by Vertical Slice
 
+## What this document is, in plain terms
+
+This is a list of what the app can genuinely do, sorted so you can see **what is
+finished and what is only pretending**.
+
+The organising idea is simple. A feature is only real if it works **all the way
+through** — it appears on screen, the server accepts it, and the data gets saved.
+If a button is on the screen but clicking it does nothing useful, that is worse
+than if the button were missing, because it looks like it works.
+
+**The word "phantom" means exactly that**: something that appears to exist but is
+not really finished. The whole point of this catalogue is to find phantoms, because
+they are the defect you cannot see by using the app normally.
+
+**How to read the scoreboard.** Each row is one area of the app. The verdict column
+tells you whether that area is good enough to release:
+
+| verdict | meaning |
+|---|---|
+| **shippable** | genuinely finished — use it |
+| *shippable, UI thin* | works, but the screen is rough around it |
+| *shippable, 1 phantom* | works, except for one button or field that does not |
+| **not shippable** | do not demo this yet |
+| **absent** | not built at all — no promise is being made |
+
+Row **I** is the one to read twice: user accounts and permissions do not exist
+yet. That is the gap between "working app" and "safe to give to other people".
+
+---
+
 A vertical slice is a feature that is complete through every layer: **UI →
 API → storage**. A feature that exists at one layer and not the others is not
 "half done", it is a *phantom* — the most expensive kind of incomplete, because

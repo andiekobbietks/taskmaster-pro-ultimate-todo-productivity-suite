@@ -18,6 +18,16 @@ item is the third one under **Fixed**: `v1.0.0` shipped a Durable Object that
 `wrangler.json` never bound, so the API could not serve. This is the first tag
 that includes that fix.
 
+**In plain terms.** Version 1.0.0 was released broken — it could not load or save
+tasks at all, though nothing on screen said so. This release is the first that
+actually works. It also fixes two filters that appeared to work but did not
+(filtering by tag returned everything; searching for something containing a `%`
+returned everything), makes failed requests visible instead of silent, and adds an
+automatic check that compares files against each other so this class of fault
+cannot ship again.
+
+Everything below is the detail.
+
 ### Added
 
 - **A static cross-file consistency check.** `scripts/tier1-check.mjs` compares

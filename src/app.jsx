@@ -114,6 +114,11 @@ function App() {
   const [hackathonProfile, setHackathonProfile] = useState(null);
   const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
+  const [archiveSources, setArchiveSources] = useState([]);
+  const [archiveView, setArchiveView] = useState(false);
+  const [archiveUrl, setArchiveUrl] = useState('');
+  const [archiveResult, setArchiveResult] = useState(null);
+  const [checkingArchive, setCheckingArchive] = useState(false);
   const [attachments, setAttachments] = useState({});
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -144,6 +149,7 @@ function App() {
   // Fetch hackathons on mount
   useEffect(() => {
     fetchHackathons();
+    fetchArchiveSources();
     fetchHackathonProfile();
   }, [fetchHackathons, fetchHackathonProfile]);
 
@@ -231,6 +237,39 @@ function App() {
       await fetchAttachments(ticketId);
     } catch (err) {
       fail("Deleting attachment", () => deleteAttachment(ticketId, attachmentId))(err);
+    }
+  }, [fetchAttachments, fail]);
+
+  const fetchArchiveSources = useCallback(async () => {
+    try {
+      const data = await api("./api/archive/sources");
+      setArchiveSources(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // No sources yet
+    }
+  }, []);
+
+  const checkArchive = useCallback(async (url) => {
+    setCheckingArchive(true);
+    try {
+      const data = await api(`./api/archive/check?url=${encodeURIComponent(url)}`);
+      setArchiveResult(data);
+    } catch (err) {
+      setArchiveResult({ archived: false, url, error: err.message });
+    } finally {
+      setCheckingArchive(false);
+    }
+  }, []);
+
+  const fetchArchiveForTicket = useCallback(async (ticketId, url) => {
+    try {
+      await api("./api/archive/fetch", {
+        method: "POST",
+        body: JSON.stringify({ url, ticket_id: ticketId }),
+      });
+      await fetchAttachments(ticketId);
+    } catch (err) {
+      fail("Fetching archive", () => fetchArchiveForTicket(ticketId, url))(err);
     }
   }, [fetchAttachments, fail]);
 
@@ -541,6 +580,21 @@ function App() {
                         {hackathons.length}
                       </span>
                     </button>
+
+                    <button
+                      onClick={() => { setArchiveView(true); setHackathonView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        archiveView
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                      <span>Archives</span>
+                      <span className="ml-auto text-xs bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400 px-1.5 py-0.5 rounded-full">
+                        {archiveSources.length}
+                      </span>
+                    </button>
                   </div>
                 </div>
 
@@ -645,6 +699,100 @@ function App() {
                   </div>
                 </div>
 
+                {/* Archive View */}
+                {archiveView && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold tracking-tight">Web Archive Integration</h2>
+                        <p className="text-sm text-neutral-500">Fetch hackathon pages from web archives. No scraping, no ToS issues.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={fetchArchiveSources}
+                          className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                        >
+                          Refresh
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* URL checker */}
+                    <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      <h3 className="text-sm font-semibold mb-2">Check if a page is archived</h3>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="url"
+                          value={archiveUrl}
+                          onChange={(e) => setArchiveUrl(e.target.value)}
+                          placeholder="https://devpost.com/hackathons/..."
+                          className="flex-1 h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                        />
+                        <button
+                          onClick={() => checkArchive(archiveUrl)}
+                          disabled={checkingArchive || !archiveUrl}
+                          className="h-9 px-3 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+                        >
+                          {checkingArchive ? 'Checking...' : 'Check'}
+                        </button>
+                      </div>
+                      {archiveResult && (
+                        <div className={`mt-3 p-3 rounded-lg text-sm ${archiveResult.archived ? 'bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800'}`}>
+                          {archiveResult.archived ? (
+                            <div>
+                              <p className="font-medium text-green-700 dark:text-green-400">Archived!</p>
+                              <p className="text-xs text-green-600 dark:text-green-500 mt-1">Snapshot: {archiveResult.timestamp}</p>
+                              <p className="text-xs text-neutral-500 mt-1 break-all">{archiveResult.snapshot_url}</p>
+                              {archiveResult.extracted && Object.keys(archiveResult.extracted).length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {Object.entries(archiveResult.extracted).map(([k, v]) => (
+                                    <p key={k} className="text-xs"><span className="font-medium">{k}:</span> {v}</p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-red-700 dark:text-red-400">Not found in archive</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Archive sources */}
+                    <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      <h3 className="text-sm font-semibold mb-2">Archive sources</h3>
+                      {archiveSources.length === 0 ? (
+                        <p className="text-xs text-neutral-500">No archive sources configured. Wayback Machine is available by default.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {archiveSources.map(src => (
+                            <div key={src.id} className="flex items-center justify-between p-2 rounded bg-neutral-50 dark:bg-neutral-800/50">
+                              <div>
+                                <span className="text-sm font-medium">{src.name}</span>
+                                <span className="text-[10px] text-neutral-400 ml-2">{src.type}</span>
+                              </div>
+                              <span className={`text-[10px] font-medium ${src.enabled ? 'text-green-600' : 'text-neutral-400'}`}>
+                                {src.enabled ? 'Enabled' : 'Disabled'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Instructions */}
+                    <div className="p-4 bg-neutral-50 dark:bg-neutral-800/30 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      <h3 className="text-sm font-semibold mb-2">How to use</h3>
+                      <ol className="text-xs text-neutral-500 space-y-1 list-decimal list-inside">
+                        <li>Paste a hackathon URL above and click "Check"</li>
+                        <li>If archived, click "Fetch" on the hackathon card to import the snapshot</li>
+                        <li>The archived page is stored as an attachment (immutable record)</li>
+                        <li>Deadlines, prizes, and rules are extracted automatically</li>
+                      </ol>
+                    </div>
+                  </div>
+                )}
+
                 {/* Hackathon View */}
                 {hackathonView && (
                   <div className="space-y-4">
@@ -712,6 +860,17 @@ function App() {
                                       </span>
                                     )}
                                   </div>
+
+                                  {h.url && (
+                                    <div className="mt-2">
+                                      <button
+                                        onClick={() => fetchArchiveForTicket(h.id, h.url)}
+                                        className="text-[10px] font-medium text-teal-600 dark:text-teal-400 hover:underline"
+                                      >
+                                        Fetch from Wayback Archive
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Attachments */}
@@ -812,7 +971,7 @@ function App() {
                 )}
 
                 {/* Task List */}
-                {!hackathonView && (
+                {!hackathonView && !archiveView && (
                 <div className="space-y-3">
                   {todos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-xs">

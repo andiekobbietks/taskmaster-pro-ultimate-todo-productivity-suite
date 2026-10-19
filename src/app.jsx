@@ -114,6 +114,9 @@ function App() {
   const [hackathonProfile, setHackathonProfile] = useState(null);
   const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
+  const [attachments, setAttachments] = useState({});
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   /**
    * Build an error handler for one kind of work.
@@ -195,6 +198,41 @@ function App() {
       fail("Loading hackathons", fetchHackathons)(err);
     }
   }, [fail]);
+
+  const fetchAttachments = useCallback(async (ticketId) => {
+    try {
+      const data = await api(`./api/todos/${ticketId}/attachments`);
+      setAttachments(prev => ({ ...prev, [ticketId]: Array.isArray(data) ? data : [] }));
+    } catch (err) {
+      // No attachments yet
+    }
+  }, []);
+
+  const uploadAttachment = useCallback(async (ticketId, file) => {
+    setUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await api(`./api/todos/${ticketId}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+      await fetchAttachments(ticketId);
+    } catch (err) {
+      fail("Uploading attachment", () => uploadAttachment(ticketId, file))(err);
+    } finally {
+      setUploadingAttachment(false);
+    }
+  }, [fetchAttachments, fail]);
+
+  const deleteAttachment = useCallback(async (ticketId, attachmentId) => {
+    try {
+      await api(`./api/attachments/${attachmentId}`, { method: "DELETE" });
+      await fetchAttachments(ticketId);
+    } catch (err) {
+      fail("Deleting attachment", () => deleteAttachment(ticketId, attachmentId))(err);
+    }
+  }, [fetchAttachments, fail]);
 
   const fetchHackathonProfile = useCallback(async () => {
     try {
@@ -675,6 +713,25 @@ function App() {
                                     )}
                                   </div>
                                 </div>
+
+                                {/* Attachments */}
+                                {attachments[h.id] && attachments[h.id].length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {attachments[h.id].map(att => (
+                                        <button
+                                          key={att.id}
+                                          onClick={() => setPreviewAttachment(att)}
+                                          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/50 px-2 py-1 rounded hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-colors"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                          {att.filename.length > 20 ? att.filename.slice(0, 20) + '...' : att.filename}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => { setEditingHackathon(h); setIsHackathonModalOpen(true); }}
@@ -702,6 +759,55 @@ function App() {
                         })}
                       </div>
                     )}
+
+                    {/* Upload attachment button */}
+                    <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                      <label className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-colors cursor-pointer ${uploadingAttachment ? 'bg-neutral-200 text-neutral-400' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}`}>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        {uploadingAttachment ? 'Uploading...' : 'Attach Screenshot'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file && editingHackathon) {
+                              uploadAttachment(editingHackathon.id, file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Attachment Preview Modal */}
+                {previewAttachment && (
+                  <div className="fixed inset-0 z-50 bg-neutral-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn" onClick={() => setPreviewAttachment(null)}>
+                    <div className="bg-white dark:bg-[#111827] rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 max-w-4xl w-full max-h-[90vh] overflow-hidden animate-scaleIn" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
+                        <h3 className="text-sm font-semibold truncate">{previewAttachment.filename}</h3>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`./api/attachments/${previewAttachment.id}`}
+                            download={previewAttachment.filename}
+                            className="h-7 px-2.5 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                          >
+                            Download
+                          </a>
+                          <button onClick={() => setPreviewAttachment(null)} className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-4 overflow-auto max-h-[calc(90vh-60px)]">
+                        <img
+                          src={`./api/attachments/${previewAttachment.id}`}
+                          alt={previewAttachment.filename}
+                          className="max-w-full h-auto rounded-lg border border-neutral-200 dark:border-neutral-700"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 

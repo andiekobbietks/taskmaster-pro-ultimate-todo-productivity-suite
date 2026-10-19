@@ -23,7 +23,6 @@ export interface Settings {
     azure_sas_token: string;
   };
   email: {
-    protocol: "imap" | "jmap";
     inbox_address: string;
     imap_host: string;
     imap_port: number;
@@ -58,15 +57,11 @@ const DEFAULT_SETTINGS: Settings = {
     azure_sas_token: "",
   },
   email: {
-    protocol: "imap",
     inbox_address: "",
     imap_host: "imap.mail.yahoo.com",
     imap_port: 993,
     imap_user: "",
     imap_password: "",
-    jmap_server_url: "",
-    jmap_username: "",
-    jmap_password: "",
   },
   notifications: {
     daily_digest: true,
@@ -157,6 +152,20 @@ function deobfuscateSettings(settings: any): any {
 
 // ── Route registration ───────────────────────────────────────────────
 
+/**
+ * Register all settings-related API routes on the Hono app.
+ *
+ * Routes:
+ * - GET /api/settings — Get all settings
+ * - GET /api/settings/:section — Get a specific section
+ * - PUT /api/settings — Update all settings
+ * - PATCH /api/settings/:section — Update a specific section
+ * - POST /api/settings/reset — Reset to defaults
+ * - POST /api/settings/test-storage — Test storage connection
+ *
+ * @param app - Hono application instance
+ * @param sql - SQLite storage interface from Durable Object
+ */
 export function registerSettingsRoutes(app: Hono, sql: any) {
   // --- Get all settings -----------------------------------------------
 

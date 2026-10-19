@@ -108,6 +108,13 @@ function App() {
   // Dark mode state
   const [darkMode, setDarkMode] = useState(false);
 
+  // Hackathon Tracker state
+  const [hackathons, setHackathons] = useState([]);
+  const [hackathonView, setHackathonView] = useState(false);
+  const [hackathonProfile, setHackathonProfile] = useState(null);
+  const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
+  const [editingHackathon, setEditingHackathon] = useState(null);
+
   /**
    * Build an error handler for one kind of work.
    *
@@ -130,6 +137,12 @@ function App() {
       document.documentElement.classList.remove("dark");
     }
   }, [darkMode]);
+
+  // Fetch hackathons on mount
+  useEffect(() => {
+    fetchHackathons();
+    fetchHackathonProfile();
+  }, [fetchHackathons, fetchHackathonProfile]);
 
   // Timer countdown effect
   useEffect(() => {
@@ -173,6 +186,24 @@ function App() {
       fail("Loading your tasks", fetchTodos)(err);
     }
   }, [activeTab, activeListId, priorityFilter, searchQuery, fail]);
+
+  const fetchHackathons = useCallback(async () => {
+    try {
+      const data = await api("./api/hackathons");
+      setHackathons(Array.isArray(data) ? data : []);
+    } catch (err) {
+      fail("Loading hackathons", fetchHackathons)(err);
+    }
+  }, [fail]);
+
+  const fetchHackathonProfile = useCallback(async () => {
+    try {
+      const data = await api("./api/hackathons/profile");
+      setHackathonProfile(data);
+    } catch (err) {
+      // Profile may not exist yet
+    }
+  }, []);
 
   const fetchLists = useCallback(async () => {
     try {
@@ -457,6 +488,21 @@ function App() {
                         {stats.completed}
                       </span>
                     </button>
+
+                    <button
+                      onClick={() => { setHackathonView(true); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        hackathonView
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <span>Hackathons</span>
+                      <span className="ml-auto text-xs bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-full">
+                        {hackathons.length}
+                      </span>
+                    </button>
                   </div>
                 </div>
 
@@ -561,7 +607,106 @@ function App() {
                   </div>
                 </div>
 
+                {/* Hackathon View */}
+                {hackathonView && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold tracking-tight">Hackathon Tracker</h2>
+                        <p className="text-sm text-neutral-500">Track deadlines, eligibility, and submissions.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={fetchHackathons}
+                          className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                        >
+                          Refresh
+                        </button>
+                        <button
+                          onClick={() => { setEditingHackathon(null); setIsHackathonModalOpen(true); }}
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Hackathon
+                        </button>
+                      </div>
+                    </div>
+
+                    {hackathons.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                        <Sparkles className="w-10 h-10 text-purple-400 mb-3" />
+                        <h3 className="text-base font-semibold">No hackathons yet</h3>
+                        <p className="text-sm text-neutral-500 mt-1 max-w-xs">
+                          Add hackathons to track deadlines, eligibility, and submissions.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {hackathons.map(h => {
+                          const deadline = h.submission_deadline || h.end_date;
+                          const daysLeft = deadline ? Math.ceil((new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                          return (
+                            <div key={h.id} className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="text-sm font-semibold tracking-tight">{h.name}</h3>
+                                    <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                                      {h.platform}
+                                    </span>
+                                    {h.status === 'open' && (
+                                      <span className="text-[10px] font-medium uppercase tracking-wider text-green-600 bg-green-50 dark:bg-green-950/50 px-1.5 py-0.5 rounded">
+                                        Open
+                                      </span>
+                                    )}
+                                  </div>
+                                  {h.description && (
+                                    <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{h.description}</p>
+                                  )}
+                                  <div className="flex items-center gap-3 mt-2 text-[11px] text-neutral-500">
+                                    {h.prize && (
+                                      <span className="font-medium text-amber-600">{h.prize}</span>
+                                    )}
+                                    {deadline && (
+                                      <span className={`inline-flex items-center gap-1 ${daysLeft !== null && daysLeft <= 3 ? 'text-red-500 font-medium' : ''}`}>
+                                        <Calendar className="w-3 h-3" />
+                                        {daysLeft !== null && daysLeft >= 0 ? `${daysLeft}d left` : 'Ended'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => { setEditingHackathon(h); setIsHackathonModalOpen(true); }}
+                                    className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm('Delete this hackathon?')) {
+                                        await api(`./api/hackathons/${h.id}`, { method: 'DELETE' });
+                                        fetchHackathons();
+                                      }
+                                    }}
+                                    className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Task List */}
+                {!hackathonView && (
                 <div className="space-y-3">
                   {todos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-xs">

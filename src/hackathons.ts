@@ -285,8 +285,9 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
       `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       id, data.name.trim(), data.platform || "manual", data.url || "", data.description || "", data.prize || "", data.start_date || null, data.end_date || null, data.registration_deadline || null, data.submission_deadline || null, JSON.stringify(data.eligibility || {}), data.status || "open", data.notes || "", ts, ts
     );
-    const row = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).one();
-    return c.json(rowToHackathon(row), 201);
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]), 201);
   });
 
   // Update
@@ -311,8 +312,9 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
     if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
     sets.push("updated_at = ?"); params.push(now()); params.push(id);
     sql.exec(`UPDATE hackathons SET ${sets.join(", ")} WHERE id = ?`, ...params);
-    const row = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).one();
-    return c.json(rowToHackathon(row));
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]));
   });
 
   // Delete
@@ -360,7 +362,8 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
 
 function getUserProfile(sql: any): UserProfile {
   try {
-    const row = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").one();
+    const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
+    const row = rows.length > 0 ? rows[0] : null;
     if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
   } catch {}
   return { ...DEFAULT_PROFILE };

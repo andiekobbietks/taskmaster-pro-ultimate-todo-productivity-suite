@@ -94,6 +94,19 @@ function normalizePrize(prize: string): number {
 
 // ── Route registration ───────────────────────────────────────────────
 
+/**
+ * Register all capacity planning and daily digest routes on the Hono app.
+ *
+ * Routes:
+ * - GET /api/capacity — Get weekly capacity template
+ * - PUT /api/capacity — Update weekly capacity template
+ * - GET /api/digest — Get today's daily digest
+ * - GET /api/digest/weekly — Get weekly plan
+ * - GET /api/digest/priority — Get all open hackathons with priority scores
+ *
+ * @param app - Hono application instance
+ * @param sql - SQLite storage interface from Durable Object
+ */
 export function registerCapacityRoutes(app: Hono, sql: any) {
   // --- Get weekly capacity template -----------------------------------
 

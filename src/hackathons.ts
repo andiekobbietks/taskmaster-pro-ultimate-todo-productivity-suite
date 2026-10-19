@@ -84,6 +84,16 @@ export interface Hackathon {
 
 // ── Eligibility engine ───────────────────────────────────────────────
 
+/**
+ * Evaluate whether a user profile meets a hackathon's eligibility rules.
+ *
+ * @param rules - The hackathon's eligibility rules (citizenship, residency, age, etc.)
+ * @param profile - The user's profile (citizenships, residencies, age, student status, etc.)
+ * @returns { eligible: boolean, reasons: string[], qualification_path: string }
+ * @example
+ *   const result = evaluateEligibility(rules, profile);
+ *   if (result.eligible) console.log(result.qualification_path);
+ */
 export function evaluateEligibility(
   rules: EligibilityRules,
   profile: UserProfile,
@@ -254,6 +264,21 @@ const DEFAULT_PROFILE: UserProfile = {
 
 // ── Route registration ───────────────────────────────────────────────
 
+/**
+ * Register all hackathon-related API routes on the Hono app.
+ *
+ * Routes:
+ * - GET /api/hackathons — List hackathons (filter by status, search)
+ * - POST /api/hackathons — Create a new hackathon
+ * - GET /api/hackathons/:id — Get a single hackathon
+ * - PATCH /api/hackathons/:id — Update a hackathon
+ * - DELETE /api/hackathons/:id — Delete a hackathon
+ * - GET /api/hackathons/eligibility — Evaluate profile against all open hackathons
+ * - GET/PUT /api/hackathons/profile — Get/update user profile
+ *
+ * @param app - Hono application instance
+ * @param sql - SQLite storage interface from Durable Object
+ */
 export function registerHackathonRoutes(app: Hono, sql: any) {
   // List hackathons
   app.get("/api/hackathons", (c) => {
@@ -285,8 +310,9 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
       `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       id, data.name.trim(), data.platform || "manual", data.url || "", data.description || "", data.prize || "", data.start_date || null, data.end_date || null, data.registration_deadline || null, data.submission_deadline || null, JSON.stringify(data.eligibility || {}), data.status || "open", data.notes || "", ts, ts
     );
-    const row = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).one();
-    return c.json(rowToHackathon(row), 201);
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]), 201);
   });
 
   // Update
@@ -311,8 +337,9 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
     if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
     sets.push("updated_at = ?"); params.push(now()); params.push(id);
     sql.exec(`UPDATE hackathons SET ${sets.join(", ")} WHERE id = ?`, ...params);
-    const row = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).one();
-    return c.json(rowToHackathon(row));
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]));
   });
 
   // Delete
@@ -360,7 +387,8 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
 
 function getUserProfile(sql: any): UserProfile {
   try {
-    const row = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").one();
+    const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
+    const row = rows.length > 0 ? rows[0] : null;
     if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
   } catch {}
   return { ...DEFAULT_PROFILE };

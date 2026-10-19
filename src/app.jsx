@@ -203,7 +203,7 @@ function App() {
       const data = await api("./api/hackathons");
       setHackathons(Array.isArray(data) ? data : []);
     } catch (err) {
-      fail("Loading hackathons", fetchHackathons)(err);
+      fail("Loading hackathons", () => fetchHackathons())(err);
     }
   }, [fail]);
 
@@ -369,7 +369,7 @@ function App() {
     }
   }, [fail]);
 
-  // Fetch all data on mount (after all fetch functions are defined)
+  // Fetch all data on mount
   useEffect(() => {
     fetchTodos();
     fetchHackathons();
@@ -381,13 +381,7 @@ function App() {
     fetchHackathonProfile();
     fetchLists();
     fetchStats();
-  }, [fetchTodos, fetchHackathons, fetchDigest, fetchCapacity, fetchWeeklyPlan, fetchSettings, fetchArchiveSources, fetchHackathonProfile, fetchLists, fetchStats]);
-
-  useEffect(() => {
-    fetchTodos();
-    fetchLists();
-    fetchStats();
-  }, [fetchTodos, fetchLists, fetchStats]);
+  }, []);
 
   const handleCreateTodo = async (e) => {
     e.preventDefault();

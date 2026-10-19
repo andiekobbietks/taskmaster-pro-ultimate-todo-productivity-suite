@@ -155,17 +155,6 @@ function App() {
     }
   }, [darkMode]);
 
-  // Fetch hackathons on mount
-  useEffect(() => {
-    fetchHackathons();
-    fetchDigest();
-    fetchCapacity();
-    fetchWeeklyPlan();
-    fetchSettings();
-    fetchArchiveSources();
-    fetchHackathonProfile();
-  }, [fetchHackathons, fetchHackathonProfile]);
-
   // Timer countdown effect
   useEffect(() => {
     let interval = null;
@@ -379,6 +368,20 @@ function App() {
       fail("Loading your stats", fetchStats)(err);
     }
   }, [fail]);
+
+  // Fetch all data on mount (after all fetch functions are defined)
+  useEffect(() => {
+    fetchTodos();
+    fetchHackathons();
+    fetchDigest();
+    fetchCapacity();
+    fetchWeeklyPlan();
+    fetchSettings();
+    fetchArchiveSources();
+    fetchHackathonProfile();
+    fetchLists();
+    fetchStats();
+  }, [fetchTodos, fetchHackathons, fetchDigest, fetchCapacity, fetchWeeklyPlan, fetchSettings, fetchArchiveSources, fetchHackathonProfile, fetchLists, fetchStats]);
 
   useEffect(() => {
     fetchTodos();

@@ -369,12 +369,6 @@ function App() {
     }
   }, [fail]);
 
-  // Fetch todos on mount
-  useEffect(() => { fetchTodos(); fetchLists(); fetchStats(); }, []);
-  // Fetch digest on mount
-  useEffect(() => { fetchDigest(); fetchCapacity(); fetchWeeklyPlan(); }, []);
-  // Fetch settings on mount
-  useEffect(() => { fetchSettings(); fetchArchiveSources(); fetchHackathonProfile(); }, []);
 
   const handleCreateTodo = async (e) => {
     e.preventDefault();

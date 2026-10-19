@@ -110,7 +110,7 @@ function App() {
 
   // Hackathon Tracker state
   const [hackathons, setHackathons] = useState([]);
-  const [hackathonView, setHackathonView] = useState(false);
+  const [activeView, setActiveView] = useState('tasks'); // 'tasks', 'today', 'hackathons', 'archives', 'settings'
   const [hackathonProfile, setHackathonProfile] = useState(null);
   const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
@@ -570,7 +570,7 @@ function App() {
                   </div>
                   <div className="space-y-0.5">
                     <button
-                      onClick={() => { setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView("tasks"); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         activeTab === "all" && activeListId === "all"
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
@@ -630,9 +630,9 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setDigestView(true); setHackathonView(false); setArchiveView(false); setSettingsView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('today'); setHackathonView(false); setArchiveView(false); setSettingsView(false); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        digestView
+                        activeView === 'today'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
                       }`}
@@ -647,9 +647,9 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setHackathonView(true); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('hackathons'); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        hackathonView
+                        activeView === 'hackathons'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
                       }`}
@@ -662,9 +662,9 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setSettingsView(true); setHackathonView(false); setArchiveView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('settings'); setHackathonView(false); setArchiveView(false); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        settingsView
+                        activeView === 'settings'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
                       }`}
@@ -674,9 +674,9 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setArchiveView(true); setHackathonView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('archives'); setHackathonView(false); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        archiveView
+                        activeView === 'archives'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
                           : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
                       }`}
@@ -753,7 +753,7 @@ function App() {
               <div className="max-w-4xl mx-auto space-y-6">
                 
                 {/* Header Title & Filters — only in task view */}
-                {!hackathonView && !archiveView && !settingsView && !digestView && (
+                {activeView === 'tasks' && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800">
                   <div>
                     <h1 className="text-2xl font-bold tracking-tight">
@@ -794,7 +794,7 @@ function App() {
                 )}
 
                 {/* Settings View */}
-                {settingsView && (
+                {activeView === 'settings' && (
                   <div className="space-y-4">
                     <div>
                       <h2 className="text-lg font-bold tracking-tight">Settings</h2>
@@ -1098,7 +1098,7 @@ function App() {
                 )}
 
                 {/* Archive View */}
-                {archiveView && (
+                {activeView === 'archives' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1192,7 +1192,7 @@ function App() {
                 )}
 
                 {/* Daily Digest View */}
-                {digestView && (
+                {activeView === 'today' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1295,7 +1295,7 @@ function App() {
                 )}
 
                 {/* Hackathon View */}
-                {hackathonView && (
+                {activeView === 'hackathons' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1472,7 +1472,7 @@ function App() {
                 )}
 
                 {/* Task List */}
-                {!hackathonView && !archiveView && !settingsView && !digestView && (
+                {activeView === 'tasks' && (
                 <div className="space-y-3">
                   {todos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-xs">

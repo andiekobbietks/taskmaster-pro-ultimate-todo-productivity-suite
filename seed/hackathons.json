@@ -1,48 +1,43 @@
 {
   "_meta": {
-    "name": "taskmaster-hackathon-seeds",
-    "version": 1,
-    "purpose": "Live hackathon data for the Hackathon Tracker module. Seeded via POST /api/hackathons.",
-    "howToRun": "Start an instance (npx wrangler dev), then use the API to create each hackathon."
+    "name": "taskmaster-hackathon-seeds-v2",
+    "version": 2,
+    "purpose": "12 hackathons the user is actually eligible for, with policy-structure eligibility rules. Includes user profile for Andie.",
+    "howToRun": "Start instance, then POST each hackathon to /api/hackathons and PUT profile to /api/hackathons/profile."
+  },
+  "profile": {
+    "citizenships": [
+      "IT"
+    ],
+    "residencies": [
+      "GB"
+    ],
+    "residency_status": "settled",
+    "age": 25,
+    "is_student": false,
+    "team_size": 1,
+    "employed_by_sponsor": false
   },
   "hackathons": [
     {
-      "name": "Build, Ship, Shape: Amazon Developer Hackathon",
-      "platform": "devpost",
-      "url": "https://devpost.com/hackathons",
-      "description": "Build across Amazon Devices and shape what's next.",
-      "prize": "$138,000",
+      "name": "Hacktoberfest 2026",
+      "platform": "mlh",
+      "url": "https://hacktoberfest.com",
+      "description": "Month-long open-source celebration. Challenge/sticker-based, not PR-based.",
+      "prize": "Stickers + swag + raffle",
       "start_date": "2026-10-01",
-      "end_date": "2026-10-23",
+      "end_date": "2026-10-31",
       "registration_deadline": null,
-      "submission_deadline": "2026-10-23",
+      "submission_deadline": "2026-10-31",
       "eligibility": {
-        "age_min": 18,
-        "countries": [],
-        "student_only": false,
-        "team_max": 4
+        "eligibility_type": "unrestricted",
+        "age_min": 13,
+        "regions": [
+          "Global"
+        ]
       },
       "status": "open",
-      "notes": "Online. 51k+ participants."
-    },
-    {
-      "name": "AWS CDS Agentic AI Partner Hackathon",
-      "platform": "devpost",
-      "url": "https://devpost.com/hackathons",
-      "description": "Build the conversational experiences of tomorrow.",
-      "prize": "$40,000",
-      "start_date": "2026-10-01",
-      "end_date": "2026-10-28",
-      "registration_deadline": null,
-      "submission_deadline": "2026-10-28",
-      "eligibility": {
-        "age_min": 18,
-        "countries": [],
-        "student_only": false,
-        "team_max": 4
-      },
-      "status": "open",
-      "notes": "Online. Agentic AI focus."
+      "notes": "Online. Free. 13+. Weekly challenges with cash prizes. Global Hack Week Oct 9-15."
     },
     {
       "name": "Nebius x NVIDIA Global AI Hackathon",
@@ -55,13 +50,34 @@
       "registration_deadline": null,
       "submission_deadline": "2026-10-30",
       "eligibility": {
+        "eligibility_type": "unrestricted",
         "age_min": 18,
-        "countries": [],
-        "student_only": false,
-        "team_max": 4
+        "regions": [
+          "Global"
+        ]
       },
       "status": "open",
-      "notes": "Online. 19k+ participants."
+      "notes": "Online. 19k+ participants. Agentic AI focus."
+    },
+    {
+      "name": "AWS CDS Agentic AI Partner Hackathon",
+      "platform": "devpost",
+      "url": "https://devpost.com/hackathons",
+      "description": "Build the conversational experiences of tomorrow.",
+      "prize": "$40,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-28",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-28",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "age_min": 18,
+        "regions": [
+          "Global"
+        ]
+      },
+      "status": "open",
+      "notes": "Online. Agentic AI + conversational interfaces."
     },
     {
       "name": "Qloo Agentic Hackathon",
@@ -74,53 +90,255 @@
       "registration_deadline": null,
       "submission_deadline": "2026-10-30",
       "eligibility": {
+        "eligibility_type": "unrestricted",
         "age_min": 18,
-        "countries": [],
-        "student_only": false,
-        "team_max": 4
+        "regions": [
+          "Global"
+        ]
       },
       "status": "open",
-      "notes": "Online. Agentic AI + taste/graph data."
+      "notes": "Online. Agentic AI + taste/graph data. $25k prizes."
     },
     {
-      "name": "Hacktoberfest 2026",
-      "platform": "mlh",
-      "url": "https://hacktoberfest.com",
-      "description": "Month-long open-source celebration. Challenge/sticker-based, not PR-based.",
-      "prize": "Stickers + swag",
+      "name": "Build, Ship, Shape: Amazon Developer Hackathon",
+      "platform": "devpost",
+      "url": "https://devpost.com/hackathons",
+      "description": "Build across Amazon Devices and shape what's next.",
+      "prize": "$138,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-23",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-23",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "age_min": 18,
+        "regions": [
+          "Global"
+        ]
+      },
+      "status": "open",
+      "notes": "Online. 51k+ participants. Amazon Devices focus."
+    },
+    {
+      "name": "IEEE ClimateChain Global Hackathon",
+      "platform": "devpost",
+      "url": "https://devpost.com/hackathons",
+      "description": "AI and BLOCKCHAIN Innovate Today for a Sustainable Tomorrow.",
+      "prize": "$3,000",
       "start_date": "2026-10-01",
       "end_date": "2026-10-31",
       "registration_deadline": null,
       "submission_deadline": "2026-10-31",
       "eligibility": {
-        "age_min": 13,
-        "countries": [],
-        "student_only": false,
-        "team_max": 1
+        "eligibility_type": "unrestricted",
+        "age_min": 18,
+        "regions": [
+          "Global"
+        ]
       },
       "status": "open",
-      "notes": "Online. Free. 13+. Weekly challenges with cash prizes."
+      "notes": "Online. Climate + AI + blockchain."
     },
     {
-      "name": "OxHack '26",
-      "platform": "mlh",
-      "url": "https://26.oxhack.net/",
-      "description": "Oxford University hackathon.",
-      "prize": "TBD",
-      "start_date": "2026-10-24",
-      "end_date": "2026-10-25",
-      "registration_deadline": "2026-10-20",
-      "submission_deadline": "2026-10-25",
+      "name": "Kaggle: IEEE Big Data Traffic Flow Bench",
+      "platform": "kaggle",
+      "url": "https://www.kaggle.com/competitions",
+      "description": "Reconstruct masked freeway states, forecast queues, respect the physics, and recover the demand.",
+      "prize": "$3,500",
+      "start_date": "2026-10-01",
+      "end_date": "2026-11-30",
+      "registration_deadline": null,
+      "submission_deadline": "2026-11-30",
       "eligibility": {
-        "age_min": 18,
-        "countries": [
-          "GB"
-        ],
-        "student_only": true,
-        "team_max": 4
+        "eligibility_type": "unrestricted",
+        "regions": [
+          "Global"
+        ]
       },
       "status": "open",
-      "notes": "In-person, Oxford. Student-only."
+      "notes": "Online. 514 teams. Data science competition."
+    },
+    {
+      "name": "Kaggle: RSNA Knee Abnormality Detection",
+      "platform": "kaggle",
+      "url": "https://www.kaggle.com/competitions",
+      "description": "Create a model that can detect knee abnormalities based on multimodal imaging data.",
+      "prize": "$77,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-11-15",
+      "registration_deadline": null,
+      "submission_deadline": "2026-11-15",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "regions": [
+          "Global"
+        ]
+      },
+      "status": "open",
+      "notes": "Online. $77k prize. Medical imaging AI."
+    },
+    {
+      "name": "Kaggle: Google Gemma 4 Developer Agent Competition",
+      "platform": "kaggle",
+      "url": "https://www.kaggle.com/competitions",
+      "description": "Accelerate research in autonomous coding agents.",
+      "prize": "$65,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-11-30",
+      "registration_deadline": null,
+      "submission_deadline": "2026-11-30",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "regions": [
+          "Global"
+        ]
+      },
+      "status": "open",
+      "notes": "Online. $65k prize. Agentic AI focus."
+    },
+    {
+      "name": "ETHGlobal Online",
+      "platform": "ethglobal",
+      "url": "https://ethglobal.com",
+      "description": "Web3 hackathon \u2014 build decentralized applications.",
+      "prize": "$50,000+",
+      "start_date": "2026-10-15",
+      "end_date": "2026-10-30",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-30",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "regions": [
+          "Global"
+        ]
+      },
+      "status": "open",
+      "notes": "Online. Web3/blockchain. EU-friendly."
+    },
+    {
+      "name": "lablab.ai AI Hackathon",
+      "platform": "lablab",
+      "url": "https://lablab.ai/ai-hackathons",
+      "description": "AI-focused hackathon with various tracks.",
+      "prize": "$5,000",
+      "start_date": "2026-10-20",
+      "end_date": "2026-11-10",
+      "registration_deadline": null,
+      "submission_deadline": "2026-11-10",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "regions": [
+          "Global"
+        ]
+      },
+      "status": "open",
+      "notes": "Online. AI focus. Rolling hackathons."
+    },
+    {
+      "name": "Global Hack Week: Hacktoberfest",
+      "platform": "mlh",
+      "url": "https://ghw.mlh.com",
+      "description": "MLH's monthly Global Hack Week. Free, online, beginner-friendly.",
+      "prize": "Swag + stickers",
+      "start_date": "2026-10-09",
+      "end_date": "2026-10-15",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-15",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "age_min": 13,
+        "regions": [
+          "Global"
+        ]
+      },
+      "status": "open",
+      "notes": "Online. Free. 13+. Monthly recurring."
+    }
+  ],
+  "test_cases": [
+    {
+      "name": "OxHack '26 (student-only, UK)",
+      "eligibility": {
+        "eligibility_type": "residency",
+        "residencies": [
+          "GB"
+        ],
+        "regions": [
+          "UK"
+        ],
+        "student_only": true,
+        "age_min": 18
+      },
+      "expected": "NOT eligible (not a student)"
+    },
+    {
+      "name": "Technica Hacks (women-only, US)",
+      "eligibility": {
+        "eligibility_type": "residency",
+        "residencies": [
+          "US"
+        ],
+        "regions": [
+          "US"
+        ],
+        "age_min": 18,
+        "other": "Open to women and non-binary students only"
+      },
+      "expected": "NOT eligible (US residency required, gender restriction)"
+    },
+    {
+      "name": "EU Citizens Only Hackathon",
+      "eligibility": {
+        "eligibility_type": "citizenship",
+        "citizenships": [
+          "IT",
+          "DE",
+          "FR",
+          "ES",
+          "NL",
+          "BE",
+          "AT",
+          "IE",
+          "PT",
+          "GR",
+          "FI",
+          "SE",
+          "DK",
+          "PL",
+          "CZ",
+          "HU",
+          "RO",
+          "BG",
+          "HR",
+          "SK",
+          "SI",
+          "EE",
+          "LV",
+          "LT",
+          "LU",
+          "MT",
+          "CY"
+        ],
+        "regions": [
+          "EU"
+        ],
+        "age_min": 18
+      },
+      "expected": "ELIGIBLE via EU citizenship (Italy)"
+    },
+    {
+      "name": "UK Residents Only Hackathon",
+      "eligibility": {
+        "eligibility_type": "residency",
+        "residencies": [
+          "GB"
+        ],
+        "regions": [
+          "UK"
+        ],
+        "age_min": 18
+      },
+      "expected": "ELIGIBLE via UK residency (settled status)"
     }
   ]
 }

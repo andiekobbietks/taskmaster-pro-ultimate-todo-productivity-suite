@@ -1,0 +1,126 @@
+{
+  "_meta": {
+    "name": "taskmaster-hackathon-seeds",
+    "version": 1,
+    "purpose": "Live hackathon data for the Hackathon Tracker module. Seeded via POST /api/hackathons.",
+    "howToRun": "Start an instance (npx wrangler dev), then use the API to create each hackathon."
+  },
+  "hackathons": [
+    {
+      "name": "Build, Ship, Shape: Amazon Developer Hackathon",
+      "platform": "devpost",
+      "url": "https://devpost.com/hackathons",
+      "description": "Build across Amazon Devices and shape what's next.",
+      "prize": "$138,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-23",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-23",
+      "eligibility": {
+        "age_min": 18,
+        "countries": [],
+        "student_only": false,
+        "team_max": 4
+      },
+      "status": "open",
+      "notes": "Online. 51k+ participants."
+    },
+    {
+      "name": "AWS CDS Agentic AI Partner Hackathon",
+      "platform": "devpost",
+      "url": "https://devpost.com/hackathons",
+      "description": "Build the conversational experiences of tomorrow.",
+      "prize": "$40,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-28",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-28",
+      "eligibility": {
+        "age_min": 18,
+        "countries": [],
+        "student_only": false,
+        "team_max": 4
+      },
+      "status": "open",
+      "notes": "Online. Agentic AI focus."
+    },
+    {
+      "name": "Nebius x NVIDIA Global AI Hackathon",
+      "platform": "devpost",
+      "url": "https://devpost.com/hackathons",
+      "description": "Build the next frontier of AI on open infrastructure.",
+      "prize": "$50,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-30",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-30",
+      "eligibility": {
+        "age_min": 18,
+        "countries": [],
+        "student_only": false,
+        "team_max": 4
+      },
+      "status": "open",
+      "notes": "Online. 19k+ participants."
+    },
+    {
+      "name": "Qloo Agentic Hackathon",
+      "platform": "devpost",
+      "url": "https://devpost.com/hackathons",
+      "description": "Agents, but with taste.",
+      "prize": "$25,000",
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-30",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-30",
+      "eligibility": {
+        "age_min": 18,
+        "countries": [],
+        "student_only": false,
+        "team_max": 4
+      },
+      "status": "open",
+      "notes": "Online. Agentic AI + taste/graph data."
+    },
+    {
+      "name": "Hacktoberfest 2026",
+      "platform": "mlh",
+      "url": "https://hacktoberfest.com",
+      "description": "Month-long open-source celebration. Challenge/sticker-based, not PR-based.",
+      "prize": "Stickers + swag",
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-31",
+      "registration_deadline": null,
+      "submission_deadline": "2026-10-31",
+      "eligibility": {
+        "age_min": 13,
+        "countries": [],
+        "student_only": false,
+        "team_max": 1
+      },
+      "status": "open",
+      "notes": "Online. Free. 13+. Weekly challenges with cash prizes."
+    },
+    {
+      "name": "OxHack '26",
+      "platform": "mlh",
+      "url": "https://26.oxhack.net/",
+      "description": "Oxford University hackathon.",
+      "prize": "TBD",
+      "start_date": "2026-10-24",
+      "end_date": "2026-10-25",
+      "registration_deadline": "2026-10-20",
+      "submission_deadline": "2026-10-25",
+      "eligibility": {
+        "age_min": 18,
+        "countries": [
+          "GB"
+        ],
+        "student_only": true,
+        "team_max": 4
+      },
+      "status": "open",
+      "notes": "In-person, Oxford. Student-only."
+    }
+  ]
+}

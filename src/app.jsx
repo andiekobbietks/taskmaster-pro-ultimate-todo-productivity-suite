@@ -369,19 +369,14 @@ function App() {
     }
   }, [fail]);
 
-  // Fetch all data on mount
-  useEffect(() => {
-    fetchTodos();
-    fetchHackathons();
-    fetchDigest();
-    fetchCapacity();
-    fetchWeeklyPlan();
-    fetchSettings();
-    fetchArchiveSources();
-    fetchHackathonProfile();
-    fetchLists();
-    fetchStats();
-  }, []);
+  // Fetch todos on mount
+  useEffect(() => { fetchTodos(); fetchLists(); fetchStats(); }, []);
+  // Fetch hackathons on mount
+  useEffect(() => { fetchHackathons(); }, []);
+  // Fetch digest on mount
+  useEffect(() => { fetchDigest(); fetchCapacity(); fetchWeeklyPlan(); }, []);
+  // Fetch settings on mount
+  useEffect(() => { fetchSettings(); fetchArchiveSources(); fetchHackathonProfile(); }, []);
 
   const handleCreateTodo = async (e) => {
     e.preventDefault();

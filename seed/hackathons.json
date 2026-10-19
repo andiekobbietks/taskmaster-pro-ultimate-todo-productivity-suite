@@ -3,20 +3,23 @@
     "name": "taskmaster-hackathon-seeds-v2",
     "version": 2,
     "purpose": "12 hackathons the user is actually eligible for, with policy-structure eligibility rules. Includes user profile for Andie.",
-    "howToRun": "Start instance, then POST each hackathon to /api/hackathons and PUT profile to /api/hackathons/profile."
+    "howToRun": "Start instance, then POST each hackathon to /api/hackathons and PUT profile to /api/hackathons/profile.",
+    "anonymized": true,
+    "anonymization_note": "Profile data anonymized per sociological research practice. Real values must be set via the API before use."
   },
   "profile": {
     "citizenships": [
-      "IT"
+      "XX"
     ],
     "residencies": [
-      "GB"
+      "YY"
     ],
     "residency_status": "settled",
     "age": 25,
     "is_student": false,
     "team_size": 1,
-    "employed_by_sponsor": false
+    "employed_by_sponsor": false,
+    "_note": "Anonymized profile. Replace with real values via PUT /api/hackathons/profile before use."
   },
   "hackathons": [
     {

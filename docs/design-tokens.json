@@ -1,0 +1,116 @@
+{
+  "name": "TaskMaster Pro Design Tokens",
+  "version": "1.0.0",
+  "description": "Design tokens for TaskMaster Pro â€” extracted from tailwind.config.cjs and src/tailwind.css",
+  "tokens": {
+    "color": {
+      "brand": {
+        "50": { "value": "#EEF0FB", "type": "color", "description": "Lightest brand tint â€” backgrounds, hover states" },
+        "100": { "value": "#DDE0F7", "type": "color", "description": "Light brand tint â€” subtle backgrounds" },
+        "200": { "value": "#B9C0EF", "type": "color", "description": "Light brand â€” borders, dividers" },
+        "500": { "value": "#7B85DC", "type": "color", "description": "Mid brand â€” secondary text, icons" },
+        "600": { "value": "#5E6AD2", "type": "color", "description": "Primary brand â€” buttons, links, active states" },
+        "700": { "value": "#4A56C0", "type": "color", "description": "Dark brand â€” hover states on primary" },
+        "800": { "value": "#3A45A8", "type": "color", "description": "Darker brand â€” pressed states" },
+        "900": { "value": "#2A3284", "type": "color", "description": "Darkest brand â€” headings on light bg" }
+      },
+      "neutral": {
+        "50": { "value": "#F8FAFC", "type": "color", "description": "Page background (light mode)" },
+        "100": { "value": "#F1F5F9", "type": "color", "description": "Card background (light mode)" },
+        "200": { "value": "#E2E8F0", "type": "color", "description": "Border, divider (light mode)" },
+        "300": { "value": "#CBD5E1", "type": "color", "description": "Disabled border" },
+        "400": { "value": "#94A3B8", "type": "color", "description": "Placeholder text" },
+        "500": { "value": "#64748B", "type": "color", "description": "Secondary text" },
+        "600": { "value": "#475569", "type": "color", "description": "Body text (light mode)" },
+        "700": { "value": "#334155", "type": "color", "description": "Heading text (light mode)" },
+        "800": { "value": "#1E293B", "type": "color", "description": "Card background (dark mode)" },
+        "900": { "value": "#0F172A", "type": "color", "description": "Page background (dark mode)" },
+        "950": { "value": "#0A0E1A", "type": "color", "description": "Deepest background (dark mode)" }
+      },
+      "semantic": {
+        "success": { "value": "#16A34A", "type": "color", "description": "Success states, completed items" },
+        "warning": { "value": "#F59E0B", "type": "color", "description": "Warning states, urgent priority" },
+        "danger": { "value": "#DC2626", "type": "color", "description": "Error states, delete actions" },
+        "info": { "value": "#2563EB", "type": "color", "description": "Info states, links" }
+      },
+      "priority": {
+        "low": { "value": "#16A34A", "type": "color", "description": "Low priority badge" },
+        "medium": { "value": "#2563EB", "type": "color", "description": "Medium priority badge" },
+        "high": { "value": "#F59E0B", "type": "color", "description": "High priority badge" },
+        "urgent": { "value": "#DC2626", "type": "color", "description": "Urgent priority badge" }
+      }
+    },
+    "typography": {
+      "fontFamily": {
+        "sans": { "value": "Inter, sans-serif", "type": "fontFamily", "description": "Primary UI font" },
+        "mono": { "value": "JetBrains Mono, monospace", "type": "fontFamily", "description": "Code, timestamps, counts" }
+      },
+      "fontSize": {
+        "xs": { "value": "0.75rem", "type": "fontSize", "description": "12px â€” badges, captions" },
+        "sm": { "value": "0.875rem", "type": "fontSize", "description": "14px â€” body text, labels" },
+        "base": { "value": "1rem", "type": "fontSize", "description": "16px â€” default" },
+        "lg": { "value": "1.125rem", "type": "fontSize", "description": "18px â€” section headings" },
+        "xl": { "value": "1.25rem", "type": "fontSize", "description": "20px â€” page titles" },
+        "2xl": { "value": "1.5rem", "type": "fontSize", "description": "24px â€” hero headings" }
+      },
+      "fontWeight": {
+        "normal": { "value": "400", "type": "fontWeight" },
+        "medium": { "value": "500", "type": "fontWeight" },
+        "semibold": { "value": "600", "type": "fontWeight" },
+        "bold": { "value": "700", "type": "fontWeight" }
+      }
+    },
+    "spacing": {
+      "0": { "value": "0", "type": "spacing" },
+      "0.5": { "value": "0.125rem", "type": "spacing", "description": "2px" },
+      "1": { "value": "0.25rem", "type": "spacing", "description": "4px" },
+      "1.5": { "value": "0.375rem", "type": "spacing", "description": "6px" },
+      "2": { "value": "0.5rem", "type": "spacing", "description": "8px" },
+      "2.5": { "value": "0.625rem", "type": "spacing", "description": "10px" },
+      "3": { "value": "0.75rem", "type": "spacing", "description": "12px" },
+      "4": { "value": "1rem", "type": "spacing", "description": "16px" },
+      "5": { "value": "1.25rem", "type": "spacing", "description": "20px" },
+      "6": { "value": "1.5rem", "type": "spacing", "description": "24px" },
+      "8": { "value": "2rem", "type": "spacing", "description": "32px" },
+      "10": { "value": "2.5rem", "type": "spacing", "description": "40px" },
+      "12": { "value": "3rem", "type": "spacing", "description": "48px" }
+    },
+    "borderRadius": {
+      "sm": { "value": "0.25rem", "type": "borderRadius", "description": "4px" },
+      "md": { "value": "0.375rem", "type": "borderRadius", "description": "6px" },
+      "lg": { "value": "0.5rem", "type": "borderRadius", "description": "8px" },
+      "xl": { "value": "0.75rem", "type": "borderRadius", "description": "12px" },
+      "full": { "value": "9999px", "type": "borderRadius", "description": "Pill shape" }
+    },
+    "shadow": {
+      "xs": { "value": "0 1px 2px 0 rgba(0,0,0,0.05)", "type": "shadow" },
+      "sm": { "value": "0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1)", "type": "shadow" },
+      "md": { "value": "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)", "type": "shadow" },
+      "lg": { "value": "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)", "type": "shadow" }
+    },
+    "animation": {
+      "fadeIn": { "value": "fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1)", "type": "animation" },
+      "scaleIn": { "value": "scaleIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1)", "type": "animation" }
+    },
+    "breakpoint": {
+      "sm": { "value": "640px", "type": "breakpoint" },
+      "md": { "value": "768px", "type": "breakpoint" },
+      "lg": { "value": "1024px", "type": "breakpoint" },
+      "xl": { "value": "1280px", "type": "breakpoint" },
+      "2xl": { "value": "1536px", "type": "breakpoint" }
+    },
+    "darkMode": {
+      "bg": {
+        "page": { "value": "#0A0E1A", "type": "color" },
+        "card": { "value": "#111827", "type": "color" },
+        "sidebar": { "value": "#0F172A", "type": "color" }
+      },
+      "text": {
+        "primary": { "value": "#F1F5F9", "type": "color" },
+        "secondary": { "value": "#94A3B8", "type": "color" },
+        "muted": { "value": "#64748B", "type": "color" }
+      },
+      "border": { "value": "#1E293B", "type": "color" }
+    }
+  }
+}

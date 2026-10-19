@@ -3,6 +3,7 @@ import { registerHackathonRoutes } from "./hackathons";
 import { registerAttachmentRoutes } from "./attachments";
 import { registerArchiveRoutes } from "./archive";
 import { registerSettingsRoutes } from "./settings";
+import { registerCapacityRoutes } from "./capacity";
 import { Hono } from "hono";
 
 export class App extends DurableObject {
@@ -239,6 +240,7 @@ export class App extends DurableObject {
     registerAttachmentRoutes(this.app, this.ctx.storage.sql);
     registerArchiveRoutes(this.app, this.ctx.storage.sql);
     registerSettingsRoutes(this.app, this.ctx.storage.sql);
+    registerCapacityRoutes(this.app, this.ctx.storage.sql);
 
     // Seed sample data ONLY when explicitly enabled.
     //
@@ -340,6 +342,14 @@ export class App extends DurableObject {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
         updated_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS capacity (
+        day_of_week INTEGER PRIMARY KEY,
+        hours_available REAL NOT NULL DEFAULT 0,
+        notes TEXT DEFAULT ''
       )
     `);
   }

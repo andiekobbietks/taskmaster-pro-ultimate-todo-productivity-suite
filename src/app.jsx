@@ -13,7 +13,7 @@
  * ("users see failures instead of silent staleness") exists to prevent.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CheckCircle2, Circle, Plus, Trash2, Pin, Calendar, Tag, Search,
@@ -107,6 +107,7 @@ function App() {
 
   // Dark mode state
   const [darkMode, setDarkMode] = useState(false);
+  const fetchHackathonsRef = useRef(null);
 
   // Hackathon Tracker state
   const [hackathons, setHackathons] = useState([]);
@@ -203,9 +204,10 @@ function App() {
       const data = await api("./api/hackathons");
       setHackathons(Array.isArray(data) ? data : []);
     } catch (err) {
-      fail("Loading hackathons", () => fetchHackathons())(err);
+      fail("Loading hackathons", () => fetchHackathonsRef.current?.())(err);
     }
   }, [fail]);
+  fetchHackathonsRef.current = fetchHackathons;
 
   const fetchAttachments = useCallback(async (ticketId) => {
     try {
@@ -371,8 +373,6 @@ function App() {
 
   // Fetch todos on mount
   useEffect(() => { fetchTodos(); fetchLists(); fetchStats(); }, []);
-  // Fetch hackathons on mount
-  useEffect(() => { fetchHackathons(); }, []);
   // Fetch digest on mount
   useEffect(() => { fetchDigest(); fetchCapacity(); fetchWeeklyPlan(); }, []);
   // Fetch settings on mount

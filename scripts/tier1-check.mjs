@@ -5,6 +5,63 @@
  *
  * Usage: node tier1-check.mjs <repo-root>
  * Exit 0 = no FAIL findings. Exit 1 = at least one FAIL.
+ *
+ * ============================ READ THIS BEFORE DELETING ============================
+ * This file exists because of a specific, documented failure, and every check
+ * in it is a case from that one build.
+ *
+ * The first generated build of this project shipped THREE fatal configuration
+ * defects simultaneously:
+ *
+ *   1. The Durable Object class was exported from src/index.ts, but
+ *      wrangler.json never bound it in durable_objects.bindings. The Worker
+ *      deployed cleanly, wrangler reported success, the front end rendered --
+ *      and the API could not serve a single request.
+ *
+ *   2. The `?tag=` query filter was read from the request, validated, and then
+ *      dropped before it reached the SQL. Every request returned the full
+ *      todo list regardless of the tag asked for.
+ *
+ *   3. `?search=` interpolated user input straight into a LIKE pattern, so
+ *      searching "100%" returned every row in the table.
+ *
+ * All three are invisible to a compiler, invisible to a bundler, invisible to
+ * `wrangler deploy --dry-run`, and invisible to a test that only asserts
+ * "returns 200 with valid JSON". Defects 2 and 3 returned well-formed,
+ * correct-looking JSON containing the wrong rows -- which is precisely why
+ * nobody caught them.
+ *
+ * They shipped, and they were not noticed for NINETEEN DAYS.
+ *
+ * ============================ WHAT THIS CHECKS ============================
+ * The one property all three share: nothing that runs will catch them, because
+ * the code that is broken is not the code that executes. This file compares
+ * files against each other instead of running the program:
+ *
+ *   - a Durable Object exported from src but never bound in wrangler.json
+ *   - a missing `migrations` entry for a class that IS bound
+ *   - an unnamed worker, or a missing `main`
+ *   - a query parameter read from the request and never used in the SQL
+ *   - README routes documented that no longer exist in the code
+ *
+ * ============================ WHAT IT DELIBERATELY DOES NOT DO ============================
+ * It does not typecheck, lint, test, or build. Those jobs already exist in
+ * ci.yml. This is the narrow slice that nothing else covers -- it reads text
+ * and compares facts across file boundaries. If you are about to add a
+ * general-purpose linter, do not; that is scope creep and it duplicates
+ * existing jobs.
+ *
+ * Keep it dependency-free. A checker that needs `npm install` cannot run in the
+ * "my install is broken" scenario, which is exactly when it is most needed.
+ *
+ * ============================ WHEN A CHECK FIRES ============================
+ * Read the finding before you suppress it. Every check here corresponds to
+ * something that already shipped broken to real users. A check firing is not
+ * noise to route around -- it is the checker doing the only job it has.
+ *
+ * See also: docs/THREAT-NOTE.md for the security posture, and the "Fixed"
+ * section of CHANGELOG.md for the 1.0.1 release that shipped these two
+ * correctness fixes alongside this gate.
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'

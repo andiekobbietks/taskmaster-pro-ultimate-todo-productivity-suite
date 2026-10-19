@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { registerHackathonRoutes } from "./hackathons";
 import { registerAttachmentRoutes } from "./attachments";
+import { registerArchiveRoutes } from "./archive";
 import { Hono } from "hono";
 
 export class App extends DurableObject {
@@ -235,6 +236,7 @@ export class App extends DurableObject {
     // Hackathon Tracker routes
     registerHackathonRoutes(this.app, this.ctx.storage.sql);
     registerAttachmentRoutes(this.app, this.ctx.storage.sql);
+    registerArchiveRoutes(this.app, this.ctx.storage.sql);
 
     // Seed sample data ONLY when explicitly enabled.
     //
@@ -315,6 +317,18 @@ export class App extends DurableObject {
         mime_type TEXT NOT NULL,
         data BLOB NOT NULL,
         size INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS archive_sources (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        api_key TEXT DEFAULT NULL,
+        enabled INTEGER DEFAULT 1,
+        base_url TEXT DEFAULT '',
         created_at INTEGER NOT NULL
       )
     `);

@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { registerHackathonRoutes } from "./hackathons";
 import { registerAttachmentRoutes } from "./attachments";
 import { registerArchiveRoutes } from "./archive";
+import { registerSettingsRoutes } from "./settings";
 import { Hono } from "hono";
 
 export class App extends DurableObject {
@@ -237,6 +238,7 @@ export class App extends DurableObject {
     registerHackathonRoutes(this.app, this.ctx.storage.sql);
     registerAttachmentRoutes(this.app, this.ctx.storage.sql);
     registerArchiveRoutes(this.app, this.ctx.storage.sql);
+    registerSettingsRoutes(this.app, this.ctx.storage.sql);
 
     // Seed sample data ONLY when explicitly enabled.
     //
@@ -330,6 +332,14 @@ export class App extends DurableObject {
         enabled INTEGER DEFAULT 1,
         base_url TEXT DEFAULT '',
         created_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
       )
     `);
   }

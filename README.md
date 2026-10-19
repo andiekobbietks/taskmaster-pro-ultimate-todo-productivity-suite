@@ -16,6 +16,39 @@ confidential data. See [Is it ready to use?](#-is-it-ready-to-use) below.
 user accounts yet — see [Security](#-security), which is the single most important
 section in this file.
 
+![TaskMaster Pro — the task list, with priority badges, due dates, tags and a per-task focus timer](docs/images/task-list.png)
+
+*Every task carries its own priority, due date, tags and pomodoro estimate. Pinned
+tasks sort to the top; the rest sort by due date. Search, filters and the focus
+timer all act on the same list.*
+
+## 💡 What this product is actually about
+
+Most to-do apps are a checklist. This one is built around a different premise:
+**a task is only useful if you can tell whether you are actually finishing it.**
+
+That shows up in the choices:
+
+- **Pomodoro focus is per task, not global.** Every task carries its own estimate
+  and its own completed count. The question the app answers is not *"what is on my
+  list"* but *"did I actually do the thing I said I would do"*.
+- **Estimates and completions are separate numbers.** A task can be estimated at 4
+  pomodoros and completed at 7. That gap is the signal, and it is the reason the
+  stats dashboard exists.
+- **Sorting is opinionated.** Pinned first, then by due date, then newest. Not by
+  alphabetical order or manual drag-and-drop — the list you see is the list that
+  needs your attention next.
+- **Failures are visible.** A request that fails shows a banner with a retry. The
+  alternative — a screen that silently shows stale data — is the failure mode this
+  project has the least patience for.
+- **The data model is small and inspectable.** Two tables, thirteen columns, no
+  hidden services. You can read the whole schema in one screen.
+
+The honest summary: **this is an opinionated small-team task list, not a project
+management suite.** It does a few things deliberately rather than many things
+approximately. [`docs/VERTICAL-SLICES.md`](docs/VERTICAL-SLICES.md) is candid about
+which parts are finished and which are only advertised.
+
 ---
 
 <details>

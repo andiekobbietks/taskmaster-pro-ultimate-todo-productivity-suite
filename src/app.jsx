@@ -108,6 +108,26 @@ function App() {
   // Dark mode state
   const [darkMode, setDarkMode] = useState(false);
 
+  // Hackathon Tracker state
+  const [hackathons, setHackathons] = useState([]);
+  const [hackathonView, setHackathonView] = useState(false);
+  const [hackathonProfile, setHackathonProfile] = useState(null);
+  const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
+  const [editingHackathon, setEditingHackathon] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [settingsView, setSettingsView] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('storage');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [storageTestResult, setStorageTestResult] = useState(null);
+  const [archiveSources, setArchiveSources] = useState([]);
+  const [archiveView, setArchiveView] = useState(false);
+  const [archiveUrl, setArchiveUrl] = useState('');
+  const [archiveResult, setArchiveResult] = useState(null);
+  const [checkingArchive, setCheckingArchive] = useState(false);
+  const [attachments, setAttachments] = useState({});
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+
   /**
    * Build an error handler for one kind of work.
    *
@@ -130,6 +150,14 @@ function App() {
       document.documentElement.classList.remove("dark");
     }
   }, [darkMode]);
+
+  // Fetch hackathons on mount
+  useEffect(() => {
+    fetchHackathons();
+    fetchSettings();
+    fetchArchiveSources();
+    fetchHackathonProfile();
+  }, [fetchHackathons, fetchHackathonProfile]);
 
   // Timer countdown effect
   useEffect(() => {
@@ -173,6 +201,131 @@ function App() {
       fail("Loading your tasks", fetchTodos)(err);
     }
   }, [activeTab, activeListId, priorityFilter, searchQuery, fail]);
+
+  const fetchHackathons = useCallback(async () => {
+    try {
+      const data = await api("./api/hackathons");
+      setHackathons(Array.isArray(data) ? data : []);
+    } catch (err) {
+      fail("Loading hackathons", fetchHackathons)(err);
+    }
+  }, [fail]);
+
+  const fetchAttachments = useCallback(async (ticketId) => {
+    try {
+      const data = await api(`./api/todos/${ticketId}/attachments`);
+      setAttachments(prev => ({ ...prev, [ticketId]: Array.isArray(data) ? data : [] }));
+    } catch (err) {
+      // No attachments yet
+    }
+  }, []);
+
+  const uploadAttachment = useCallback(async (ticketId, file) => {
+    setUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await api(`./api/todos/${ticketId}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+      await fetchAttachments(ticketId);
+    } catch (err) {
+      fail("Uploading attachment", () => uploadAttachment(ticketId, file))(err);
+    } finally {
+      setUploadingAttachment(false);
+    }
+  }, [fetchAttachments, fail]);
+
+  const deleteAttachment = useCallback(async (ticketId, attachmentId) => {
+    try {
+      await api(`./api/attachments/${attachmentId}`, { method: "DELETE" });
+      await fetchAttachments(ticketId);
+    } catch (err) {
+      fail("Deleting attachment", () => deleteAttachment(ticketId, attachmentId))(err);
+    }
+  }, [fetchAttachments, fail]);
+
+  const fetchArchiveSources = useCallback(async () => {
+    try {
+      const data = await api("./api/archive/sources");
+      setArchiveSources(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // No sources yet
+    }
+  }, []);
+
+  const checkArchive = useCallback(async (url) => {
+    setCheckingArchive(true);
+    try {
+      const data = await api(`./api/archive/check?url=${encodeURIComponent(url)}`);
+      setArchiveResult(data);
+    } catch (err) {
+      setArchiveResult({ archived: false, url, error: err.message });
+    } finally {
+      setCheckingArchive(false);
+    }
+  }, []);
+
+  const fetchArchiveForTicket = useCallback(async (ticketId, url) => {
+    try {
+      await api("./api/archive/fetch", {
+        method: "POST",
+        body: JSON.stringify({ url, ticket_id: ticketId }),
+      });
+      await fetchAttachments(ticketId);
+    } catch (err) {
+      fail("Fetching archive", () => fetchArchiveForTicket(ticketId, url))(err);
+    }
+  }, [fetchAttachments, fail]);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const data = await api("./api/settings");
+      setSettings(data);
+    } catch (err) {
+      fail("Loading settings", fetchSettings)(err);
+    }
+  }, [fail]);
+
+  const saveSettings = useCallback(async (updates) => {
+    setSavingSettings(true);
+    try {
+      const data = await api("./api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      setSettings(data);
+    } catch (err) {
+      fail("Saving settings", () => saveSettings(updates))(err);
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [fail]);
+
+  const testStorage = useCallback(async (provider, config) => {
+    setStorageTestResult(null);
+    try {
+      const data = await api("./api/settings/test-storage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, ...config }),
+      });
+      setStorageTestResult(data);
+    } catch (err) {
+      setStorageTestResult({ success: false, message: describeError(err) });
+    }
+  }, []);
+
+  const fetchHackathonProfile = useCallback(async () => {
+    try {
+      const data = await api("./api/hackathons/profile");
+      setHackathonProfile(data);
+    } catch (err) {
+      // Profile may not exist yet
+    }
+  }, []);
 
   const fetchLists = useCallback(async () => {
     try {
@@ -457,6 +610,48 @@ function App() {
                         {stats.completed}
                       </span>
                     </button>
+
+                    <button
+                      onClick={() => { setHackathonView(true); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        hackathonView
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4 text-purple-500" />
+                      <span>Hackathons</span>
+                      <span className="ml-auto text-xs bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-full">
+                        {hackathons.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => { setSettingsView(true); setHackathonView(false); setArchiveView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        settingsView
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      <span>Settings</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setArchiveView(true); setHackathonView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        archiveView
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                      <span>Archives</span>
+                      <span className="ml-auto text-xs bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400 px-1.5 py-0.5 rounded-full">
+                        {archiveSources.length}
+                      </span>
+                    </button>
                   </div>
                 </div>
 
@@ -561,7 +756,583 @@ function App() {
                   </div>
                 </div>
 
+                {/* Settings View */}
+                {settingsView && (
+                  <div className="space-y-4">
+                    <div>
+                      <h2 className="text-lg font-bold tracking-tight">Settings</h2>
+                      <p className="text-sm text-neutral-500">Configure storage, email, notifications, and profile.</p>
+                    </div>
+
+                    {/* Settings tabs */}
+                    <div className="flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-800 pb-2">
+                      {['storage', 'profile', 'notifications', 'email'].map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => setSettingsTab(tab)}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
+                            settingsTab === tab
+                              ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400"
+                              : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                          }`}
+                        >
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Storage settings */}
+                    {settingsTab === 'storage' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Storage backend</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Provider</label>
+                              <select
+                                value={settings.storage?.provider || 'r2'}
+                                onChange={(e) => saveSettings({ storage: { ...settings.storage, provider: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              >
+                                <option value="r2">Cloudflare R2 (recommended)</option>
+                                <option value="s3">Amazon S3</option>
+                                <option value="azure">Azure Blob Storage</option>
+                              </select>
+                            </div>
+
+                            {settings.storage?.provider === 'r2' && (
+                              <div>
+                                <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">R2 bucket name</label>
+                                <input
+                                  type="text"
+                                  value={settings.storage?.r2_bucket || ''}
+                                  onChange={(e) => saveSettings({ storage: { ...settings.storage, r2_bucket: e.target.value } })}
+                                  className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                                />
+                              </div>
+                            )}
+
+                            {settings.storage?.provider === 's3' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">S3 bucket</label>
+                                  <input type="text" value={settings.storage?.s3_bucket || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, s3_bucket: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Region</label>
+                                  <input type="text" value={settings.storage?.s3_region || 'eu-west-2'} onChange={(e) => saveSettings({ storage: { ...settings.storage, s3_region: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                              </>
+                            )}
+
+                            {settings.storage?.provider === 'azure' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Storage account</label>
+                                  <input type="text" value={settings.storage?.azure_account || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_account: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Container</label>
+                                  <input type="text" value={settings.storage?.azure_container || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_container: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">SAS token</label>
+                                  <input type="password" value={settings.storage?.azure_sas_token || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_sas_token: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                              </>
+                            )}
+
+                            <button
+                              onClick={() => testStorage(settings.storage?.provider, settings.storage)}
+                              className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                            >
+                              Test connection
+                            </button>
+                            {storageTestResult && (
+                              <p className={`text-xs ${storageTestResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                {storageTestResult.message}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Profile settings */}
+                    {settingsTab === 'profile' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Eligibility profile</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Citizenships (comma-separated ISO codes)</label>
+                              <input
+                                type="text"
+                                value={(settings.profile?.citizenships || []).join(', ')}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, citizenships: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                              <p className="text-[11px] text-neutral-400 mt-1">e.g. IT, GB, DE</p>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Residencies (comma-separated ISO codes)</label>
+                              <input
+                                type="text"
+                                value={(settings.profile?.residencies || []).join(', ')}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, residencies: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                              <p className="text-[11px] text-neutral-400 mt-1">e.g. GB</p>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Residency status</label>
+                              <select
+                                value={settings.profile?.residency_status || 'settled'}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, residency_status: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              >
+                                <option value="settled">Settled</option>
+                                <option value="pre-settled">Pre-settled</option>
+                                <option value="visa">Visa</option>
+                                <option value="citizen">Citizen</option>
+                                <option value="none">None</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Age</label>
+                              <input
+                                type="number"
+                                value={settings.profile?.age || 25}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, age: parseInt(e.target.value) || 25 } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={settings.profile?.is_student || false}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, is_student: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                              <label className="text-sm text-neutral-600 dark:text-neutral-400">I am a student</label>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Team size</label>
+                              <input
+                                type="number"
+                                value={settings.profile?.team_size || 1}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, team_size: parseInt(e.target.value) || 1 } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notifications settings */}
+                    {settingsTab === 'notifications' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Notifications</h3>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">Daily digest</p>
+                                <p className="text-xs text-neutral-500">Morning summary of deadlines and conflicts</p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={settings.notifications?.daily_digest ?? true}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, daily_digest: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">Conflict alerts</p>
+                                <p className="text-xs text-neutral-500">Warn when deadlines overlap</p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={settings.notifications?.conflict_alerts ?? true}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, conflict_alerts: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">Deadline reminders</p>
+                                <p className="text-xs text-neutral-500">Remind before deadlines</p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={settings.notifications?.deadline_reminders ?? true}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, deadline_reminders: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Digest time</label>
+                              <input
+                                type="time"
+                                value={settings.notifications?.digest_time || '08:00'}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, digest_time: e.target.value } })}
+                                className="h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Email settings */}
+                    {settingsTab === 'email' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Email inbox</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Inbox address</label>
+                              <input
+                                type="email"
+                                value={settings.email?.inbox_address || ''}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, inbox_address: e.target.value } })}
+                                placeholder="hackathons@yourdomain.com"
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP host</label>
+                              <input
+                                type="text"
+                                value={settings.email?.imap_host || 'imap.mail.yahoo.com'}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_host: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP port</label>
+                              <input
+                                type="number"
+                                value={settings.email?.imap_port || 993}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_port: parseInt(e.target.value) || 993 } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP username</label>
+                              <input
+                                type="text"
+                                value={settings.email?.imap_user || ''}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_user: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP password (app password)</label>
+                              <input
+                                type="password"
+                                value={settings.email?.imap_password || ''}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_password: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reset button */}
+                    <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                      <button
+                        onClick={async () => {
+                          if (confirm('Reset all settings to defaults?')) {
+                            await api("./api/settings/reset", { method: "POST" });
+                            fetchSettings();
+                          }
+                        }}
+                        className="h-8 px-3 rounded-md text-xs font-medium bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                      >
+                        Reset to defaults
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Archive View */}
+                {archiveView && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold tracking-tight">Web Archive Integration</h2>
+                        <p className="text-sm text-neutral-500">Fetch hackathon pages from web archives. No scraping, no ToS issues.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={fetchArchiveSources}
+                          className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                        >
+                          Refresh
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* URL checker */}
+                    <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      <h3 className="text-sm font-semibold mb-2">Check if a page is archived</h3>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="url"
+                          value={archiveUrl}
+                          onChange={(e) => setArchiveUrl(e.target.value)}
+                          placeholder="https://devpost.com/hackathons/..."
+                          className="flex-1 h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                        />
+                        <button
+                          onClick={() => checkArchive(archiveUrl)}
+                          disabled={checkingArchive || !archiveUrl}
+                          className="h-9 px-3 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+                        >
+                          {checkingArchive ? 'Checking...' : 'Check'}
+                        </button>
+                      </div>
+                      {archiveResult && (
+                        <div className={`mt-3 p-3 rounded-lg text-sm ${archiveResult.archived ? 'bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800'}`}>
+                          {archiveResult.archived ? (
+                            <div>
+                              <p className="font-medium text-green-700 dark:text-green-400">Archived!</p>
+                              <p className="text-xs text-green-600 dark:text-green-500 mt-1">Snapshot: {archiveResult.timestamp}</p>
+                              <p className="text-xs text-neutral-500 mt-1 break-all">{archiveResult.snapshot_url}</p>
+                              {archiveResult.extracted && Object.keys(archiveResult.extracted).length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {Object.entries(archiveResult.extracted).map(([k, v]) => (
+                                    <p key={k} className="text-xs"><span className="font-medium">{k}:</span> {v}</p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-red-700 dark:text-red-400">Not found in archive</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Archive sources */}
+                    <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      <h3 className="text-sm font-semibold mb-2">Archive sources</h3>
+                      {archiveSources.length === 0 ? (
+                        <p className="text-xs text-neutral-500">No archive sources configured. Wayback Machine is available by default.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {archiveSources.map(src => (
+                            <div key={src.id} className="flex items-center justify-between p-2 rounded bg-neutral-50 dark:bg-neutral-800/50">
+                              <div>
+                                <span className="text-sm font-medium">{src.name}</span>
+                                <span className="text-[10px] text-neutral-400 ml-2">{src.type}</span>
+                              </div>
+                              <span className={`text-[10px] font-medium ${src.enabled ? 'text-green-600' : 'text-neutral-400'}`}>
+                                {src.enabled ? 'Enabled' : 'Disabled'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Instructions */}
+                    <div className="p-4 bg-neutral-50 dark:bg-neutral-800/30 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      <h3 className="text-sm font-semibold mb-2">How to use</h3>
+                      <ol className="text-xs text-neutral-500 space-y-1 list-decimal list-inside">
+                        <li>Paste a hackathon URL above and click "Check"</li>
+                        <li>If archived, click "Fetch" on the hackathon card to import the snapshot</li>
+                        <li>The archived page is stored as an attachment (immutable record)</li>
+                        <li>Deadlines, prizes, and rules are extracted automatically</li>
+                      </ol>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hackathon View */}
+                {hackathonView && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold tracking-tight">Hackathon Tracker</h2>
+                        <p className="text-sm text-neutral-500">Track deadlines, eligibility, and submissions.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={fetchHackathons}
+                          className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                        >
+                          Refresh
+                        </button>
+                        <button
+                          onClick={() => { setEditingHackathon(null); setIsHackathonModalOpen(true); }}
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Hackathon
+                        </button>
+                      </div>
+                    </div>
+
+                    {hackathons.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                        <Sparkles className="w-10 h-10 text-purple-400 mb-3" />
+                        <h3 className="text-base font-semibold">No hackathons yet</h3>
+                        <p className="text-sm text-neutral-500 mt-1 max-w-xs">
+                          Add hackathons to track deadlines, eligibility, and submissions.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {hackathons.map(h => {
+                          const deadline = h.submission_deadline || h.end_date;
+                          const daysLeft = deadline ? Math.ceil((new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                          return (
+                            <div key={h.id} className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="text-sm font-semibold tracking-tight">{h.name}</h3>
+                                    <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                                      {h.platform}
+                                    </span>
+                                    {h.status === 'open' && (
+                                      <span className="text-[10px] font-medium uppercase tracking-wider text-green-600 bg-green-50 dark:bg-green-950/50 px-1.5 py-0.5 rounded">
+                                        Open
+                                      </span>
+                                    )}
+                                  </div>
+                                  {h.description && (
+                                    <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{h.description}</p>
+                                  )}
+                                  <div className="flex items-center gap-3 mt-2 text-[11px] text-neutral-500">
+                                    {h.prize && (
+                                      <span className="font-medium text-amber-600">{h.prize}</span>
+                                    )}
+                                    {deadline && (
+                                      <span className={`inline-flex items-center gap-1 ${daysLeft !== null && daysLeft <= 3 ? 'text-red-500 font-medium' : ''}`}>
+                                        <Calendar className="w-3 h-3" />
+                                        {daysLeft !== null && daysLeft >= 0 ? `${daysLeft}d left` : 'Ended'}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {h.url && (
+                                    <div className="mt-2">
+                                      <button
+                                        onClick={() => fetchArchiveForTicket(h.id, h.url)}
+                                        className="text-[10px] font-medium text-teal-600 dark:text-teal-400 hover:underline"
+                                      >
+                                        Fetch from Wayback Archive
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Attachments */}
+                                {attachments[h.id] && attachments[h.id].length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {attachments[h.id].map(att => (
+                                        <button
+                                          key={att.id}
+                                          onClick={() => setPreviewAttachment(att)}
+                                          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/50 px-2 py-1 rounded hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-colors"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                          {att.filename.length > 20 ? att.filename.slice(0, 20) + '...' : att.filename}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => { setEditingHackathon(h); setIsHackathonModalOpen(true); }}
+                                    className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm('Delete this hackathon?')) {
+                                        await api(`./api/hackathons/${h.id}`, { method: 'DELETE' });
+                                        fetchHackathons();
+                                      }
+                                    }}
+                                    className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Upload attachment button */}
+                    <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                      <label className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-colors cursor-pointer ${uploadingAttachment ? 'bg-neutral-200 text-neutral-400' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}`}>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        {uploadingAttachment ? 'Uploading...' : 'Attach Screenshot'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file && editingHackathon) {
+                              uploadAttachment(editingHackathon.id, file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Attachment Preview Modal */}
+                {previewAttachment && (
+                  <div className="fixed inset-0 z-50 bg-neutral-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn" onClick={() => setPreviewAttachment(null)}>
+                    <div className="bg-white dark:bg-[#111827] rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 max-w-4xl w-full max-h-[90vh] overflow-hidden animate-scaleIn" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
+                        <h3 className="text-sm font-semibold truncate">{previewAttachment.filename}</h3>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`./api/attachments/${previewAttachment.id}`}
+                            download={previewAttachment.filename}
+                            className="h-7 px-2.5 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                          >
+                            Download
+                          </a>
+                          <button onClick={() => setPreviewAttachment(null)} className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-4 overflow-auto max-h-[calc(90vh-60px)]">
+                        <img
+                          src={`./api/attachments/${previewAttachment.id}`}
+                          alt={previewAttachment.filename}
+                          className="max-w-full h-auto rounded-lg border border-neutral-200 dark:border-neutral-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Task List */}
+                {!hackathonView && !archiveView && !settingsView && (
                 <div className="space-y-3">
                   {todos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-xs">

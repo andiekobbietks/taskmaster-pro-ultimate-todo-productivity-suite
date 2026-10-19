@@ -1,4 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
+import { registerHackathonRoutes } from "./hackathons";
+import { registerAttachmentRoutes } from "./attachments";
+import { registerArchiveRoutes } from "./archive";
+import { registerSettingsRoutes } from "./settings";
 import { Hono } from "hono";
 
 export class App extends DurableObject {
@@ -230,6 +234,12 @@ export class App extends DurableObject {
       });
     });
 
+    // Hackathon Tracker routes
+    registerHackathonRoutes(this.app, this.ctx.storage.sql);
+    registerAttachmentRoutes(this.app, this.ctx.storage.sql);
+    registerArchiveRoutes(this.app, this.ctx.storage.sql);
+    registerSettingsRoutes(this.app, this.ctx.storage.sql);
+
     // Seed sample data ONLY when explicitly enabled.
     //
     // This used to run unconditionally on an empty database, which meant every
@@ -270,6 +280,66 @@ export class App extends DurableObject {
         pomodoro_count INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL,
         completed_at INTEGER DEFAULT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS hackathons (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        platform TEXT DEFAULT 'manual',
+        url TEXT DEFAULT '',
+        description TEXT DEFAULT '',
+        prize TEXT DEFAULT '',
+        start_date TEXT DEFAULT NULL,
+        end_date TEXT DEFAULT NULL,
+        registration_deadline TEXT DEFAULT NULL,
+        submission_deadline TEXT DEFAULT NULL,
+        eligibility_json TEXT DEFAULT '{}',
+        status TEXT DEFAULT 'open',
+        notes TEXT DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS hackathon_profile (
+        id TEXT PRIMARY KEY,
+        profile_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS attachments (
+        id TEXT PRIMARY KEY,
+        ticket_id TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        data BLOB NOT NULL,
+        size INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS archive_sources (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        api_key TEXT DEFAULT NULL,
+        enabled INTEGER DEFAULT 1,
+        base_url TEXT DEFAULT '',
+        created_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
       )
     `);
   }

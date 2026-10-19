@@ -19,7 +19,12 @@
       "entry": "wrangler.json",
       "evidence": "wrangler.json: main=src/index.ts, assets.directory=./public",
       "dependsOn": [],
-      "usedBy": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+      "usedBy": [
+        "FEAT-001",
+        "FEAT-002",
+        "FEAT-003",
+        "FEAT-004"
+      ],
       "dataAtRest": "none (stateless host)",
       "maturity": "solid",
       "risk": "low",
@@ -32,8 +37,19 @@
       "role": "Single DO class named App - acts as both the HTTP server and the stateful persistence unit. One instance per (space, branch).",
       "entry": "src/index.ts:4 export class App extends DurableObject",
       "evidence": "src/index.ts:4-8, 309-311",
-      "dependsOn": ["COMP-001", "COMP-004", "COMP-003"],
-      "usedBy": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006"],
+      "dependsOn": [
+        "COMP-001",
+        "COMP-004",
+        "COMP-003"
+      ],
+      "usedBy": [
+        "FEAT-001",
+        "FEAT-002",
+        "FEAT-003",
+        "FEAT-004",
+        "FEAT-005",
+        "FEAT-006"
+      ],
       "dataAtRest": "all application data",
       "maturity": "adequate",
       "risk": "medium",
@@ -46,8 +62,18 @@
       "role": "In-process HTTP router; 8 routes registered in the DO constructor",
       "entry": "src/index.ts:5 private app = new Hono()",
       "evidence": "src/index.ts:12, 58, 101, 170, 177, 182, 195, 206",
-      "dependsOn": ["DEP-001"],
-      "usedBy": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-011", "FEAT-013", "FEAT-014"],
+      "dependsOn": [
+        "DEP-001"
+      ],
+      "usedBy": [
+        "FEAT-001",
+        "FEAT-002",
+        "FEAT-003",
+        "FEAT-004",
+        "FEAT-011",
+        "FEAT-013",
+        "FEAT-014"
+      ],
       "dataAtRest": "none",
       "maturity": "adequate",
       "risk": "low",
@@ -60,8 +86,28 @@
       "role": "Per-(space,branch) SQLite database via this.ctx.storage.sql. Two tables: todos (13 cols), lists (5 cols).",
       "entry": "src/index.ts:232-260 initDb()",
       "evidence": "src/index.ts:233-259",
-      "dependsOn": ["COMP-002"],
-      "usedBy": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005", "FEAT-006", "FEAT-007", "FEAT-008", "FEAT-009", "FEAT-011", "FEAT-012", "FEAT-013", "FEAT-014", "FEAT-016", "FEAT-017", "FEAT-021", "FEAT-022"],
+      "dependsOn": [
+        "COMP-002"
+      ],
+      "usedBy": [
+        "FEAT-001",
+        "FEAT-002",
+        "FEAT-003",
+        "FEAT-004",
+        "FEAT-005",
+        "FEAT-006",
+        "FEAT-007",
+        "FEAT-008",
+        "FEAT-009",
+        "FEAT-011",
+        "FEAT-012",
+        "FEAT-013",
+        "FEAT-014",
+        "FEAT-016",
+        "FEAT-017",
+        "FEAT-021",
+        "FEAT-022"
+      ],
       "dataAtRest": "todos, lists",
       "maturity": "adequate",
       "risk": "medium",
@@ -74,8 +120,12 @@
       "role": "Serves public/ host-side before any Worker invocation: the index.html shell plus the compiled bundles public/assets/app.js and public/assets/app.css",
       "entry": "wrangler.json assets.directory=./public",
       "evidence": "public/index.html (31 lines), public/assets/app.js + public/assets/app.css (build output, gitignored)",
-      "dependsOn": ["COMP-001"],
-      "usedBy": ["FEAT-023"],
+      "dependsOn": [
+        "COMP-001"
+      ],
+      "usedBy": [
+        "FEAT-023"
+      ],
       "dataAtRest": "none",
       "maturity": "adequate",
       "risk": "low",
@@ -88,8 +138,18 @@
       "role": "One App() component holding all 24 useState hooks; all UI, data fetching, and timer logic in one scope",
       "entry": "src/app.jsx:74 function App()",
       "evidence": "src/app.jsx:74-854 (800 lines in one scope)",
-      "dependsOn": ["DEP-002", "DEP-003", "DEP-005"],
-      "usedBy": ["FEAT-018", "FEAT-019", "FEAT-020", "FEAT-023", "FEAT-024"],
+      "dependsOn": [
+        "DEP-002",
+        "DEP-003",
+        "DEP-005"
+      ],
+      "usedBy": [
+        "FEAT-018",
+        "FEAT-019",
+        "FEAT-020",
+        "FEAT-023",
+        "FEAT-024"
+      ],
       "dataAtRest": "none (in-memory only)",
       "maturity": "fragile",
       "risk": "medium",
@@ -102,8 +162,20 @@
       "role": "One api() helper wraps every request and rejects on any non-2xx; 9 call sites (fetchTodos, fetchLists, fetchStats, handleCreateTodo, toggleComplete, togglePin, deleteTodo, incrementPomodoro, createList) report failure through fail() into a dismissible ErrorBanner with retry",
       "entry": "src/lib/api.js:47 api(); src/app.jsx:117 fail(); src/app.jsx:30 ErrorBanner",
       "evidence": "src/lib/api.js:45-81 (ApiError, describeError, api), src/app.jsx:117-124 (fail/clearError), 30-72 (ErrorBanner), 151-310 (call sites), 849 (banner rendered)",
-      "dependsOn": ["COMP-003"],
-      "usedBy": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-011", "FEAT-013", "FEAT-014", "FEAT-016", "FEAT-025"],
+      "dependsOn": [
+        "COMP-003"
+      ],
+      "usedBy": [
+        "FEAT-001",
+        "FEAT-002",
+        "FEAT-003",
+        "FEAT-004",
+        "FEAT-011",
+        "FEAT-013",
+        "FEAT-014",
+        "FEAT-016",
+        "FEAT-025"
+      ],
       "dataAtRest": "none",
       "maturity": "adequate",
       "risk": "medium",
@@ -116,8 +188,14 @@
       "role": "npm run build compiles src/app.jsx into public/assets/app.js (esbuild, IIFE) and src/tailwind.css into public/assets/app.css (Tailwind CLI). Supersedes COMP-008, COMP-009 and COMP-011.",
       "entry": "package.json scripts: build, build:js, build:css",
       "evidence": "package.json:6-8, tailwind.config.cjs, src/tailwind.css; CI builds then asserts both outputs in .github/workflows/ci.yml",
-      "dependsOn": ["DEP-011", "DEP-007"],
-      "usedBy": ["COMP-005", "COMP-006"],
+      "dependsOn": [
+        "DEP-011",
+        "DEP-007"
+      ],
+      "usedBy": [
+        "COMP-005",
+        "COMP-006"
+      ],
       "dataAtRest": "none",
       "maturity": "solid",
       "risk": "low",
@@ -131,7 +209,9 @@
       "entry": "src/tailwind.css:14-45",
       "evidence": "src/tailwind.css:16-28 (brand-50..900), 31-45 (animations)",
       "dependsOn": [],
-      "usedBy": ["FEAT-023"],
+      "usedBy": [
+        "FEAT-023"
+      ],
       "dataAtRest": "none",
       "maturity": "solid",
       "risk": "low",
@@ -144,7 +224,10 @@
       "role": "Inter (sans) + JetBrains Mono (mono) loaded from Google Fonts with preconnect",
       "entry": "public/index.html:8-11",
       "evidence": "public/index.html:9-10 (preconnect), 11 (css2 stylesheet)",
-      "dependsOn": ["DEP-008", "DEP-009"],
+      "dependsOn": [
+        "DEP-008",
+        "DEP-009"
+      ],
       "usedBy": [],
       "dataAtRest": "none",
       "maturity": "adequate",
@@ -158,8 +241,12 @@
       "role": "Injects 4 lists and 4 sample tasks on first run when the lists table is empty, and only when SEED_DEMO_DATA=true",
       "entry": "src/index.ts:272-317 seedDefaults()",
       "evidence": "src/index.ts:237-238 (SEED_DEMO_DATA gate in the constructor), 273 (empty-table guard)",
-      "dependsOn": ["COMP-004"],
-      "usedBy": ["FEAT-022"],
+      "dependsOn": [
+        "COMP-004"
+      ],
+      "usedBy": [
+        "FEAT-022"
+      ],
       "dataAtRest": "writes to todos and lists",
       "maturity": "adequate",
       "risk": "low",
@@ -187,7 +274,10 @@
       "entry": ".github/workflows/ci.yml and release.yml (added 2026-10-17)",
       "evidence": "ci.yml runs the Worker bundle check, a docs-sync gate and seed validation on every push; 0 files match *test*/*spec*",
       "dependsOn": [],
-      "usedBy": ["FEAT-029", "FEAT-030"],
+      "usedBy": [
+        "FEAT-029",
+        "FEAT-030"
+      ],
       "dataAtRest": "none",
       "maturity": "missing",
       "risk": "high",
@@ -201,11 +291,35 @@
       "entry": "absent",
       "evidence": "grep for auth|bearer|token|session|cookie = only a string literal in an alert()",
       "dependsOn": [],
-      "usedBy": ["FEAT-027"],
+      "usedBy": [
+        "FEAT-027"
+      ],
       "dataAtRest": "all application data",
       "maturity": "missing",
       "risk": "critical",
       "notes": "Isolation currently relies entirely on the platform fact that one DO instance serves one deployment. That is single-tenant by architecture, not by access control - it protects a private deploy but cannot support a shared beta."
+    },
+    {
+      "id": "COMP-015",
+      "name": "Hackathon routes module",
+      "layer": "backend",
+      "role": "Hono routes for hackathon CRUD, eligibility engine, and user profile. Registered in the App DO constructor.",
+      "entry": "src/hackathons.ts:1 export function registerHackathonRoutes",
+      "evidence": "src/hackathons.ts:1-220, src/index.ts:2 (import), src/index.ts:249 (registration)",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
+      "usedBy": [
+        "FEAT-032",
+        "FEAT-033",
+        "FEAT-034"
+      ],
+      "dataAtRest": "hackathons, hackathon_profile",
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "All SQL parameterised. Eligibility engine is a pure function \u2014 rules stored as JSON per hackathon."
     }
   ],
   "dataFlow": [
@@ -218,9 +332,18 @@
   ],
   "summary": {
     "total": 14,
-    "byMaturity": { "solid": 3, "adequate": 7, "fragile": 2, "missing": 2 },
-    "criticalRisks": ["COMP-016"],
-    "highRisks": ["COMP-015"],
+    "byMaturity": {
+      "solid": 3,
+      "adequate": 7,
+      "fragile": 2,
+      "missing": 2
+    },
+    "criticalRisks": [
+      "COMP-016"
+    ],
+    "highRisks": [
+      "COMP-015"
+    ],
     "structuralDebt": [
       "COMP-006 - 800 lines in one component, no decomposition (was 821; same shape)",
       "COMP-015/COMP-016 - no tests and no auth"

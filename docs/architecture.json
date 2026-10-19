@@ -300,7 +300,7 @@
       "notes": "Isolation currently relies entirely on the platform fact that one DO instance serves one deployment. That is single-tenant by architecture, not by access control - it protects a private deploy but cannot support a shared beta."
     },
     {
-      "id": "COMP-015",
+      "id": "COMP-016",
       "name": "Hackathon routes module",
       "layer": "backend",
       "role": "Hono routes for hackathon CRUD, eligibility engine, and user profile. Registered in the App DO constructor.",

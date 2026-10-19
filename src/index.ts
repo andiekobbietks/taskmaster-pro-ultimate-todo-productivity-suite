@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { registerHackathonRoutes } from "./hackathons";
 import { Hono } from "hono";
 
 export class App extends DurableObject {
@@ -229,6 +230,9 @@ export class App extends DurableObject {
         pomodoros
       });
     });
+
+    // Hackathon Tracker routes
+    registerHackathonRoutes(this.app, this.ctx.storage.sql);
 
     // Seed sample data ONLY when explicitly enabled.
     //

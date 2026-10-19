@@ -118,6 +118,20 @@ function extractHackathonData(html: string): ArchivedPage["extracted"] {
 
 // ── Route registration ───────────────────────────────────────────────
 
+/**
+ * Register all archive-related API routes on the Hono app.
+ *
+ * Routes:
+ * - GET /api/archive/sources — List configured archive sources
+ * - POST /api/archive/sources — Add an archive source
+ * - DELETE /api/archive/sources/:id — Remove an archive source
+ * - POST /api/archive/fetch — Fetch an archived page for a URL
+ * - POST /api/archive/bulk — Bulk fetch for multiple URLs
+ * - GET /api/archive/check — Check if a URL has archived snapshots
+ *
+ * @param app - Hono application instance
+ * @param sql - SQLite storage interface from Durable Object
+ */
 export function registerArchiveRoutes(app: Hono, sql: any) {
   // --- List archive sources -------------------------------------------
 

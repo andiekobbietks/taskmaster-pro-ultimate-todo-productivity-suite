@@ -1,8 +1,8 @@
 {
   "schema": "feature-inventory/1.0",
   "project": "taskmaster-pro",
-  "version": "0.1.0-alpha",
-  "generated": "2026-10-17",
+  "version": "0.2.0-alpha",
+  "generated": "2026-10-19",
   "verification": "Every status below was read from src/index.ts (323 lines) and the front end, which now lives in src/app.jsx (854 lines) and src/lib/api.js rather than in public/index.html. Frontend evidence is cited by line number in src/app.jsx.",
   "statusVocabulary": {
     "implemented": "Backend route exists AND frontend calls it AND UI renders it",
@@ -19,7 +19,11 @@
       "backend": "POST /api/todos",
       "frontend": "handleCreateTodo() -> fetch('./api/todos')",
       "evidence": "src/index.ts:58-99, src/app.jsx:202 (handleCreateTodo) + 680 (New Task modal)",
-      "dependsOn": ["COMP-002", "COMP-003", "COMP-004"],
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
       "gaps": [],
       "notes": "Title validated non-empty server-side. Returns 201 with full row."
     },
@@ -31,7 +35,10 @@
       "backend": "GET /api/todos (status, priority, listId, search)",
       "frontend": "fetchTodos() builds query string from filter state",
       "evidence": "src/index.ts:12-56, src/app.jsx:151 (fetchTodos)",
-      "dependsOn": ["COMP-002", "COMP-004"],
+      "dependsOn": [
+        "COMP-002",
+        "COMP-004"
+      ],
       "gaps": [],
       "notes": "Sorted by is_pinned DESC, due_date ASC, created_at DESC. Parameterised SQL throughout."
     },
@@ -43,8 +50,13 @@
       "backend": "PATCH /api/todos/:id",
       "frontend": "toggleComplete, togglePin, incrementPomodoro",
       "evidence": "src/index.ts:101-168, src/app.jsx:243 (toggleComplete), 257 (togglePin), 280 (incrementPomodoro)",
-      "dependsOn": ["COMP-002", "COMP-004"],
-      "gaps": ["No general-purpose edit UI - only 3 of the 8 supported fields are reachable from the frontend"],
+      "dependsOn": [
+        "COMP-002",
+        "COMP-004"
+      ],
+      "gaps": [
+        "No general-purpose edit UI - only 3 of the 8 supported fields are reachable from the frontend"
+      ],
       "notes": "Dynamic SET clause built from present keys only; column names are hardcoded, so no injection."
     },
     {
@@ -55,7 +67,10 @@
       "backend": "DELETE /api/todos/:id",
       "frontend": "deleteTodo()",
       "evidence": "src/index.ts:170-174, src/app.jsx:270 (deleteTodo)",
-      "dependsOn": ["COMP-002", "COMP-004"],
+      "dependsOn": [
+        "COMP-002",
+        "COMP-004"
+      ],
       "gaps": [
         "Returns {success:true} even when no row matched - client cannot distinguish delete of missing item",
         "No confirmation dialog before destructive delete"
@@ -70,7 +85,9 @@
       "backend": "PATCH sets completed_at on rising edge, NULLs on falling edge",
       "frontend": "toggleComplete()",
       "evidence": "src/index.ts:121-130, src/app.jsx:243 (toggleComplete)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [],
       "notes": "Edge detection via comparison against existing.completed. Correct."
     },
@@ -82,7 +99,9 @@
       "backend": "PATCH is_pinned; ORDER BY is_pinned DESC",
       "frontend": "togglePin()",
       "evidence": "src/index.ts:147-150, src/app.jsx:257 (togglePin)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [],
       "notes": ""
     },
@@ -94,7 +113,9 @@
       "backend": "priority column, GET filter",
       "frontend": "getPriorityBadge(), priorityFilter select",
       "evidence": "src/index.ts:28-31, src/app.jsx:318 (getPriorityBadge), 543 (filter select), 613 (rendered on card)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "Priority is free-text in POST/PATCH - no server-side enum validation, so an invalid value is storable and renders as 'Low'"
       ],
@@ -108,7 +129,9 @@
       "backend": "due_date column, due_date ASC ordering, dueToday stat",
       "frontend": "newDueDate input, due badge display, client-side 'today' filter",
       "evidence": "src/index.ts:135-138, 212-213, src/app.jsx:91 (newDueDate state), 165 (today filter), 614 (due badge)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "'today' filter runs client-side after fetching ALL todos - does not scale, and disagrees with the server-side dueToday count",
         "No overdue indication; a past-due task looks identical to a future one",
@@ -124,7 +147,9 @@
       "backend": "tags TEXT column, JSON-serialised array",
       "frontend": "newTagsStr comma-split, tag badges on card",
       "evidence": "src/index.ts:52, 75, 143-146, src/app.jsx:93 (newTagsStr state), 206 (comma split), 630 (tag badges)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "Tags stored as a JSON string in a TEXT column - not normalised, not indexable, cannot be queried relationally"
       ],
@@ -153,7 +178,9 @@
       "backend": "GET/POST/DELETE /api/lists",
       "frontend": "sidebar list nav, createList() modal",
       "evidence": "src/index.ts:177-203, src/app.jsx:294 (createList), 467 (sidebar list nav), 788 (New List modal)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "No rename or edit of an existing list (create + delete only)",
         "No reordering despite sort_order column existing",
@@ -169,7 +196,9 @@
       "backend": "UPDATE todos SET list_id='inbox' WHERE list_id=:id",
       "frontend": "n/a (server-side cascade)",
       "evidence": "src/index.ts:195-203",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "Guard checks id==='default' but no list with id 'default' is ever created - the check for 'inbox' is the only one that can ever fire"
       ],
@@ -183,7 +212,9 @@
       "backend": "GET ?search= LIKE '%term%' on title OR description",
       "frontend": "searchQuery state, encodeURIComponent applied",
       "evidence": "src/index.ts:38-41, src/app.jsx:85 (searchQuery state), 340-344 (search input)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "LIKE wildcards (% and _) in user input are NOT escaped - a search for '100%' matches everything containing '100'",
         "No debounce - fires a request per keystroke",
@@ -199,7 +230,9 @@
       "backend": "GET /api/stats",
       "frontend": "sidebar counters + productivity widget",
       "evidence": "src/index.ts:206-226, src/app.jsx:490-515 (productivity widget), 395-465 (sidebar counters)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "Six separate COUNT(*) scans of the whole table on every stats fetch",
         "No time-series/history - only an instantaneous snapshot"
@@ -231,7 +264,9 @@
       "backend": "PATCH pomodoro_count",
       "frontend": "incrementPomodoro() called from timer completion",
       "evidence": "src/index.ts:151-154, src/app.jsx:280 (incrementPomodoro)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "Read-modify-write from the client ((todo.pomodoro_count||0)+1) - two concurrent timers silently lose an increment"
       ],
@@ -260,7 +295,10 @@
       "backend": "status query param",
       "frontend": "sidebar Overview buttons with live counts",
       "evidence": "src/app.jsx:395-465 (Overview view buttons with live counts)",
-      "dependsOn": ["FEAT-002", "FEAT-014"],
+      "dependsOn": [
+        "FEAT-002",
+        "FEAT-014"
+      ],
       "gaps": [],
       "notes": "Counts sourced from /api/stats, not from the filtered fetch."
     },
@@ -286,7 +324,9 @@
       "backend": "none",
       "frontend": "darkMode state toggles .dark on documentElement",
       "evidence": "src/app.jsx:109 (darkMode state), 126 (class effect), 372 (toggle button)",
-      "dependsOn": ["COMP-017"],
+      "dependsOn": [
+        "COMP-017"
+      ],
       "gaps": [
         "Preference NOT persisted - resets to light on every reload",
         "Does not read prefers-color-scheme, so system-dark users get a light flash"
@@ -301,7 +341,9 @@
       "backend": "POST /api/lists",
       "frontend": "createList() + 6-colour picker",
       "evidence": "src/index.ts:182-193, src/app.jsx:294 (createList), 788-843 (New List modal)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "icon param accepted server-side, never selectable or rendered"
       ],
@@ -315,7 +357,9 @@
       "backend": "seedDefaults() - 4 lists, 4 tasks, only when SEED_DEMO_DATA=true",
       "frontend": "n/a",
       "evidence": "src/index.ts:237-238 (opt-in gate), 272-317 (seedDefaults), wrangler.json vars.SEED_DEMO_DATA=false, .dev.vars.example",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "Runs in the constructor - re-checked per DO instantiation",
         "No in-app control; opting in means setting a var and restarting"
@@ -357,7 +401,9 @@
       "backend": "returns 400/404 JSON errors as {error: ...}",
       "frontend": "api() rejects on any non-2xx and rethrows the server's own message; fail() pushes it into a dismissible ErrorBanner with Retry",
       "evidence": "src/lib/api.js:45-81 (ApiError, describeError, api), src/app.jsx:30-72 (ErrorBanner), 117-124 (fail/clearError), 849 (rendered); 9 call sites at 151, 177, 186, 202, 243, 257, 270, 280, 294",
-      "dependsOn": ["COMP-007"],
+      "dependsOn": [
+        "COMP-007"
+      ],
       "gaps": [
         "No loading state, so a slow request looks like an empty list until it resolves",
         "Retry re-runs the failed operation but there is no optimistic UI to restore",
@@ -367,7 +413,7 @@
     },
     {
       "id": "FEAT-026",
-      "name": "⌘K keyboard shortcut",
+      "name": "\u2318K keyboard shortcut",
       "status": "planned",
       "maturity": "not-started",
       "backend": "none",
@@ -429,7 +475,9 @@
       "backend": "GET /api/todos performs SELECT * with no LIMIT or cursor",
       "frontend": "fetchTodos() fetches the entire filtered set in one request",
       "evidence": "src/index.ts:19 (SELECT * FROM todos), 45 (exec with no LIMIT); src/app.jsx:151 (fetchTodos - no paging state)",
-      "dependsOn": ["COMP-004"],
+      "dependsOn": [
+        "COMP-004"
+      ],
       "gaps": [
         "BLOCKER-for-GA: unbounded SELECT grows with dataset size. Fine at 50 rows, a timeout at 50,000.",
         "No LIMIT, no OFFSET, no cursor, no infinite-scroll trigger",
@@ -445,19 +493,94 @@
       "backend": "none",
       "frontend": "none",
       "evidence": ".github/workflows/ci.yml (3 jobs: Worker bundle, docs-sync, seed validation), .github/workflows/release.yml (v* tag -> GitHub Release)",
-      "dependsOn": ["FEAT-029"],
+      "dependsOn": [
+        "FEAT-029"
+      ],
       "gaps": [
         "Continuous delivery is not enabled - npm run deploy is manual because it needs a CLOUDFLARE_API_TOKEN repository secret",
         "No typecheck or test job to gate on, since FEAT-029 is not started"
       ],
       "notes": "CI landed 2026-10-17: every push and PR builds the front end, bundles the Worker as a dry run, regenerates the docs and validates the seed fixtures. Releases are published from CHANGELOG.md by tag."
+    },
+    {
+      "id": "FEAT-032",
+      "name": "Hackathon Tracker \u2014 CRUD",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET/POST/PATCH/DELETE /api/hackathons",
+      "frontend": "Hackathon view in sidebar with add/edit/delete",
+      "evidence": "src/hackathons.ts:1-200, src/app.jsx:107-112 (state), src/app.jsx:560-680 (view)",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
+      "gaps": [],
+      "notes": "Full CRUD with parameterised SQL. Eligibility rules stored as JSON per hackathon."
+    },
+    {
+      "id": "FEAT-033",
+      "name": "Eligibility engine",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET /api/hackathons/eligibility",
+      "frontend": "Eligibility badge on each hackathon card",
+      "evidence": "src/hackathons.ts:30-70 (evaluateEligibility), src/app.jsx:620-640 (badge)",
+      "dependsOn": [
+        "COMP-002"
+      ],
+      "gaps": [],
+      "notes": "Pure function: (rules, profile) => { eligible, reasons[] }. Rules: age_min, age_max, countries, student_only, team_min, team_max, not_employee_of_sponsor, other."
+    },
+    {
+      "id": "FEAT-034",
+      "name": "Hackathon profile",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET/PUT /api/hackathons/profile",
+      "frontend": "Profile state in App component",
+      "evidence": "src/hackathons.ts:170-200, src/app.jsx:110",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-004"
+      ],
+      "gaps": [],
+      "notes": "Singleton row in hackathon_profile table. Fields: age, country, is_student, team_size, employed_by_sponsor."
+    },
+    {
+      "id": "FEAT-035",
+      "name": "Hackathon sync script",
+      "status": "stub",
+      "maturity": "planned",
+      "backend": "scripts/sync-hackathons.mjs",
+      "frontend": "N/A",
+      "evidence": "scripts/sync-hackathons.mjs:1-50",
+      "dependsOn": [],
+      "gaps": [
+        "Scraping not implemented \u2014 sources disabled pending actual scraper implementation"
+      ],
+      "notes": "Scaffold for Devpost/MLH/lablab.ai sync. Idempotent upsert by (platform, external_id)."
     }
   ],
   "summary": {
     "total": 31,
-    "byStatus": { "implemented": 14, "partial": 9, "stub": 2, "planned": 6 },
-    "phantomFeatures": ["FEAT-010", "FEAT-017", "FEAT-026"],
-    "betaBlockers": ["FEAT-027", "FEAT-029", "FEAT-024", "FEAT-010"],
+    "byStatus": {
+      "implemented": 14,
+      "partial": 9,
+      "stub": 2,
+      "planned": 6
+    },
+    "phantomFeatures": [
+      "FEAT-010",
+      "FEAT-017",
+      "FEAT-026"
+    ],
+    "betaBlockers": [
+      "FEAT-027",
+      "FEAT-029",
+      "FEAT-024",
+      "FEAT-010"
+    ],
     "assessment": "The product is beta-shaped; the engineering is alpha. 23 of 31 features are usable today. FEAT-025 (error handling) stopped being a phantom on 2026-10-17 and FEAT-030 (CI) is now partial, but 3 phantoms remain, and a phantom that appears to work is worse than an absent feature."
   }
 }

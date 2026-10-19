@@ -29,6 +29,19 @@ function generateId(): string {
   return `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Register all attachment-related API routes on the Hono app.
+ *
+ * Routes:
+ * - POST /api/todos/:id/attachments — Upload an attachment (screenshot)
+ * - GET /api/todos/:id/attachments — List attachments for a ticket
+ * - GET /api/attachments/:id — Download/preview an attachment
+ * - DELETE /api/attachments/:id — Delete an attachment
+ * - GET /api/attachments — List all attachments
+ *
+ * @param app - Hono application instance
+ * @param sql - SQLite storage interface from Durable Object
+ */
 export function registerAttachmentRoutes(app: Hono, sql: any) {
   // --- Upload attachment ---------------------------------------------------
 

@@ -152,6 +152,20 @@ function deobfuscateSettings(settings: any): any {
 
 // ── Route registration ───────────────────────────────────────────────
 
+/**
+ * Register all settings-related API routes on the Hono app.
+ *
+ * Routes:
+ * - GET /api/settings — Get all settings
+ * - GET /api/settings/:section — Get a specific section
+ * - PUT /api/settings — Update all settings
+ * - PATCH /api/settings/:section — Update a specific section
+ * - POST /api/settings/reset — Reset to defaults
+ * - POST /api/settings/test-storage — Test storage connection
+ *
+ * @param app - Hono application instance
+ * @param sql - SQLite storage interface from Durable Object
+ */
 export function registerSettingsRoutes(app: Hono, sql: any) {
   // --- Get all settings -----------------------------------------------
 

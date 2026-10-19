@@ -140,9 +140,9 @@
       "evidence": "src/index.ts:24 (declared), 49-52 (clause), 27-60 (query builder); guarded by scripts/tier1-check.mjs DEAD-FILTER",
       "dependsOn": [],
       "gaps": [
-        "No frontend surface at all - the filter is reachable only via the API"
+        "No frontend surface - the filter is reachable only via the API"
       ],
-      "notes": "Either implement in the query builder or remove the param read. Silently ignoring it is the worst option."
+      "notes": "The dead-param defect is fixed as of 2026-10-19 (26601b5): the filter is wired into the SQL and returns only matching rows, verified at runtime against a local instance. What remains is the missing UI control, so the feature is still partial for an end user even though the API is now correct."
     },
     {
       "id": "FEAT-011",
@@ -187,7 +187,7 @@
         "No debounce - fires a request per keystroke",
         "No index; full table scan per keystroke"
       ],
-      "notes": "Parameterised so no SQL injection, but wildcard semantics are unescaped."
+      "notes": "Parameterised so no SQL injection, and LIKE metacharacters are escaped as of 2026-10-19 (26601b5) so a search for 100% matches that literal string rather than every row. Both remaining gaps are performance, not correctness."
     },
     {
       "id": "FEAT-014",

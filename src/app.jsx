@@ -752,7 +752,8 @@ function App() {
             <main className="flex-1 overflow-y-auto p-6 lg:p-8">
               <div className="max-w-4xl mx-auto space-y-6">
                 
-                {/* Header Title & Filters */}
+                {/* Header Title & Filters — only in task view */}
+                {!hackathonView && !archiveView && !settingsView && !digestView && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800">
                   <div>
                     <h1 className="text-2xl font-bold tracking-tight">
@@ -790,6 +791,7 @@ function App() {
                     </button>
                   </div>
                 </div>
+                )}
 
                 {/* Settings View */}
                 {settingsView && (

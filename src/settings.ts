@@ -23,6 +23,7 @@ export interface Settings {
     azure_sas_token: string;
   };
   email: {
+    protocol: "imap" | "jmap";
     inbox_address: string;
     imap_host: string;
     imap_port: number;
@@ -57,11 +58,15 @@ const DEFAULT_SETTINGS: Settings = {
     azure_sas_token: "",
   },
   email: {
+    protocol: "imap",
     inbox_address: "",
     imap_host: "imap.mail.yahoo.com",
     imap_port: 993,
     imap_user: "",
     imap_password: "",
+    jmap_server_url: "",
+    jmap_username: "",
+    jmap_password: "",
   },
   notifications: {
     daily_digest: true,

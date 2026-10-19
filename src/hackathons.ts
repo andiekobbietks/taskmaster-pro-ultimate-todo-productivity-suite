@@ -84,6 +84,16 @@ export interface Hackathon {
 
 // ── Eligibility engine ───────────────────────────────────────────────
 
+/**
+ * Evaluate whether a user profile meets a hackathon's eligibility rules.
+ *
+ * @param rules - The hackathon's eligibility rules (citizenship, residency, age, etc.)
+ * @param profile - The user's profile (citizenships, residencies, age, student status, etc.)
+ * @returns { eligible: boolean, reasons: string[], qualification_path: string }
+ * @example
+ *   const result = evaluateEligibility(rules, profile);
+ *   if (result.eligible) console.log(result.qualification_path);
+ */
 export function evaluateEligibility(
   rules: EligibilityRules,
   profile: UserProfile,
@@ -254,6 +264,21 @@ const DEFAULT_PROFILE: UserProfile = {
 
 // ── Route registration ───────────────────────────────────────────────
 
+/**
+ * Register all hackathon-related API routes on the Hono app.
+ *
+ * Routes:
+ * - GET /api/hackathons — List hackathons (filter by status, search)
+ * - POST /api/hackathons — Create a new hackathon
+ * - GET /api/hackathons/:id — Get a single hackathon
+ * - PATCH /api/hackathons/:id — Update a hackathon
+ * - DELETE /api/hackathons/:id — Delete a hackathon
+ * - GET /api/hackathons/eligibility — Evaluate profile against all open hackathons
+ * - GET/PUT /api/hackathons/profile — Get/update user profile
+ *
+ * @param app - Hono application instance
+ * @param sql - SQLite storage interface from Durable Object
+ */
 export function registerHackathonRoutes(app: Hono, sql: any) {
   // List hackathons
   app.get("/api/hackathons", (c) => {

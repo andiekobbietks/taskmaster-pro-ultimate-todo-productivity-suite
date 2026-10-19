@@ -276,6 +276,34 @@ export class App extends DurableObject {
         completed_at INTEGER DEFAULT NULL
       )
     `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS hackathons (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        platform TEXT DEFAULT 'manual',
+        url TEXT DEFAULT '',
+        description TEXT DEFAULT '',
+        prize TEXT DEFAULT '',
+        start_date TEXT DEFAULT NULL,
+        end_date TEXT DEFAULT NULL,
+        registration_deadline TEXT DEFAULT NULL,
+        submission_deadline TEXT DEFAULT NULL,
+        eligibility_json TEXT DEFAULT '{}',
+        status TEXT DEFAULT 'open',
+        notes TEXT DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS hackathon_profile (
+        id TEXT PRIMARY KEY,
+        profile_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
   }
 
   private seedDefaults() {

@@ -198,7 +198,7 @@ function App() {
     }
   }, [activeTab, activeListId, priorityFilter, searchQuery, fail]);
 
-  const fetchHackathons = useCallback(async () => {
+  const loadHackathons = useCallback(async () => {
     try {
       const data = await api("./api/hackathons");
       setHackathons(Array.isArray(data) ? data : []);
@@ -1308,7 +1308,7 @@ function App() {
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={fetchHackathons}
+                          onClick={loadHackathons}
                           className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
                         >
                           Refresh
@@ -1408,7 +1408,7 @@ function App() {
                                     onClick={async () => {
                                       if (confirm('Delete this hackathon?')) {
                                         await api(`./api/hackathons/${h.id}`, { method: 'DELETE' });
-                                        fetchHackathons();
+                                        loadHackathons();
                                       }
                                     }}
                                     className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-neutral-400 hover:text-red-600 transition-colors"

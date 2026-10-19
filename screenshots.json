@@ -1,0 +1,32 @@
+[
+  {
+    "ticket_id": "hack-1",
+    "url": "https://devpost.com/hackathons",
+    "name": "Amazon Developer Hackathon"
+  },
+  {
+    "ticket_id": "hack-2",
+    "url": "https://devpost.com/hackathons",
+    "name": "AWS CDS Agentic AI Partner Hackathon"
+  },
+  {
+    "ticket_id": "hack-3",
+    "url": "https://devpost.com/hackathons",
+    "name": "Nebius x NVIDIA Global AI Hackathon"
+  },
+  {
+    "ticket_id": "hack-4",
+    "url": "https://devpost.com/hackathons",
+    "name": "Qloo Agentic Hackathon"
+  },
+  {
+    "ticket_id": "hack-5",
+    "url": "https://hacktoberfest.com",
+    "name": "Hacktoberfest 2026"
+  },
+  {
+    "ticket_id": "hack-6",
+    "url": "https://26.oxhack.net/",
+    "name": "OxHack '26"
+  }
+]

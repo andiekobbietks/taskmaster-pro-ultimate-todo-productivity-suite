@@ -1,6 +1,52 @@
 import { DurableObject } from "cloudflare:workers";
 import { Hono } from "hono";
 
+/**
+ * Escape LIKE metacharacters so a search for "100%" matches a literal "100%"
+ * instead of turning into a match-everything wildcard.
+ *
+ * ============================ WHY THIS EXISTS ============================
+ * The original search handler interpolated user input straight into a LIKE
+ * pattern:
+ *
+ *     params.push(`%${search}%`)
+ *
+ * `%` and `_` are not literal characters in SQL LIKE -- they are wildcards.
+ * So the user's search text was silently reinterpreted as a *pattern*:
+ *
+ *     search = "100%"   ->  pattern "%100%%"  ->  matches EVERY row
+ *     search = "a_b"    ->  pattern "%a_b%"  ->  matches "aXb", "axb", ...
+ *
+ * A user searching for "budget 100% done" got their entire todo list back
+ * and would reasonably read that as "everything matches this". There was no
+ * error, no warning, and the response looked completely healthy. This is the
+ * worst shape of bug: a wrong answer that looks like a right one.
+ *
+ * Note the string is still *wrapped* in wildcards on purpose -- search is a
+ * substring match, "port" should find "import". We only neutralise
+ * metacharacters the user typed, we never change the matching semantics.
+ *
+ * ============================ WHAT IT ENABLES ============================
+ *     ?search=100%      -> only todos whose text literally contains "100%"
+ *     ?search=a_b       -> only todos containing literal "a_b"
+ *     ?search=port      -> "import", "export", "transport"   (unchanged)
+ *     ?search=50% off   -> sales-discount todos, not every todo in the table
+ *
+ * The backslash is the ESCAPE character declared on the query as ESCAPE '\'.
+ * Both halves are required: escaping without the clause leaves a stray
+ * backslash in the data, and the clause without escaping leaves the wildcard
+ * live. If you ever change one, change both.
+ *
+ * Backslash itself is escaped first so an existing "\%" in user input
+ * cannot consume the escape character we are about to add.
+ *
+ * See scripts/tier1-check.mjs, which fails CI if this helper is ever deleted
+ * while the search route still interpolates into a LIKE pattern.
+ */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export class App extends DurableObject {
   private app = new Hono();
 
@@ -35,9 +81,49 @@ export class App extends DurableObject {
         params.push(listId);
       }
 
+      // ============================ WHY THIS EXISTS ============================
+      // `tag` was read from the query string, validated as present, and then
+      // never used. The route built its SQL from `status`, `priority`,
+      // `search` and `listId` only -- `tag` was dead weight.
+      //
+      // The failure was invisible because the response shape was correct.
+      // Callers got 200 and a well-formed todo array, just not the one they
+      // asked for:
+      //
+      //     GET /api/todos?tag=urgent   ->  returned all 12 todos
+      //     GET /api/todos              ->  returned all 12 todos
+      //
+      // Identical. Meanwhile the README documented tag filtering as a
+      // supported feature, so this was not merely broken -- it was broken
+      // *and* advertised. Anyone who trusted the docs and filtered by tag
+      // got the whole database back and, again, nothing looked wrong.
+      //
+      // This is the exact defect class that scripts/tier1-check.mjs now
+      // blocks in CI: a parameter read from the request and dropped before
+      // it reaches the SQL.
+      //
+      // ============================ WHY json_each =============================
+      // `tags` is stored as a JSON array inside a TEXT column, so a plain
+      // `tags LIKE '%urgent%'` would also match "not_urgent", "urgent_ish"
+      // and any description that happened to mention the word. Matching the
+      // parsed element instead makes "urgent" mean exactly the tag "urgent":
+      //
+      //     tags = ["urgent","work"]   ?tag=urgent  -> match
+      //     tags = ["not_urgent"]      ?tag=urgent  -> NO match  (substring would match)
+      //
+      // ============================ WHAT IT ENABLES ============================
+      //     GET /api/todos?tag=urgent    -> only todos carrying that tag
+      //     combined with status/priority/search, they AND together
+      //     unfiltered requests are unchanged: an absent tag skips the clause
+      if (tag) {
+        query += " AND EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ?)";
+        params.push(tag);
+      }
+
       if (search) {
-        query += " AND (title LIKE ? OR description LIKE ?)";
-        params.push(`%${search}%`, `%${search}%`);
+        const pattern = `%${escapeLike(search)}%`;
+        query += " AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')";
+        params.push(pattern, pattern);
       }
 
       query += " ORDER BY is_pinned DESC, due_date ASC, created_at DESC";

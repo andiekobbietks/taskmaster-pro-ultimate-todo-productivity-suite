@@ -46,9 +46,9 @@ Highest-leverage unmet gates, ordered by stage then effort — the smallest chan
 
 *Why this matters:* A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.
 
-*Current state:* 3 phantom feature(s)
+*Current state:* 2 phantom feature(s)
 
-Target: `FEAT-010` **Filter by tag** — stub (`src/index.ts:16 (declared), absent from query builder lines 19-43`)
+Target: `FEAT-010` **Filter by tag** — partial (`src/index.ts:24 (declared), 49-52 (clause), 27-60 (query builder); guarded by scripts/tier1-check.mjs DEAD-FILTER`)
 
 ### `G-SCOPE-01` The product works on the device it is used on
 
@@ -78,7 +78,7 @@ Target: `FEAT-004` **Delete task** — partial (`src/index.ts:170-174, src/app.j
 
 *Current state:* FEAT-013 is "partial"
 
-Target: `FEAT-013` **Search title + description** — partial (`src/index.ts:38-41, src/app.jsx:85 (searchQuery state), 340-344 (search input)`)
+Target: `FEAT-013` **Search title + description** — partial (`src/index.ts:8-10 (escapeLike), 54-58 (query), src/app.jsx:85 (searchQuery state), 340-344 (search input); guarded by scripts/tier1-check.mjs LIKE-ESCAPE`)
 
 ### `G-ACCESS-01` Access control exists
 
@@ -109,7 +109,7 @@ Target: `FEAT-028` **Data export** — planned (`absent`)
 | `G-CORE-01` Core CRUD loop works | alpha | ✅ pass | all 4 ready | done |
 | `G-CORE-02` Data persists beyond the process | alpha | ✅ pass | satisfied by COMP-004 | done |
 | `G-TRUST-01` Users see failures instead of silent staleness | beta | ✅ pass | FEAT-025 is "implemented" | small |
-| `G-TRUST-02` No phantom features | beta | ⬜ not met | 3 phantom feature(s) | small |
+| `G-TRUST-02` No phantom features | beta | ⬜ not met | 2 phantom feature(s) | small |
 | `G-ACCESS-01` Access control exists | beta | ⬜ not met | FEAT-027 is "planned" | medium |
 | `G-SCOPE-01` The product works on the device it is used on | beta | ⬜ not met | FEAT-024 is "partial" | small |
 | `G-SAFE-01` Destructive actions are survivable | beta | ⬜ not met | none of FEAT-004/FEAT-028 ready | small |

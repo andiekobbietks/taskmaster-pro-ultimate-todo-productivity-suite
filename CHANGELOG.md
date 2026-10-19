@@ -11,8 +11,32 @@ changelog is the single source of truth for what a release contains.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-19
+
+Everything below shipped after `v1.0.0` was tagged. The single most important
+item is the third one under **Fixed**: `v1.0.0` shipped a Durable Object that
+`wrangler.json` never bound, so the API could not serve. This is the first tag
+that includes that fix.
+
+**In plain terms.** Version 1.0.0 was released broken — it could not load or save
+tasks at all, though nothing on screen said so. This release is the first that
+actually works. It also fixes two filters that appeared to work but did not
+(filtering by tag returned everything; searching for something containing a `%`
+returned everything), makes failed requests visible instead of silent, and adds an
+automatic check that compares files against each other so this class of fault
+cannot ship again.
+
+Everything below is the detail.
+
 ### Added
 
+- **A static cross-file consistency check.** `scripts/tier1-check.mjs` compares
+  code against configuration and fails on the defect class a build cannot see:
+  a Durable Object exported but absent from `durable_objects.bindings`, a
+  missing `migrations` entry, an unnamed worker, a query parameter that is read
+  and then dropped before it reaches the SQL, and README routes that no longer
+  exist. Dependency-free, runs in well under a second, wired up as a fourth CI
+  job and available locally as `npm run check:consistency`.
 - Continuous integration workflow (bundle check, docs-sync gate, seed-fixture
   validation) and a tag-driven release workflow.
 - Security policy with an honest threat model.
@@ -39,6 +63,19 @@ changelog is the single source of truth for what a release contains.
 
 ### Fixed
 
+- **`?tag=` no longer lies.** `GET /api/todos` read the `tag` query parameter and
+  then dropped it before the SQL, so a tagged filter silently returned unfiltered
+  results while both the README and the documented API surface advertised it. It
+  is now matched with `EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ?)`,
+  which compares an exact JSON element rather than a substring. (`FEAT-010`)
+- **A search for `100%` no longer matches everything.** The `LIKE` pattern was
+  built from raw input with no escaping, so `%` and `_` acted as wildcards. A
+  new `escapeLike()` helper escapes them and the clause declares `ESCAPE`.
+  (`FEAT-013`)
+- **The Worker can actually serve its API.** `v1.0.0` shipped `src/index.ts`
+  exporting `App extends DurableObject` next to a `wrangler.json` with no `name`,
+  no `durable_objects` binding and no `migrations` entry, so the DO was never
+  constructed and every route 404'd at the edge.
 - **Front-end errors are visible instead of silently stale.** All nine `fetch`
   call sites swallowed failures into `console.error`, so a failed request left
   the UI showing old data with no indication anything had gone wrong. Requests
@@ -81,5 +118,6 @@ First tagged release. Everything below is new relative to "no releases at all".
 - Self-ticking readiness check so claims about the code stay derived from the
   code rather than asserted by hand.
 
-[Unreleased]: https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/releases/tag/v1.0.0

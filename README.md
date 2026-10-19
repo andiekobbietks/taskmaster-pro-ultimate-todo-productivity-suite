@@ -1,6 +1,64 @@
 # TaskMaster Pro — Ultimate Todo & Productivity Suite
 
-> A full-featured todo and productivity app built on **Cloudflare Workers**, using a **Durable Object** with an embedded SQLite database for persistent, per-user state and a **Hono** REST API.
+## What this is, in plain terms
+
+TaskMaster is a to-do list app. It runs in a web browser, saves your tasks on the
+server, and works on a phone or a laptop without installing anything. It does the
+ordinary things a good to-do app should: create tasks, set priorities and due dates,
+group them into lists, tag them, pin the important ones, search everything, and show
+a small dashboard of how much you got done.
+
+**How mature is it?** It is **Alpha** — early. It works, and the current release
+fixes the reason it previously didn't. It is not yet something to load with
+confidential data. See [Is it ready to use?](#-is-it-ready-to-use) below.
+
+**Who is it for?** At the moment, one person or a small trusted team. There are no
+user accounts yet — see [Security](#-security), which is the single most important
+section in this file.
+
+![TaskMaster Pro — the task list, with priority badges, due dates, tags and a per-task focus timer](docs/images/task-list.png)
+
+*Every task carries its own priority, due date, tags and pomodoro estimate. Pinned
+tasks sort to the top; the rest sort by due date. Search, filters and the focus
+timer all act on the same list.*
+
+## 💡 What this product is actually about
+
+Most to-do apps are a checklist. This one is built around a different premise:
+**a task is only useful if you can tell whether you are actually finishing it.**
+
+That shows up in the choices:
+
+- **Pomodoro focus is per task, not global.** Every task carries its own estimate
+  and its own completed count. The question the app answers is not *"what is on my
+  list"* but *"did I actually do the thing I said I would do"*.
+- **Estimates and completions are separate numbers.** A task can be estimated at 4
+  pomodoros and completed at 7. That gap is the signal, and it is the reason the
+  stats dashboard exists.
+- **Sorting is opinionated.** Pinned first, then by due date, then newest. Not by
+  alphabetical order or manual drag-and-drop — the list you see is the list that
+  needs your attention next.
+- **Failures are visible.** A request that fails shows a banner with a retry. The
+  alternative — a screen that silently shows stale data — is the failure mode this
+  project has the least patience for.
+- **The data model is small and inspectable.** Two tables, thirteen columns, no
+  hidden services. You can read the whole schema in one screen.
+
+The honest summary: **this is an opinionated small-team task list, not a project
+management suite.** It does a few things deliberately rather than many things
+approximately. [`docs/VERTICAL-SLICES.md`](docs/VERTICAL-SLICES.md) is candid about
+which parts are finished and which are only advertised.
+
+---
+
+<details>
+<summary><strong>Technical detail (skip if you don't need it)</strong></summary>
+
+A full-featured todo and productivity app built on **Cloudflare Workers**, using a
+**Durable Object** with an embedded SQLite database for persistent, per-user state
+and a **Hono** REST API.
+
+</details>
 
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?style=flat-square&logo=cloudflare&logoColor=white)
 ![Hono](https://img.shields.io/badge/Hono-4.6-000000?style=flat-square)
@@ -23,6 +81,38 @@
 - **Stats dashboard** — aggregated productivity stats at a glance
 - **Pomodoro tracking** — estimated and completed pomodoro counts per task
 - **Visible failures** — every request reports errors in the UI with a retry, instead of leaving the screen silently stale
+
+## 📗 Is it ready to use?
+
+**Yes for trying out. Not yet for anything you would mind losing.**
+
+| | |
+|---|---|
+| **Works?** | Yes, as of `v1.0.1`. The previous release, `v1.0.0`, could not serve its own data at all — see [`docs/VERSION-HISTORY.md`](docs/VERSION-HISTORY.md). |
+| **Safe for private or sensitive data?** | **No.** There are no user accounts yet. Anyone who finds the web address can read, change or delete everything on it. |
+| **Safe to share with a team?** | Only with people you trust completely, and only after the decisions in [`docs/THREAT-NOTE.md`](docs/THREAT-NOTE.md) are implemented. |
+| **Will it lose your data?** | No. Tasks are stored on the server, not in your browser, so you can close the tab and come back. |
+| **Does it cost anything?** | No, on Cloudflare's free tier — comfortably so for a small team. |
+
+The one-line answer: **it is a working prototype.** The code is sound and tested by
+four automated checks, but the security work for real users has not started yet.
+That is deliberate and documented, not an oversight.
+
+## 🧭 Which parts of this file do you need?
+
+This README serves two audiences, so it is written in two layers. Read the top
+three sections and stop — you have what you need. Everything below is for people
+building or hosting it.
+
+| If you want to… | Read |
+|---|---|
+| Know what the app does | [What this is](#what-this-is-in-plain-terms), [Features](#-features) |
+| Know whether it's safe to use | [Is it ready to use?](#-is-it-ready-to-use) |
+| Know what was broken and why | [`docs/VERSION-HISTORY.md`](docs/VERSION-HISTORY.md) — [plain version](#what-this-is-in-plain-terms) |
+| Share it with the team safely | [`docs/THREAT-NOTE.md`](docs/THREAT-NOTE.md) — starts with a no-jargon summary |
+| Install and run it | [Run Locally](#-run-locally) |
+| Deploy it | [Releases](#-releases), [Security](#-security) |
+| Change it | [Project Structure](#-project-structure) onward, plus `docs/MAINTENANCE.md` |
 
 ## 🗂 Project Structure
 

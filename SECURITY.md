@@ -1,5 +1,10 @@
 # Security Policy
 
+> **The one thing you must know before putting this online: there are no user
+> accounts.** Anyone who can find the web address can read, change or delete
+> everything stored in it. Treat any live instance as public. The rest of this
+> file is the detail behind that warning.
+
 ## Supported versions
 
 This project is **Alpha**. Only the newest published release is supported — there
@@ -14,11 +19,15 @@ is no long-term-support branch and no back-porting of fixes.
 
 **Please do not open a public issue for security reports.**
 
-Use [GitHub Private Vulnerability Reporting](../../security/advisories/new):
+Use [GitHub Private Vulnerability Reporting](https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite/security/advisories/new):
 
 1. Open the **Security** tab at the top of this repository.
 2. Click **Report a vulnerability**.
 3. Describe what you found, how to reproduce it, and what you think the impact is.
+
+In plain terms: this opens a private conversation between you and the maintainer.
+Nobody else can see it until a fix is released, so you can describe a real attack
+without handing it to anyone first.
 
 A maintainer is notified immediately when a private report is filed, and the
 conversation stays private until a fix ships. Credit is given in the release

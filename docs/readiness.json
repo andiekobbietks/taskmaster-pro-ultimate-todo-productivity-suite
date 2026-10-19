@@ -2,7 +2,7 @@
   "schema": "readiness-state/1.0",
   "project": "taskmaster-pro",
   "version": "0.1.0-alpha",
-  "generated": "2026-10-16T23:37:46.714Z",
+  "generated": "2026-10-19T08:54:58.264Z",
   "sourceInventories": [
     "features.json",
     "architecture.json",
@@ -343,7 +343,7 @@
       "blockingFeature": "FEAT-010",
       "effort": "small",
       "pass": false,
-      "detail": "3 phantom feature(s)",
+      "detail": "2 phantom feature(s)",
       "conditional": null,
       "note": null
     },
@@ -535,12 +535,12 @@
       "label": "No phantom features",
       "effort": "small",
       "why": "A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.",
-      "detail": "3 phantom feature(s)",
+      "detail": "2 phantom feature(s)",
       "target": {
         "id": "FEAT-010",
         "name": "Filter by tag",
-        "status": "stub",
-        "evidence": "src/index.ts:16 (declared), absent from query builder lines 19-43"
+        "status": "partial",
+        "evidence": "src/index.ts:24 (declared), 49-52 (clause), 27-60 (query builder); guarded by scripts/tier1-check.mjs DEAD-FILTER"
       },
       "dependsOn": null
     },
@@ -585,7 +585,7 @@
         "id": "FEAT-013",
         "name": "Search title + description",
         "status": "partial",
-        "evidence": "src/index.ts:38-41, src/app.jsx:85 (searchQuery state), 340-344 (search input)"
+        "evidence": "src/index.ts:8-10 (escapeLike), 54-58 (query), src/app.jsx:85 (searchQuery state), 340-344 (search input); guarded by scripts/tier1-check.mjs LIKE-ESCAPE"
       },
       "dependsOn": null
     },
@@ -625,7 +625,6 @@
     "passed": 6,
     "failing": 13,
     "phantomFeatures": [
-      "FEAT-010",
       "FEAT-017",
       "FEAT-026"
     ],

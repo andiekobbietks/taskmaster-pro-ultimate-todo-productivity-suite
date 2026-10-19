@@ -3,7 +3,7 @@
   "project": "taskmaster-pro",
   "version": "0.1.0-alpha",
   "generated": "2026-10-17",
-  "verification": "Every status below was read from src/index.ts (323 lines) and the front end, which now lives in src/app.jsx (854 lines) and src/lib/api.js rather than in public/index.html. Frontend evidence is cited by line number in src/app.jsx.",
+  "verification": "Every status below was read from src/index.ts (377 lines) and the front end, which now lives in src/app.jsx (854 lines) and src/lib/api.js rather than in public/index.html. Frontend evidence is cited by line number in src/app.jsx. Cross-file claims that a static check can actually prove are additionally guarded by scripts/tier1-check.mjs, which runs as a CI job and fails the build when one drifts.",
   "statusVocabulary": {
     "implemented": "Backend route exists AND frontend calls it AND UI renders it",
     "partial": "Works but with a known correctness or UX gap",
@@ -133,17 +133,16 @@
     {
       "id": "FEAT-010",
       "name": "Filter by tag",
-      "status": "stub",
-      "maturity": "phantom-feature",
-      "backend": "tag query param READ at src/index.ts:16 but NEVER added to the SQL query",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "tag query param wired into the SQL as EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ?) - matches an exact JSON element, not a substring",
       "frontend": "no UI control exists",
-      "evidence": "src/index.ts:16 (declared), absent from query builder lines 19-43",
+      "evidence": "src/index.ts:24 (declared), 49-52 (clause), 27-60 (query builder); guarded by scripts/tier1-check.mjs DEAD-FILTER",
       "dependsOn": [],
       "gaps": [
-        "CRITICAL: accepting ?tag=x silently returns unfiltered results - the API lies to its caller",
-        "No frontend surface at all"
+        "No frontend surface - the filter is reachable only via the API"
       ],
-      "notes": "Either implement in the query builder or remove the param read. Silently ignoring it is the worst option."
+      "notes": "The dead-param defect is fixed as of 2026-10-19 (26601b5): the filter is wired into the SQL and returns only matching rows, verified at runtime against a local instance. What remains is the missing UI control, so the feature is still partial for an end user even though the API is now correct."
     },
     {
       "id": "FEAT-011",
@@ -180,16 +179,15 @@
       "name": "Search title + description",
       "status": "partial",
       "maturity": "needs-fix",
-      "backend": "GET ?search= LIKE '%term%' on title OR description",
+      "backend": "GET ?search= LIKE '%term%' ESCAPE '\\' on title OR description, with % _ and backslash escaped through escapeLike()",
       "frontend": "searchQuery state, encodeURIComponent applied",
-      "evidence": "src/index.ts:38-41, src/app.jsx:85 (searchQuery state), 340-344 (search input)",
+      "evidence": "src/index.ts:8-10 (escapeLike), 54-58 (query), src/app.jsx:85 (searchQuery state), 340-344 (search input); guarded by scripts/tier1-check.mjs LIKE-ESCAPE",
       "dependsOn": ["COMP-004"],
       "gaps": [
-        "LIKE wildcards (% and _) in user input are NOT escaped - a search for '100%' matches everything containing '100'",
         "No debounce - fires a request per keystroke",
         "No index; full table scan per keystroke"
       ],
-      "notes": "Parameterised so no SQL injection, but wildcard semantics are unescaped."
+      "notes": "Parameterised so no SQL injection, and LIKE metacharacters are escaped as of 2026-10-19 (26601b5) so a search for 100% matches that literal string rather than every row. Both remaining gaps are performance, not correctness."
     },
     {
       "id": "FEAT-014",
@@ -455,9 +453,9 @@
   ],
   "summary": {
     "total": 31,
-    "byStatus": { "implemented": 14, "partial": 9, "stub": 2, "planned": 6 },
-    "phantomFeatures": ["FEAT-010", "FEAT-017", "FEAT-026"],
-    "betaBlockers": ["FEAT-027", "FEAT-029", "FEAT-024", "FEAT-010"],
-    "assessment": "The product is beta-shaped; the engineering is alpha. 23 of 31 features are usable today. FEAT-025 (error handling) stopped being a phantom on 2026-10-17 and FEAT-030 (CI) is now partial, but 3 phantoms remain, and a phantom that appears to work is worse than an absent feature."
+    "byStatus": { "implemented": 14, "partial": 10, "stub": 1, "planned": 6 },
+    "phantomFeatures": ["FEAT-017", "FEAT-026"],
+    "betaBlockers": ["FEAT-027", "FEAT-029", "FEAT-024"],
+    "assessment": "The product is beta-shaped; the engineering is alpha. 24 of 31 features are usable today. FEAT-010 (filter by tag) stopped being a phantom on 2026-10-19 when the dead query param was wired into the SQL, and FEAT-013 (search) had its LIKE-wildcard bug fixed, but 2 phantoms remain, and a phantom that appears to work is worse than an absent feature."
   }
 }

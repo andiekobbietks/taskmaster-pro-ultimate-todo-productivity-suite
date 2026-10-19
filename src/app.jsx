@@ -114,6 +114,11 @@ function App() {
   const [hackathonProfile, setHackathonProfile] = useState(null);
   const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [settingsView, setSettingsView] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('storage');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [storageTestResult, setStorageTestResult] = useState(null);
   const [archiveSources, setArchiveSources] = useState([]);
   const [archiveView, setArchiveView] = useState(false);
   const [archiveUrl, setArchiveUrl] = useState('');
@@ -149,6 +154,7 @@ function App() {
   // Fetch hackathons on mount
   useEffect(() => {
     fetchHackathons();
+    fetchSettings();
     fetchArchiveSources();
     fetchHackathonProfile();
   }, [fetchHackathons, fetchHackathonProfile]);
@@ -272,6 +278,45 @@ function App() {
       fail("Fetching archive", () => fetchArchiveForTicket(ticketId, url))(err);
     }
   }, [fetchAttachments, fail]);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const data = await api("./api/settings");
+      setSettings(data);
+    } catch (err) {
+      fail("Loading settings", fetchSettings)(err);
+    }
+  }, [fail]);
+
+  const saveSettings = useCallback(async (updates) => {
+    setSavingSettings(true);
+    try {
+      const data = await api("./api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      setSettings(data);
+    } catch (err) {
+      fail("Saving settings", () => saveSettings(updates))(err);
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [fail]);
+
+  const testStorage = useCallback(async (provider, config) => {
+    setStorageTestResult(null);
+    try {
+      const data = await api("./api/settings/test-storage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, ...config }),
+      });
+      setStorageTestResult(data);
+    } catch (err) {
+      setStorageTestResult({ success: false, message: describeError(err) });
+    }
+  }, []);
 
   const fetchHackathonProfile = useCallback(async () => {
     try {
@@ -582,6 +627,18 @@ function App() {
                     </button>
 
                     <button
+                      onClick={() => { setSettingsView(true); setHackathonView(false); setArchiveView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        settingsView
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <svg className="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      <span>Settings</span>
+                    </button>
+
+                    <button
                       onClick={() => { setArchiveView(true); setHackathonView(false); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         archiveView
@@ -698,6 +755,310 @@ function App() {
                     </button>
                   </div>
                 </div>
+
+                {/* Settings View */}
+                {settingsView && (
+                  <div className="space-y-4">
+                    <div>
+                      <h2 className="text-lg font-bold tracking-tight">Settings</h2>
+                      <p className="text-sm text-neutral-500">Configure storage, email, notifications, and profile.</p>
+                    </div>
+
+                    {/* Settings tabs */}
+                    <div className="flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-800 pb-2">
+                      {['storage', 'profile', 'notifications', 'email'].map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => setSettingsTab(tab)}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
+                            settingsTab === tab
+                              ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400"
+                              : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                          }`}
+                        >
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Storage settings */}
+                    {settingsTab === 'storage' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Storage backend</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Provider</label>
+                              <select
+                                value={settings.storage?.provider || 'r2'}
+                                onChange={(e) => saveSettings({ storage: { ...settings.storage, provider: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              >
+                                <option value="r2">Cloudflare R2 (recommended)</option>
+                                <option value="s3">Amazon S3</option>
+                                <option value="azure">Azure Blob Storage</option>
+                              </select>
+                            </div>
+
+                            {settings.storage?.provider === 'r2' && (
+                              <div>
+                                <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">R2 bucket name</label>
+                                <input
+                                  type="text"
+                                  value={settings.storage?.r2_bucket || ''}
+                                  onChange={(e) => saveSettings({ storage: { ...settings.storage, r2_bucket: e.target.value } })}
+                                  className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                                />
+                              </div>
+                            )}
+
+                            {settings.storage?.provider === 's3' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">S3 bucket</label>
+                                  <input type="text" value={settings.storage?.s3_bucket || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, s3_bucket: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Region</label>
+                                  <input type="text" value={settings.storage?.s3_region || 'eu-west-2'} onChange={(e) => saveSettings({ storage: { ...settings.storage, s3_region: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                              </>
+                            )}
+
+                            {settings.storage?.provider === 'azure' && (
+                              <>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Storage account</label>
+                                  <input type="text" value={settings.storage?.azure_account || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_account: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Container</label>
+                                  <input type="text" value={settings.storage?.azure_container || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_container: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">SAS token</label>
+                                  <input type="password" value={settings.storage?.azure_sas_token || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_sas_token: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
+                                </div>
+                              </>
+                            )}
+
+                            <button
+                              onClick={() => testStorage(settings.storage?.provider, settings.storage)}
+                              className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                            >
+                              Test connection
+                            </button>
+                            {storageTestResult && (
+                              <p className={`text-xs ${storageTestResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                                {storageTestResult.message}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Profile settings */}
+                    {settingsTab === 'profile' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Eligibility profile</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Citizenships (comma-separated ISO codes)</label>
+                              <input
+                                type="text"
+                                value={(settings.profile?.citizenships || []).join(', ')}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, citizenships: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                              <p className="text-[11px] text-neutral-400 mt-1">e.g. IT, GB, DE</p>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Residencies (comma-separated ISO codes)</label>
+                              <input
+                                type="text"
+                                value={(settings.profile?.residencies || []).join(', ')}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, residencies: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                              <p className="text-[11px] text-neutral-400 mt-1">e.g. GB</p>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Residency status</label>
+                              <select
+                                value={settings.profile?.residency_status || 'settled'}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, residency_status: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              >
+                                <option value="settled">Settled</option>
+                                <option value="pre-settled">Pre-settled</option>
+                                <option value="visa">Visa</option>
+                                <option value="citizen">Citizen</option>
+                                <option value="none">None</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Age</label>
+                              <input
+                                type="number"
+                                value={settings.profile?.age || 25}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, age: parseInt(e.target.value) || 25 } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={settings.profile?.is_student || false}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, is_student: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                              <label className="text-sm text-neutral-600 dark:text-neutral-400">I am a student</label>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Team size</label>
+                              <input
+                                type="number"
+                                value={settings.profile?.team_size || 1}
+                                onChange={(e) => saveSettings({ profile: { ...settings.profile, team_size: parseInt(e.target.value) || 1 } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notifications settings */}
+                    {settingsTab === 'notifications' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Notifications</h3>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">Daily digest</p>
+                                <p className="text-xs text-neutral-500">Morning summary of deadlines and conflicts</p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={settings.notifications?.daily_digest ?? true}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, daily_digest: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">Conflict alerts</p>
+                                <p className="text-xs text-neutral-500">Warn when deadlines overlap</p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={settings.notifications?.conflict_alerts ?? true}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, conflict_alerts: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">Deadline reminders</p>
+                                <p className="text-xs text-neutral-500">Remind before deadlines</p>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={settings.notifications?.deadline_reminders ?? true}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, deadline_reminders: e.target.checked } })}
+                                className="rounded border-neutral-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Digest time</label>
+                              <input
+                                type="time"
+                                value={settings.notifications?.digest_time || '08:00'}
+                                onChange={(e) => saveSettings({ notifications: { ...settings.notifications, digest_time: e.target.value } })}
+                                className="h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Email settings */}
+                    {settingsTab === 'email' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Email inbox</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Inbox address</label>
+                              <input
+                                type="email"
+                                value={settings.email?.inbox_address || ''}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, inbox_address: e.target.value } })}
+                                placeholder="hackathons@yourdomain.com"
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP host</label>
+                              <input
+                                type="text"
+                                value={settings.email?.imap_host || 'imap.mail.yahoo.com'}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_host: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP port</label>
+                              <input
+                                type="number"
+                                value={settings.email?.imap_port || 993}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_port: parseInt(e.target.value) || 993 } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP username</label>
+                              <input
+                                type="text"
+                                value={settings.email?.imap_user || ''}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_user: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP password (app password)</label>
+                              <input
+                                type="password"
+                                value={settings.email?.imap_password || ''}
+                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_password: e.target.value } })}
+                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reset button */}
+                    <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                      <button
+                        onClick={async () => {
+                          if (confirm('Reset all settings to defaults?')) {
+                            await api("./api/settings/reset", { method: "POST" });
+                            fetchSettings();
+                          }
+                        }}
+                        className="h-8 px-3 rounded-md text-xs font-medium bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                      >
+                        Reset to defaults
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Archive View */}
                 {archiveView && (
@@ -971,7 +1332,7 @@ function App() {
                 )}
 
                 {/* Task List */}
-                {!hackathonView && !archiveView && (
+                {!hackathonView && !archiveView && !settingsView && (
                 <div className="space-y-3">
                   {todos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-xs">

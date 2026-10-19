@@ -36,6 +36,17 @@ export interface JMAPEmail {
 }
 
 // JMAP session discovery
+/**
+ * Discover the JMAP session endpoint for a given server URL.
+ *
+ * JMAP (RFC 8620) requires servers to expose a session resource at
+ * `/.well-known/jmap`. This function fetches that resource to obtain
+ * the API endpoint URL, account IDs, and download URLs.
+ *
+ * @param serverUrl - The base URL of the JMAP server
+ * @returns The JMAP session object
+ * @throws {Error} If session discovery fails
+ */
 export async function discoverJMAPSession(serverUrl: string): Promise<any> {
   const resp = await fetch(`${serverUrl}/.well-known/jmap`);
   if (!resp.ok) throw new Error(`JMAP session discovery failed: ${resp.status}`);
@@ -43,6 +54,19 @@ export async function discoverJMAPSession(serverUrl: string): Promise<any> {
 }
 
 // JMAP API call
+/**
+ * Make a JMAP API call with one or more method calls.
+ *
+ * JMAP uses a batched request model — multiple method calls can be
+ * sent in a single HTTP POST. Method calls can reference results from
+ * previous calls using result references (e.g., `#ids`).
+ *
+ * @param serverUrl - The base URL of the JMAP server
+ * @param accountId - The JMAP account ID
+ * @param methodCalls - Array of [methodName, arguments, callId] tuples
+ * @param authToken - Bearer token for authentication
+ * @returns The JMAP response with methodResponses
+ */
 export async function jmapCall(serverUrl: string, accountId: string, methodCalls: any[], authToken: string): Promise<any> {
   const resp = await fetch(`${serverUrl}/jmap/api/`, {
     method: "POST",
@@ -60,6 +84,16 @@ export async function jmapCall(serverUrl: string, accountId: string, methodCalls
 }
 
 // Search for hackathon-related emails via JMAP
+/**
+ * Search for hackathon-related emails via JMAP.
+ *
+ * Uses JMAP's Email/query method with text filtering to find emails
+ * mentioning hackathon, competition, challenge, or deadline. Returns
+ * structured email objects with from, subject, body, and attachments.
+ *
+ * @param config - JMAP server configuration (URL, credentials, account ID)
+ * @returns Array of parsed hackathon emails
+ */
 export async function searchHackathonEmails(config: JMAPConfig): Promise<JMAPEmail[]> {
   const session = await discoverJMAPSession(config.server_url);
   const accountId = config.account_id || session.primaryAccounts?.["urn:ietf:params:jmap:mail"];

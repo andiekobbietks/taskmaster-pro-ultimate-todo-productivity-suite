@@ -116,6 +116,10 @@ function App() {
   const [editingHackathon, setEditingHackathon] = useState(null);
   const [settings, setSettings] = useState(null);
   const [settingsView, setSettingsView] = useState(false);
+  const [digestView, setDigestView] = useState(false);
+  const [digest, setDigest] = useState(null);
+  const [capacity, setCapacity] = useState([]);
+  const [weeklyPlan, setWeeklyPlan] = useState([]);
   const [settingsTab, setSettingsTab] = useState('storage');
   const [savingSettings, setSavingSettings] = useState(false);
   const [storageTestResult, setStorageTestResult] = useState(null);
@@ -154,6 +158,9 @@ function App() {
   // Fetch hackathons on mount
   useEffect(() => {
     fetchHackathons();
+    fetchDigest();
+    fetchCapacity();
+    fetchWeeklyPlan();
     fetchSettings();
     fetchArchiveSources();
     fetchHackathonProfile();
@@ -315,6 +322,33 @@ function App() {
       setStorageTestResult(data);
     } catch (err) {
       setStorageTestResult({ success: false, message: describeError(err) });
+    }
+  }, []);
+
+  const fetchDigest = useCallback(async () => {
+    try {
+      const data = await api("./api/digest");
+      setDigest(data);
+    } catch (err) {
+      fail("Loading digest", fetchDigest)(err);
+    }
+  }, [fail]);
+
+  const fetchCapacity = useCallback(async () => {
+    try {
+      const data = await api("./api/capacity");
+      setCapacity(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // No capacity set yet
+    }
+  }, []);
+
+  const fetchWeeklyPlan = useCallback(async () => {
+    try {
+      const data = await api("./api/digest/weekly");
+      setWeeklyPlan(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // No weekly plan
     }
   }, []);
 
@@ -609,6 +643,23 @@ function App() {
                       <span className="ml-auto text-xs bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded-full">
                         {stats.completed}
                       </span>
+                    </button>
+
+                    <button
+                      onClick={() => { setDigestView(true); setHackathonView(false); setArchiveView(false); setSettingsView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        digestView
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                      <span>Today</span>
+                      {digest && digest.remaining_hours <= 0 && (
+                        <span className="ml-auto text-xs bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded-full">
+                          Full
+                        </span>
+                      )}
                     </button>
 
                     <button
@@ -1154,6 +1205,109 @@ function App() {
                   </div>
                 )}
 
+                {/* Daily Digest View */}
+                {digestView && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold tracking-tight">Today's Digest</h2>
+                        <p className="text-sm text-neutral-500">{digest?.date || 'Loading...'}</p>
+                      </div>
+                      <button
+                        onClick={fetchDigest}
+                        className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+
+                    {/* Summary banner */}
+                    {digest && (
+                      <div className={`p-4 rounded-xl border ${digest.remaining_hours > 0 ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'}`}>
+                        <p className="text-sm font-medium">{digest.summary}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-neutral-500">
+                          <span>Available: <strong className="font-mono text-brand-600">{digest.available_hours}h</strong></span>
+                          <span>Used: <strong className="font-mono">{digest.used_hours}h</strong></span>
+                          <span>Remaining: <strong className={`font-mono ${digest.remaining_hours > 0 ? 'text-green-600' : 'text-red-500'}`}>{digest.remaining_hours}h</strong></span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Today's tasks */}
+                    {digest && digest.today_tasks && digest.today_tasks.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Focus today</h3>
+                        {digest.today_tasks.map((task, idx) => (
+                          <div key={task.hackathon_id} className="p-3 bg-white dark:bg-[#111827] rounded-lg border border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono text-neutral-400">{idx + 1}.</span>
+                                <span className="text-sm font-medium truncate">{task.name}</span>
+                                <span className="text-[10px] font-medium uppercase text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">{task.platform}</span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-[11px] text-neutral-500">
+                                <span className="font-medium text-amber-600">{task.prize}</span>
+                                <span>{task.estimated_hours}h needed</span>
+                                <span className={task.days_remaining <= 3 ? 'text-red-500 font-medium' : ''}>
+                                  {task.days_remaining}d left
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-xs font-mono text-brand-600">{task.priority_score}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Conflicts */}
+                    {digest && digest.conflicts && digest.conflicts.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">Conflicts</h3>
+                        {digest.conflicts.map((c, idx) => (
+                          <div key={idx} className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                            <p className="text-sm font-medium text-red-800 dark:text-red-300">{c.hackathon_a} vs {c.hackathon_b}</p>
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">{c.suggestion}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Upcoming this week */}
+                    {digest && digest.upcoming_this_week && digest.upcoming_this_week.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">Upcoming this week</h3>
+                        {digest.upcoming_this_week.map((item) => (
+                          <div key={item.hackathon_id} className="flex items-center justify-between p-2 rounded bg-neutral-50 dark:bg-neutral-800/50">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${item.eligible ? 'bg-green-500' : 'bg-red-500'}`} />
+                              <span className="text-sm truncate">{item.name}</span>
+                              <span className="text-[10px] text-neutral-400">{item.platform}</span>
+                            </div>
+                            <span className={`text-xs font-mono ${item.days_remaining <= 3 ? 'text-red-500 font-medium' : 'text-neutral-500'}`}>
+                              {item.days_remaining}d
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Weekly capacity */}
+                    {weeklyPlan.length > 0 && (
+                      <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                        <h3 className="text-sm font-semibold mb-3">Weekly capacity</h3>
+                        <div className="grid grid-cols-7 gap-1">
+                          {weeklyPlan.map((day) => (
+                            <div key={day.date} className={`text-center p-2 rounded-lg ${day.is_today ? 'bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800' : 'bg-neutral-50 dark:bg-neutral-800/50'}`}>
+                              <p className="text-[10px] font-medium text-neutral-500">{day.day}</p>
+                              <p className="text-sm font-bold">{day.hours_available}h</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Hackathon View */}
                 {hackathonView && (
                   <div className="space-y-4">
@@ -1332,7 +1486,7 @@ function App() {
                 )}
 
                 {/* Task List */}
-                {!hackathonView && !archiveView && !settingsView && (
+                {!hackathonView && !archiveView && !settingsView && !digestView && (
                 <div className="space-y-3">
                   {todos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-xs">

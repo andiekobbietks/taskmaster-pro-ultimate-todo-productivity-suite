@@ -1,2 +1,4 @@
 playwright>=1.40.0
 requests>=2.31.0
+# JMAP client (optional, for JMAP-compatible email servers)
+# jmapc>=0.3.0

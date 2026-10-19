@@ -1,300 +1,163 @@
-"""Search Outlook and Yahoo inboxes for hackathon-related emails.
+"""Search Outlook and Yahoo inboxes for hackathon-related emails via IMAP.
 
-Prerequisites:
-  1. Microsoft app registration: https://portal.azure.com → App registrations
-     - Add redirect URI: http://localhost:8080/callback
-     - API permissions: Mail.Read (delegated)
-     - Copy Client ID and Client Secret
-  2. Yahoo app registration: https://developer.yahoo.com/apps/create
-     - Add redirect URI: http://localhost:8080/callback
-     - Copy Client ID and Client Secret
+Simpler than OAuth — just use app passwords.
+
+Setup (one-time, 2 minutes each):
+
+  Outlook (andiekobbietks@outlook.com):
+    1. Go to: https://account.microsoft.com/security
+    2. Click "Advanced security options"
+    3. Under "App passwords", click "Create a new app password"
+    4. Copy the generated password
+
+  Yahoo (andre.enne@yahoo.com):
+    1. Go to: https://login.yahoo.com/account/security
+    2. Click "Generate app password"
+    3. Select "Other app" and name it "taskmaster"
+    4. Copy the generated password
 
 Usage:
-    python email_search.py --outlook-client-id <id> --outlook-client-secret <secret> --yahoo-client-id <id> --yahoo-client-secret <secret>
+    python email_search_imap.py \
+      --outlook-email andiekobbietks@outlook.com \
+      --outlook-password <app-password> \
+      --yahoo-email andre.enne@yahoo.com \
+      --yahoo-password <app-password>
 
 Output: hackathon_emails.json (importable into taskmaster-pro)
 """
 import json
 import os
 import sys
-import time
-import webbrowser
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse, urlencode
-from pathlib import Path
+import imaplib
+import email as email_lib
+from email.header import decode_header
+from datetime import datetime, timedelta
 
 try:
     import requests
 except ImportError:
-    print("ERROR: requests not installed. Run: pip install requests")
-    sys.exit(1)
+    pass  # Not needed for IMAP-only mode
 
 
-# ── Hackathon search terms ────────────────────────────────────────────
+# ── Hackathon detection ──────────────────────────────────────────────
 
 HACKATHON_KEYWORDS = [
     "hackathon", "competition", "challenge", "deadline", "submission",
     "prize", "devpost", "mlh", "kaggle", "lablab", "ethglobal",
-    "devfolio", "unstop", "hackerrank", "hackerearth",
+    "devfolio", "unstop", "hackerrank", "hackerearth", "hackday",
+    "hackfest", "codeathon", "ideathon", "datathon",
 ]
 
 HACKATHON_SENDERS = [
-    "devpost.com", "mlh.io", "mlh.com", "kaggle.com", "lablab.ai",
-    "ethglobal.com", "devfolio.co", "unstop.com", "hackerrank.com",
-    "hackerearth.com", "hackathon", "challenge",
+    "devpost", "mlh.io", "mlh.com", "kaggle.com", "lablab.ai",
+    "ethglobal", "devfolio", "unstop.com", "hackerrank.com",
+    "hackerearth.com", "hackathon", "challenge", "competition",
 ]
 
-# ── OAuth callback server ─────────────────────────────────────────────
-
-class CallbackHandler(BaseHTTPRequestHandler):
-    """Handle OAuth callback and capture the authorization code."""
-    code = None
-    state = None
-
-    def do_GET(self):
-        parsed = urlparse(self.path)
-        params = parse_qs(parsed.query)
-        CallbackHandler.code = params.get("code", [None])[0]
-        CallbackHandler.state = params.get("state", [None])[0]
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html")
-        self.end_headers()
-        self.wfile.write(b"<h1>Authorization successful. You can close this window.</h1>")
-
-    def log_message(self, format, *args):
-        pass  # Suppress logs
+# How far back to search (days)
+SEARCH_DAYS = 365
 
 
-def get_auth_code(auth_url: str, state: str) -> str:
-    """Open browser for OAuth and wait for callback."""
-    webbrowser.open(auth_url)
-    server = HTTPServer(("localhost", 8080), CallbackHandler)
-    CallbackHandler.code = None
-    CallbackHandler.state = None
-    while CallbackHandler.code is None:
-        server.handle_one_request()
-    server.server_close()
-    return CallbackHandler.code
+# ── Helpers ──────────────────────────────────────────────────────────
+
+def decode_str(s):
+    """Decode email header strings."""
+    if not s:
+        return ""
+    parts = decode_header(s)
+    result = []
+    for part, enc in parts:
+        if isinstance(part, bytes):
+            result.append(part.decode(enc or "utf-8", errors="replace"))
+        else:
+            result.append(part)
+    return "".join(result)
 
 
-# ── Microsoft Graph (Outlook) ─────────────────────────────────────────
-
-MS_SCOPES = ["Mail.Read", "User.Read"]
-MS_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
-MS_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
-
-# Search queries for Microsoft Graph
-MS_SEARCH_QUERIES = [
-    'from:devpost.com',
-    'from:mlh.io',
-    'from:kaggle.com',
-    'from:lablab.ai',
-    'from:ethglobal.com',
-    'subject:hackathon',
-    'subject:competition',
-    'subject:challenge',
-    'subject:deadline',
-    'subject:submission',
-]
-
-
-def auth_outlook(client_id: str, client_secret: str) -> str:
-    """Authenticate with Microsoft Graph and return access token."""
-    auth_url = MS_AUTH_URL + "?" + urlencode({
-        "client_id": client_id,
-        "response_type": "code",
-        "redirect_uri": "http://localhost:8080/callback",
-        "scope": " ".join(MS_SCOPES),
-        "state": "outlook",
-    })
-    print("Opening browser for Outlook authorization...")
-    code = get_auth_code(auth_url, "outlook")
-
-    resp = requests.post(MS_TOKEN_URL, data={
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "code": code,
-        "redirect_uri": "http://localhost:8080/callback",
-        "grant_type": "authorization_code",
-    })
-    resp.raise_for_status()
-    return resp.json()["access_token"]
-
-
-def search_outlook(access_token: str) -> list[dict]:
-    """Search Outlook inbox for hackathon-related emails."""
-    headers = {"Authorization": f"Bearer {access_token}"}
-    results = []
-
-    # Build a single search query combining all keywords
-    search_query = " OR ".join(f'"{k}"' for k in HACKATHON_KEYWORDS[:5])
-    url = "https://graph.microsoft.com/v1.0/me/messages"
-
-    # Search with $search parameter
-    params = {
-        "$search": '"hackathon" OR "competition" OR "challenge" OR "deadline"',
-        "$select": "id,subject,from,receivedDateTime,body,hasAttachments,webLink",
-        "$top": 50,
-        "$orderby": "receivedDateTime desc",
-    }
-
-    resp = requests.get(url, headers=headers, params=params, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-
-    for msg in data.get("value", []):
-        sender = msg.get("from", {}).get("emailAddress", {}).get("address", "")
-        subject = msg.get("subject", "")
-        body = msg.get("body", {}).get("content", "")
-        received = msg.get("receivedDateTime", "")
-
-        # Check if sender is a known hackathon platform
-        is_platform = any(d in sender.lower() for d in HACKATHON_SENDERS)
-        # Check if subject contains hackathon keywords
-        has_keyword = any(k in (subject + " " + body[:500]).lower() for k in HACKATHON_KEYWORDS)
-
-        if is_platform or has_keyword:
-            results.append({
-                "source": "outlook",
-                "id": msg.get("id"),
-                "sender": sender,
-                "subject": subject,
-                "received_at": received,
-                "body_preview": body[:500],
-                "has_attachments": msg.get("hasAttachments", False),
-                "web_link": msg.get("webLink"),
-                "is_platform": is_platform,
-            })
-
-    return results
-
-
-# ── Yahoo Mail ────────────────────────────────────────────────────────
-
-YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
-YAHOO_AUTH_URL = "https://api.login.yahoo.com/oauth2/request_auth"
-
-# Yahoo Mail API (via IMAP is more reliable, but let's try the REST API first)
-YAHOO_MAIL_URL = "https://mail.yahooapis.com/v2/messages"
-
-
-def auth_yahoo(client_id: str, client_secret: str) -> str:
-    """Authenticate with Yahoo and return access token."""
-    auth_url = YAHOO_AUTH_URL + "?" + urlencode({
-        "client_id": client_id,
-        "response_type": "code",
-        "redirect_uri": "http://localhost:8080/callback",
-        "scope": "mail-r",
-        "state": "yahoo",
-    })
-    print("Opening browser for Yahoo authorization...")
-    code = get_auth_code(auth_url, "yahoo")
-
-    resp = requests.post(YAHOO_TOKEN_URL, data={
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "code": code,
-        "redirect_uri": "http://localhost:8080/callback",
-        "grant_type": "authorization_code",
-    })
-    resp.raise_for_status()
-    return resp.json()["access_token"]
-
-
-def search_yahoo(access_token: str) -> list[dict]:
-    """Search Yahoo inbox for hackathon-related emails."""
-    headers = {"Authorization": f"Bearer {access_token}"}
-    results = []
-
-    # Yahoo Mail API v2
-    url = "https://mail.yahooapis.com/v2/messages"
-    params = {
-        "q": "hackathon OR competition OR challenge OR deadline",
-        "fields": "id,subject,from,date,snippet,hasAttachments",
-        "count": 50,
-    }
-
-    try:
-        resp = requests.get(url, headers=headers, params=params, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-
-        for msg in data.get("messages", []):
-            sender = msg.get("from", {}).get("email", "")
-            subject = msg.get("subject", "")
-
-            is_platform = any(d in sender.lower() for d in HACKATHON_SENDERS)
-            has_keyword = any(k in (subject + " " + msg.get("snippet", "")).lower() for k in HACKATHON_KEYWORDS)
-
-            if is_platform or has_keyword:
-                results.append({
-                    "source": "yahoo",
-                    "id": msg.get("id"),
-                    "sender": sender,
-                    "subject": subject,
-                    "received_at": msg.get("date"),
-                    "body_preview": msg.get("snippet", ""),
-                    "has_attachments": msg.get("hasAttachments", False),
-                    "is_platform": is_platform,
-                })
-    except Exception as e:
-        print(f"Yahoo API error: {e}")
-        print("Note: Yahoo Mail API may require different authentication or endpoints.")
-        print("Alternative: use IMAP to access Yahoo Mail.")
-
-    return results
-
-
-# ── IMAP fallback for Yahoo ───────────────────────────────────────────
-
-def search_yahoo_imap(email: str, password: str) -> list[dict]:
-    """Search Yahoo inbox via IMAP (fallback if REST API fails)."""
-    import imaplib
-    import email as email_lib
-    from email.header import decode_header
-
+def search_inbox(imap, source_label: str) -> list[dict]:
+    """Search an IMAP inbox for hackathon-related emails."""
     results = []
     try:
-        mail = imaplib.IMAP4_SSL("imap.mail.yahoo.com", 993)
-        mail.login(email, password)
-        mail.select("INBOX")
+        imap.select("INBOX")
 
-        # Search for hackathon-related emails
-        for keyword in ["hackathon", "competition", "challenge", "deadline"]:
-            status, messages = mail.search(None, f'SUBJECT "{keyword}"')
-            if status == "OK":
-                for msg_id in messages[0].split():
-                    status, msg_data = mail.fetch(msg_id, "(RFC822)")
-                    if status == "OK":
-                        msg = email_lib.message_from_bytes(msg_data[0][1])
-                        sender = msg.get("From", "")
-                        subject = msg.get("Subject", "")
-                        date = msg.get("Date", "")
+        # Search by date (last N days) + keywords
+        since_date = (datetime.now() - timedelta(days=SEARCH_DAYS)).strftime("%d-%b-%Y")
+        search_criteria = f'(SINCE {since_date})'
 
-                        # Decode subject
-                        decoded_parts = decode_header(subject)
-                        subject = "".join(
-                            part.decode(enc or "utf-8") if isinstance(part, bytes) else part
-                            for part, enc in decoded_parts
-                        )
+        status, messages = imap.search(None, search_criteria)
+        if status != "OK":
+            print(f"  Search failed: {status}")
+            return results
 
-                        is_platform = any(d in sender.lower() for d in HACKATHON_SENDERS)
+        msg_ids = messages[0].split()
+        print(f"  Found {len(msg_ids)} emails since {since_date}, scanning...")
 
-                        results.append({
-                            "source": "yahoo-imap",
-                            "id": msg_id.decode(),
-                            "sender": sender,
-                            "subject": subject,
-                            "received_at": date,
-                            "body_preview": "",
-                            "has_attachments": msg.is_multipart(),
-                            "is_platform": is_platform,
-                        })
+        for msg_id in msg_ids:
+            try:
+                status, msg_data = imap.fetch(msg_id, "(RFC822)")
+                if status != "OK":
+                    continue
 
-        mail.close()
-        mail.logout()
+                msg = email_lib.message_from_bytes(msg_data[0][1])
+                sender = decode_str(msg.get("From", ""))
+                subject = decode_str(msg.get("Subject", ""))
+                date = msg.get("Date", "")
+                body_preview = ""
+
+                # Get body preview (first 500 chars of text)
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/plain":
+                            try:
+                                payload = part.get_payload(decode=True)
+                                if payload:
+                                    body_preview = payload.decode(
+                                        part.get_content_charset() or "utf-8",
+                                        errors="replace"
+                                    )[:500]
+                                    break
+                            except Exception:
+                                pass
+                else:
+                    try:
+                        payload = msg.get_payload(decode=True)
+                        if payload:
+                            body_preview = payload.decode(
+                                msg.get_content_charset() or "utf-8",
+                                errors="replace"
+                            )[:500]
+                    except Exception:
+                        pass
+
+                # Check if hackathon-related
+                combined = (sender + " " + subject + " " + body_preview).lower()
+                is_platform = any(d in combined for d in HACKATHON_SENDERS)
+                has_keyword = any(k in combined for k in HACKATHON_KEYWORDS)
+
+                if is_platform or has_keyword:
+                    # Check for attachments
+                    has_attachments = False
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get("Content-Disposition", "").startswith("attachment"):
+                                has_attachments = True
+                                break
+
+                    results.append({
+                        "source": source_label,
+                        "id": msg_id.decode(),
+                        "sender": sender,
+                        "subject": subject,
+                        "received_at": date,
+                        "body_preview": body_preview.strip(),
+                        "has_attachments": has_attachments,
+                        "is_platform": is_platform,
+                    })
+            except Exception as e:
+                pass  # Skip problematic emails
+
     except Exception as e:
-        print(f"Yahoo IMAP error: {e}")
+        print(f"  Error: {e}")
 
     return results
 
@@ -304,49 +167,45 @@ def search_yahoo_imap(email: str, password: str) -> list[dict]:
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Search Outlook and Yahoo for hackathon emails")
-    parser.add_argument("--outlook-client-id", help="Microsoft app client ID")
-    parser.add_argument("--outlook-client-secret", help="Microsoft app client secret")
-    parser.add_argument("--yahoo-client-id", help="Yahoo app client ID")
-    parser.add_argument("--yahoo-client-secret", help="Yahoo app client secret")
-    parser.add_argument("--yahoo-email", help="Yahoo email address (for IMAP fallback)")
-    parser.add_argument("--yahoo-password", help="Yahoo app password (for IMAP fallback)")
+    parser = argparse.ArgumentParser(description="Search Outlook and Yahoo for hackathon emails via IMAP")
+    parser.add_argument("--outlook-email", help="Outlook email address")
+    parser.add_argument("--outlook-password", help="Outlook app password")
+    parser.add_argument("--yahoo-email", help="Yahoo email address")
+    parser.add_argument("--yahoo-password", help="Yahoo app password")
     parser.add_argument("--output", default="hackathon_emails.json", help="Output file")
     args = parser.parse_args()
 
     all_results = []
 
     # Outlook
-    if args.outlook_client_id and args.outlook_client_secret:
-        print("\n=== Searching Outlook ===")
+    if args.outlook_email and args.outlook_password:
+        print("\n=== Searching Outlook (IMAP) ===")
         try:
-            token = auth_outlook(args.outlook_client_id, args.outlook_client_secret)
-            results = search_outlook(token)
-            print(f"Found {len(results)} hackathon-related emails in Outlook")
+            mail = imaplib.IMAP4_SSL("outlook.office365.com", 993)
+            mail.login(args.outlook_email, args.outlook_password)
+            results = search_inbox(mail, "outlook")
+            print(f"  Found {len(results)} hackathon-related emails")
             all_results.extend(results)
+            mail.logout()
         except Exception as e:
-            print(f"Outlook error: {e}")
+            print(f"  Outlook IMAP error: {e}")
+            print("  Check: IMAP enabled? App password correct? 2FA enabled?")
 
-    # Yahoo (REST API)
-    if args.yahoo_client_id and args.yahoo_client_secret:
-        print("\n=== Searching Yahoo (REST API) ===")
-        try:
-            token = auth_yahoo(args.yahoo_client_id, args.yahoo_client_secret)
-            results = search_yahoo(token)
-            print(f"Found {len(results)} hackathon-related emails in Yahoo")
-            all_results.extend(results)
-        except Exception as e:
-            print(f"Yahoo REST API error: {e}")
-            print("Trying IMAP fallback...")
-
-    # Yahoo (IMAP fallback)
+    # Yahoo
     if args.yahoo_email and args.yahoo_password:
         print("\n=== Searching Yahoo (IMAP) ===")
-        results = search_yahoo_imap(args.yahoo_email, args.yahoo_password)
-        print(f"Found {len(results)} hackathon-related emails in Yahoo via IMAP")
-        all_results.extend(results)
+        try:
+            mail = imaplib.IMAP4_SSL("imap.mail.yahoo.com", 993)
+            mail.login(args.yahoo_email, args.yahoo_password)
+            results = search_inbox(mail, "yahoo")
+            print(f"  Found {len(results)} hackathon-related emails")
+            all_results.extend(results)
+            mail.logout()
+        except Exception as e:
+            print(f"  Yahoo IMAP error: {e}")
+            print("  Check: App password correct? 2FA enabled?")
 
-    # Deduplicate by (source, id)
+    # Deduplicate
     seen = set()
     unique = []
     for r in all_results:
@@ -365,7 +224,7 @@ def main():
     print(f"\nTotal: {len(unique)} unique hackathon emails found")
     print(f"Output written to: {args.output}")
 
-    # Print summary
+    # Summary by platform
     print("\n=== Summary ===")
     platforms = {}
     for r in unique:
@@ -379,6 +238,12 @@ def main():
 
     for platform, count in sorted(platforms.items(), key=lambda x: -x[1]):
         print(f"  {platform}: {count}")
+
+    # Print recent emails
+    print("\n=== Recent emails ===")
+    for r in unique[:10]:
+        print(f"  [{r['source']}] {r['received_at'][:16]} | {r['subject'][:60]}")
+        print(f"    from: {r['sender'][:50]}")
 
 
 if __name__ == "__main__":

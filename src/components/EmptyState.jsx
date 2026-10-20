@@ -1,5 +1,5 @@
 /**
- * EmptyState â€” reusable empty state display.
+ * EmptyState — reusable empty state display.
  *
  * Features: icon, title, description, action button
  */

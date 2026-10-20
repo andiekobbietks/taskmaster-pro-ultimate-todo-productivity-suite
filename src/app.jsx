@@ -23,6 +23,9 @@ import {
 } from "lucide-react";
 import { api, describeError } from "./lib/api.js";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import {
+  EmailListItem, EmailDetail, InboxSplitView, EmailListSkeleton,
+} from "./components/InboxPrimitives";
 
 /**
  * A dismissible banner that tells the person what failed and offers a retry.
@@ -133,7 +136,7 @@ function App() {
   const [inboxItems, setInboxItems] = useState([]);
   const [inboxStats, setInboxStats] = useState({ total: 0, unread: 0, unprocessed: 0, platform: 0 });
   const [eligibility, setEligibility] = useState({});
-  const [expandedEmail, setExpandedEmail] = useState(null);
+  const [selectedEmail, setSelectedEmail] = useState(null);
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
@@ -1226,106 +1229,45 @@ function App() {
                       </button>
                     </div>
 
-                    {inboxItems.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
-                        <svg className="w-10 h-10 text-amber-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 009.586 13H20" /></svg>
-                        <h3 className="text-base font-semibold">Inbox is empty</h3>
-                        <p className="text-sm text-neutral-500 mt-1 max-w-xs">
-                          Forward competition emails here, or set up the Cloudflare Email Worker and they arrive automatically.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {inboxItems.map((email) => {
-                          const linked = email.ticket_id
-                            ? hackathons.find((h) => h.id === email.ticket_id)
-                            : null;
-                          const isOpen = expandedEmail === email.id;
-                          return (
-                            <div
-                              key={email.id}
-                              className={`p-4 bg-white dark:bg-[#111827] rounded-xl border transition-colors ${
-                                email.read
-                                  ? 'border-neutral-200 dark:border-neutral-800'
-                                  : 'border-amber-300 dark:border-amber-800'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <button
-                                  onClick={() => {
-                                    setExpandedEmail(isOpen ? null : email.id);
-                                    if (!email.read) markEmailRead(email.id, true);
-                                  }}
-                                  className="flex-1 min-w-0 text-left"
-                                >
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {!email.read && (
-                                      <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                                    )}
-                                    <span className={`text-sm ${email.read ? 'font-medium' : 'font-semibold'} truncate`}>
-                                      {email.subject || '(no subject)'}
-                                    </span>
-                                    {email.is_platform && email.platform && (
-                                      <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
-                                        {email.platform}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-neutral-500 flex-wrap">
-                                    <span className="truncate max-w-xs">{email.sender}</span>
-                                    {email.received_at && (
-                                      <span>{new Date(email.received_at).toLocaleDateString()}</span>
-                                    )}
-                                    {linked ? (
-                                      <span className="inline-flex items-center gap-1 text-green-600 font-medium">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m3 3a4 4 0 010-5.656l-3-3a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
-                                        {linked.name}
-                                      </span>
-                                    ) : email.is_platform ? (
-                                      <span className="text-amber-600">no match — several {email.platform} entries, not sure which</span>
-                                    ) : null}
-                                  </div>
-                                </button>
-
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <button
-                                    onClick={() => markEmailProcessed(email.id, !email.processed)}
-                                    title={email.processed ? 'Mark unprocessed' : 'Mark processed'}
-                                    className={`p-1.5 rounded transition-colors ${email.processed ? 'text-green-600' : 'text-neutral-400 hover:text-neutral-600'}`}
-                                  >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                  </button>
-                                  <button
-                                    onClick={() => deleteEmail(email.id)}
-                                    title="Delete"
-                                    className="p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {isOpen && (
-                                <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-                                  {email.body_preview ? (
-                                    <p className="text-xs text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap leading-relaxed">
-                                      {email.body_preview}
-                                    </p>
-                                  ) : (
-                                    <p className="text-xs text-neutral-400 italic">No preview available.</p>
-                                  )}
-                                  {email.has_attachments && email.attachment_names && email.attachment_names.length > 0 && (
-                                    <p className="text-[11px] text-neutral-500 mt-2">
-                                      Attachments: {email.attachment_names.join(', ')}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <div className="bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+                      {inboxItems.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                          <div className="w-12 h-12 rounded-full bg-brand-50 dark:bg-brand-950/50 flex items-center justify-center text-brand-600 mb-4">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 009.586 13H20" />
+                            </svg>
+                          </div>
+                          <h3 className="text-base font-semibold">Your inbox is empty</h3>
+                          <p className="text-sm text-neutral-500 mt-1.5 max-w-xs">
+                            Forward competition emails here, or set up the Cloudflare Email Worker and they arrive automatically.
+                          </p>
+                        </div>
+                      ) : (
+                        <InboxSplitView
+                          selected={selectedEmail}
+                          onClose={() => setSelectedEmail(null)}
+                        >
+                          <div className="flex-1 overflow-y-auto">
+                            {inboxItems.map((email) => (
+                              <EmailListItem
+                                key={email.id}
+                                email={email}
+                                isSelected={selectedEmail?.id === email.id}
+                                panelOpen={selectedEmail !== null}
+                                onSelect={(e) => {
+                                  setSelectedEmail(e);
+                                  if (!e.read) markEmailRead(e.id, true);
+                                }}
+                                onToggleProcessed={(e) =>
+                                  markEmailProcessed(e.id, !e.processed)
+                                }
+                                onDelete={(e) => deleteEmail(e.id)}
+                              />
+                            ))}
+                          </div>
+                        </InboxSplitView>
+                      )}
+                    </div>
                   </div>
                 )}
 

@@ -474,6 +474,27 @@
       "maturity": "adequate",
       "risk": "low",
       "notes": "The one thing a single-component crash must not take down is the whole app."
+    },
+    {
+      "id": "COMP-027",
+      "name": "Inbox UI primitives",
+      "layer": "frontend",
+      "role": "Reusable inbox primitives: split view (list beside a detail panel), accessible list row, email detail panel, and skeleton placeholders. Built on TaskMaster Pro's design tokens.",
+      "entry": "src/components/InboxPrimitives.jsx:1 export function EmailListItem",
+      "evidence": "src/components/InboxPrimitives.jsx:1-260, src/lib/email.js:1-140",
+      "dependsOn": [
+        "COMP-006",
+        "COMP-010",
+        "COMP-012"
+      ],
+      "usedBy": [
+        "FEAT-045",
+        "FEAT-048"
+      ],
+      "dataAtRest": "none",
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "Interaction patterns adapted from cloudflare/agentic-inbox (Apache-2.0, Copyright Cloudflare Inc). Re-implemented against the brand palette, the Inter typeface and the existing component library rather than importing Kumo or Phosphor. Email bodies are rendered as plain text, never injected as HTML, so there is no sanitiser to get wrong. Rows are div[role=button] with tabIndex 0 and Enter/Space activation, so the list is keyboard reachable."
     }
   ],
   "dataFlow": [

@@ -13,6 +13,57 @@ export class App extends DurableObject {
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
     this.initDb();
+
+    // Security headers middleware
+    this.app.use("/*", async (c, next) => {
+      await next();
+      c.header("X-Content-Type-Options", "nosniff");
+      c.header("X-Frame-Options", "DENY");
+      c.header("X-XSS-Protection", "1; mode=block");
+      c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+      c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+      c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'");
+    });
+
+    // Rate limiting middleware (100 requests per minute per IP)
+    this.app.use("/*", async (c, next) => {
+      const ip = c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "unknown";
+      const now = Date.now();
+      const windowMs = 60000; // 1 minute
+      const maxRequests = 100;
+
+      const row = this.ctx.storage.sql.exec(
+        "SELECT count, window_start FROM rate_limits WHERE ip = ?", ip
+      ).toArray();
+
+      if (row.length > 0) {
+        const { count, window_start } = row[0];
+        if (now - window_start < windowMs) {
+          if (count >= maxRequests) {
+            return c.json({ error: "Rate limit exceeded. Try again later." }, 429);
+          }
+          this.ctx.storage.sql.exec(
+            "UPDATE rate_limits SET count = count + 1 WHERE ip = ?", ip
+          );
+        } else {
+          // Reset window
+          this.ctx.storage.sql.exec(
+            "UPDATE rate_limits SET count = 1, window_start = ? WHERE ip = ?", now, ip
+          );
+        }
+      } else {
+        this.ctx.storage.sql.exec(
+          "INSERT INTO rate_limits (ip, count, window_start) VALUES (?, 1, ?)", ip, now
+        );
+      }
+
+      await next();
+    });
+
+    // Health check endpoint (no auth required, no rate limit) (no auth required)
+    this.app.get("/health", (c) => {
+      return c.json({ status: "ok", version: "1.0.0", timestamp: Date.now() });
+    });
     
     // REST API routes
     this.app.get("/api/todos", (c) => {
@@ -371,6 +422,14 @@ export class App extends DurableObject {
         read INTEGER DEFAULT 0,
         processed INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS rate_limits (
+        ip TEXT PRIMARY KEY,
+        count INTEGER DEFAULT 0,
+        window_start INTEGER NOT NULL
       )
     `);
   }

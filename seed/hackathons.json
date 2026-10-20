@@ -256,6 +256,27 @@
       },
       "status": "closed",
       "notes": "Online. Free. 13+. Monthly recurring. (Ended Oct 15, 2026)"
+    },
+    {
+      "name": "Google - The Gemma 4 Developer Agent Competition",
+      "platform": "kaggle",
+      "url": "https://www.kaggle.com/competitions/gemma-4-developer-agent",
+      "description": "Accelerate research in autonomous coding agents. Build agents that use Gemma 4 models to solve coding tasks autonomously.",
+      "prize": "$65,000",
+      "start_date": "2026-09-15",
+      "end_date": "2026-11-30",
+      "registration_deadline": null,
+      "submission_deadline": "2026-11-30",
+      "eligibility": {
+        "eligibility_type": "unrestricted",
+        "regions": [
+          "Global"
+        ],
+        "age_min": 18,
+        "other": "Kaggle account required. GPU recommended for local inference. Team size up to 3 members."
+      },
+      "status": "open",
+      "notes": "Online. $65k prize. 3,181+ teams. Agentic AI focus. Gemma 4 model. Deadline Nov 30, 2026."
     }
   ],
   "test_cases": [

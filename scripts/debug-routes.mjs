@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { registerHackathonRoutes } from "./src/hackathons.ts";
+import { registerHackathonRoutes } from "../src/hackathons.ts";
 import { DatabaseSync } from "node:sqlite";
 
 const db = new DatabaseSync(":memory:");

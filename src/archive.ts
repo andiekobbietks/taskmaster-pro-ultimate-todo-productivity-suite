@@ -1,4 +1,5 @@
-"""Archive integration module — fetch hackathon data from web archives.
+/**
+ * Archive integration module — fetch hackathon data from web archives.
 
 Instead of scraping live sites (ToS issues, rate limits, maintenance burden),
 this module fetches from public web archives like the Wayback Machine.
@@ -16,7 +17,6 @@ Supported sources:
   3. Perma.cc — free tier, API key required
 """
 import { Hono } from "hono";
-import json
 
 export interface ArchiveSource {
   id: string;

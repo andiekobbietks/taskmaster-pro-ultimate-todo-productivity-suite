@@ -188,7 +188,8 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
     // Get user profile
     let profile = null;
     try {
-      const prow = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").one();
+      const prows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
+    const prow = prows.length > 0 ? prows[0] : null;
       if (prow?.profile_json) profile = parseJson(prow.profile_json, null);
     } catch {}
 

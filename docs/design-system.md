@@ -1,4 +1,4 @@
-# TaskMaster Pro â€” Design System
+# TaskMaster Pro — Design System
 
 ## Overview
 
@@ -9,38 +9,38 @@ visual language.
 ## Design Tokens
 
 Design tokens are defined in two places:
-- `tailwind.config.cjs` â€” Tailwind theme configuration
-- `src/tailwind.css` â€” CSS custom properties (brand tokens, animations)
-- `docs/design-tokens.json` â€” Machine-readable token definitions
+- `tailwind.config.cjs` — Tailwind theme configuration
+- `src/tailwind.css` — CSS custom properties (brand tokens, animations)
+- `docs/design-tokens.json` — Machine-readable token definitions
 
 ### Color Palette
 
 #### Brand (Purple)
 | Token | Hex | Usage |
 |---|---|---|
-| `brand-50` | `#EEF0FB` | Lightest tint â€” hover backgrounds |
-| `brand-100` | `#DDE0F7` | Light tint â€” subtle backgrounds |
-| `brand-200` | `#B9C0EF` | Light â€” borders, dividers |
-| `brand-500` | `#7B85DC` | Mid â€” secondary text, icons |
-| `brand-600` | `#5E6AD2` | **Primary** â€” buttons, links, active states |
-| `brand-700` | `#4A56C0` | Dark â€” hover on primary |
-| `brand-800` | `#3A45A8` | Darker â€” pressed states |
-| `brand-900` | `#2A3284` | Darkest â€” headings on light bg |
+| `brand-50` | `#EEF0FB` | Lightest tint — hover backgrounds |
+| `brand-100` | `#DDE0F7` | Light tint — subtle backgrounds |
+| `brand-200` | `#B9C0EF` | Light — borders, dividers |
+| `brand-500` | `#7B85DC` | Mid — secondary text, icons |
+| `brand-600` | `#5E6AD2` | **Primary** — buttons, links, active states |
+| `brand-700` | `#4A56C0` | Dark — hover on primary |
+| `brand-800` | `#3A45A8` | Darker — pressed states |
+| `brand-900` | `#2A3284` | Darkest — headings on light bg |
 
 #### Neutral (Slate)
 | Token | Light mode | Dark mode | Usage |
 |---|---|---|---|
-| `neutral-50` | `#F8FAFC` | â€” | Page background |
-| `neutral-100` | `#F1F5F9` | â€” | Card background |
-| `neutral-200` | `#E2E8F0` | â€” | Border, divider |
-| `neutral-300` | `#CBD5E1` | â€” | Disabled border |
-| `neutral-400` | `#94A3B8` | â€” | Placeholder text |
-| `neutral-500` | `#64748B` | â€” | Secondary text |
-| `neutral-600` | `#475569` | â€” | Body text |
-| `neutral-700` | `#334155` | â€” | Heading text |
-| `neutral-800` | â€” | `#1E293B` | Card background (dark) |
-| `neutral-900` | â€” | `#0F172A` | Page background (dark) |
-| `neutral-950` | â€” | `#0A0E1A` | Deepest background (dark) |
+| `neutral-50` | `#F8FAFC` | — | Page background |
+| `neutral-100` | `#F1F5F9` | — | Card background |
+| `neutral-200` | `#E2E8F0` | — | Border, divider |
+| `neutral-300` | `#CBD5E1` | — | Disabled border |
+| `neutral-400` | `#94A3B8` | — | Placeholder text |
+| `neutral-500` | `#64748B` | — | Secondary text |
+| `neutral-600` | `#475569` | — | Body text |
+| `neutral-700` | `#334155` | — | Heading text |
+| `neutral-800` | — | `#1E293B` | Card background (dark) |
+| `neutral-900` | — | `#0F172A` | Page background (dark) |
+| `neutral-950` | — | `#0A0E1A` | Deepest background (dark) |
 
 #### Semantic
 | Token | Hex | Usage |
@@ -230,10 +230,10 @@ Storybook configuration is in `.storybook/`. Run `npm run storybook` to view com
 
 ## Files
 
-- `docs/design-system.md` â€” This document
-- `docs/design-tokens.json` â€” Machine-readable design tokens
-- `src/components/` â€” Reusable component library
-- `src/components/index.js` â€” Barrel exports
-- `.storybook/` â€” Storybook configuration
-- `tailwind.config.cjs` â€” Tailwind theme
-- `src/tailwind.css` â€” CSS custom properties
+- `docs/design-system.md` — This document
+- `docs/design-tokens.json` — Machine-readable design tokens
+- `src/components/` — Reusable component library
+- `src/components/index.js` — Barrel exports
+- `.storybook/` — Storybook configuration
+- `tailwind.config.cjs` — Tailwind theme
+- `src/tailwind.css` — CSS custom properties

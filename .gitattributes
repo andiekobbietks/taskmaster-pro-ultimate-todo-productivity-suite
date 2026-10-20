@@ -1,0 +1,20 @@
+# Normalise line endings so diffs are stable and the Worker bundle
+# never sees CRLF in source files.
+* text=auto eol=lf
+
+# Binary files must never be touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+
+# Keep these as LF too — they are read by scripts, not editors.
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf

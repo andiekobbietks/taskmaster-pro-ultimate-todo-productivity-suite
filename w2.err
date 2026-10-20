@@ -1,0 +1,9 @@
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mThe Workers runtime failed to start. There was likely a problem with the workerd binary or your configuration.[0m
+
+  Runtime stderr:
+  <--- Last few GCs --->
+  
+  workerd/jsg/setup.c++:38: fatal: V8 fatal error; location = Scavenger: semi-space copy; message = : allocation failed: JavaScript heap out of memory
+
+
+🪵  Logs were written to "C:\Users\Admin\AppData\Roaming\xdg.config\.wrangler\logs\wrangler-2026-10-20_20-05-33_132.log"

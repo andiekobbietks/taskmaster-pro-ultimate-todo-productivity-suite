@@ -28,6 +28,8 @@ export interface InboxItem {
   is_platform: boolean;
   platform: string | null;
   ticket_id: string | null;
+  match_confidence: number;
+  match_method: string;
   read: boolean;
   processed: boolean;
   created_at: number;
@@ -55,6 +57,8 @@ function rowToInboxItem(r: any): InboxItem {
     is_platform: Boolean(r.is_platform),
     platform: r.platform,
     ticket_id: r.ticket_id,
+    match_confidence: r.match_confidence ?? 0,
+    match_method: r.match_method || "none",
     read: Boolean(r.read),
     processed: Boolean(r.processed),
     created_at: r.created_at,
@@ -85,6 +89,103 @@ function detectPlatform(sender: string): string | null {
   return null;
 }
 
+/**
+ * Normalise a string for fuzzy comparison: lowercase, strip punctuation,
+ * collapse whitespace. Used to compare an email subject against a hackathon
+ * name without being defeated by "Amazon Developer Hackathon" vs
+ * "Amazon - Developer Hackathon".
+ */
+function normalise(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Words that appear in nearly every competition name and therefore carry no
+ * discriminating power. Excluded when scoring.
+ */
+const STOP_WORDS = new Set([
+  "the", "a", "an", "of", "and", "for", "to", "in", "on", "at", "by",
+  "hackathon", "competition", "challenge", "contest", "x", "with", "2026", "2025",
+]);
+
+/**
+ * Score how well an email subject matches a hackathon name.
+ *
+ * Returns 0-1. A match needs at least one non-stop word from the hackathon
+ * name to appear in the subject, plus a bonus for matching a longer run of
+ * words. This is deliberately simple and predictable: it puts the email on the
+ * right ticket without needing an embedding model.
+ */
+function matchScore(subject: string, hackathonName: string): number {
+  const s = normalise(subject);
+  const h = normalise(hackathonName);
+  if (!s || !h) return 0;
+
+  const subjectWords = new Set(s.split(" ").filter((w) => w.length > 2));
+  const nameWords = h.split(" ").filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+  if (nameWords.length === 0) return 0;
+
+  const hits = nameWords.filter((w) => subjectWords.has(w));
+  if (hits.length === 0) return 0;
+
+  // Base: fraction of the name's meaningful words that appear in the subject.
+  let score = hits.length / nameWords.length;
+
+  // Bonus: the hackathon name appears in the subject as a contiguous run.
+  if (h.length > 6 && s.includes(h)) score += 0.5;
+
+  return Math.min(1, score);
+}
+
+/**
+ * Find the hackathon ticket an email most likely belongs to.
+ *
+ * Tries content matching first (subject against hackathon name), because two
+ * competitions on the same platform are otherwise indistinguishable. Falls
+ * back to the platform only when nothing matches by name, and reports how
+ * confident the match is.
+ */
+function findTicket(
+  sql: any,
+  platform: string | null,
+  subject: string,
+  bodyPreview: string
+): { ticketId: string | null; confidence: number; method: string } {
+  const rows = sql
+    .exec("SELECT id, name, platform FROM hackathons")
+    .toArray();
+
+  let best: { id: string; score: number } | null = null;
+
+  for (const row of rows) {
+    const score = matchScore(subject, row.name);
+    if (!best || score > best.score) best = { id: row.id, score };
+  }
+
+  if (best && best.score >= 0.5) {
+    return { ticketId: best.id, confidence: best.score, method: "content" };
+  }
+
+  // Content matching failed. Fall back to the platform, but only if it is
+  // unambiguous — one hackathon on that platform, so the match is safe.
+  if (platform) {
+    const samePlatform = rows.filter((r: any) => r.platform === platform);
+    if (samePlatform.length === 1) {
+      return { ticketId: samePlatform[0].id, confidence: 0.4, method: "platform-unique" };
+    }
+    if (samePlatform.length > 1) {
+      // Ambiguous. Leave it unlinked rather than attach to the wrong ticket.
+      return { ticketId: null, confidence: 0, method: "ambiguous" };
+    }
+  }
+
+  return { ticketId: null, confidence: 0, method: "none" };
+}
+
 // ── Route registration ───────────────────────────────────────────────
 
 export function registerInboxRoutes(app: Hono, sql: any) {
@@ -111,25 +212,21 @@ export function registerInboxRoutes(app: Hono, sql: any) {
     const id = `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const ts = now();
 
-    // Try to match to an existing hackathon ticket by sender domain
-    let ticketId = null;
-    if (platform) {
-      const rows = sql.exec(
-        "SELECT id FROM hackathons WHERE platform = ? ORDER BY updated_at DESC LIMIT 1",
-        platform
-      ).toArray();
-      if (rows.length > 0) ticketId = rows[0].id;
-    }
+    // Match to an existing hackathon ticket by content first, so two
+    // competitions on the same platform stay distinguishable.
+    const match = findTicket(sql, platform, subject, body_text.slice(0, 500));
+    const ticketId = match.ticketId;
 
     sql.exec(
-      `INSERT INTO inbox (id, sender, subject, received_at, body_preview, body_html, has_attachments, attachment_names, is_platform, platform, ticket_id, read, processed, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`,
+      `INSERT INTO inbox (id, sender, subject, received_at, body_preview, body_html, has_attachments, attachment_names, is_platform, platform, ticket_id, read, processed, created_at, match_confidence, match_method)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)`,
       id, sender, subject, received_at,
       body_text.slice(0, 500), body_html,
       has_attachments ? 1 : 0,
       JSON.stringify(attachment_names),
       is_platform || platform !== null ? 1 : 0,
-      platform, ticketId, ts
+      platform, ticketId, ts,
+      Math.round(match.confidence * 100) / 100, match.method
     );
 
     const row = sql.exec("SELECT * FROM inbox WHERE id = ?", id).toArray();
@@ -216,6 +313,30 @@ export function registerInboxRoutes(app: Hono, sql: any) {
     if (before.length === 0) return c.json({ error: "Inbox item not found" }, 404);
     sql.exec("DELETE FROM inbox WHERE id = ?", c.req.param("id"));
     return c.json({ success: true });
+  });
+
+  // --- Re-link an inbox item to a specific ticket -----------------------
+
+  app.post("/api/inbox/:id/relink", async (c) => {
+    const id = c.req.param("id");
+    const data = await c.req.json();
+    const ticketId = data.ticket_id || null;
+
+    const rows = sql.exec("SELECT id FROM inbox WHERE id = ?", id).toArray();
+    if (rows.length === 0) return c.json({ error: "Inbox item not found" }, 404);
+
+    if (ticketId) {
+      const t = sql.exec("SELECT id FROM hackathons WHERE id = ?", ticketId).toArray();
+      if (t.length === 0) return c.json({ error: "Ticket not found" }, 404);
+    }
+
+    sql.exec(
+      "UPDATE inbox SET ticket_id = ?, match_confidence = 1.0, match_method = 'manual' WHERE id = ?",
+      ticketId, id
+    );
+
+    const updated = sql.exec("SELECT * FROM inbox WHERE id = ?", id).toArray();
+    return c.json(rowToInboxItem(updated[0]));
   });
 
   // --- Get inbox stats ------------------------------------------------

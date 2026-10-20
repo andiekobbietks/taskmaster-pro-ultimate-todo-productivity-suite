@@ -45,7 +45,7 @@ function generateId(): string {
 export function registerAttachmentRoutes(app: Hono, sql: any) {
   // --- Upload attachment ---------------------------------------------------
 
-  app.post("/api/todos/:id/attachments", async (c) => {
+  const uploadHandler = async (c: any) => {
     const ticketId = c.req.param("id");
 
     // Verify the ticket exists
@@ -92,11 +92,11 @@ export function registerAttachmentRoutes(app: Hono, sql: any) {
 
     if (rows.length === 0) return c.json({ error: "Attachment not found" }, 404);
     return c.json(rows[0], 201);
-  });
+  };
 
   // --- List attachments for a ticket ---------------------------------------
 
-  app.get("/api/todos/:id/attachments", (c) => {
+  const listHandler = (c: any) => {
     const ticketId = c.req.param("id");
     const rows = sql
       .exec(
@@ -106,7 +106,7 @@ export function registerAttachmentRoutes(app: Hono, sql: any) {
       .toArray();
 
     return c.json(rows);
-  });
+  };
 
   // --- Download/preview an attachment --------------------------------------
 

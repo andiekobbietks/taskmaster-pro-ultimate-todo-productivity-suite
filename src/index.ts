@@ -4,6 +4,7 @@ import { registerAttachmentRoutes } from "./attachments";
 import { registerArchiveRoutes } from "./archive";
 import { registerSettingsRoutes } from "./settings";
 import { registerCapacityRoutes } from "./capacity";
+import { registerInboxRoutes } from "./inbox";
 import { Hono } from "hono";
 
 export class App extends DurableObject {
@@ -241,6 +242,7 @@ export class App extends DurableObject {
     registerArchiveRoutes(this.app, this.ctx.storage.sql);
     registerSettingsRoutes(this.app, this.ctx.storage.sql);
     registerCapacityRoutes(this.app, this.ctx.storage.sql);
+    registerInboxRoutes(this.app, this.ctx.storage.sql);
 
     // Seed sample data ONLY when explicitly enabled.
     //
@@ -350,6 +352,25 @@ export class App extends DurableObject {
         day_of_week INTEGER PRIMARY KEY,
         hours_available REAL NOT NULL DEFAULT 0,
         notes TEXT DEFAULT ''
+      )
+    `);
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS inbox (
+        id TEXT PRIMARY KEY,
+        sender TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        received_at INTEGER NOT NULL,
+        body_preview TEXT DEFAULT '',
+        body_html TEXT DEFAULT '',
+        has_attachments INTEGER DEFAULT 0,
+        attachment_names TEXT DEFAULT '[]',
+        is_platform INTEGER DEFAULT 0,
+        platform TEXT DEFAULT NULL,
+        ticket_id TEXT DEFAULT NULL,
+        read INTEGER DEFAULT 0,
+        processed INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL
       )
     `);
   }

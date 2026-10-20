@@ -19,7 +19,6 @@
  */
 
 import { Hono } from "hono";
-import json
 
 export interface ArchiveSource {
   id: string;

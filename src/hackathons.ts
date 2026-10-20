@@ -389,9 +389,9 @@ function getUserProfile(sql: any): UserProfile {
 
   // Delete
   app.delete("/api/hackathons/:id", (c) => {
-    const result = sql.exec("DELETE FROM hackathons WHERE id = ?", c.req.param("id"));
-    if (result.changes === 0) return c.json({ error: "Not found" }, 404);
-    return c.json({ success: true });
+    const before = sql.exec("SELECT id FROM hackathons WHERE id = ?", c.req.param("id")).toArray();
+    if (before.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    sql.exec("DELETE FROM hackathons WHERE id = ?", c.req.param("id"));
   });
 
 }

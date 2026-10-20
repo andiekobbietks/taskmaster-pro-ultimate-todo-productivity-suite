@@ -1,5 +1,5 @@
 /**
- * Button â€” reusable button component.
+ * Button — reusable button component.
  *
  * Variants: primary, secondary, ghost, danger
  * Sizes: sm, md, lg

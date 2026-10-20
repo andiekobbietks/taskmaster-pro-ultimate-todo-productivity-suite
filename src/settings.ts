@@ -170,8 +170,8 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
   // --- Get all settings -----------------------------------------------
 
   app.get("/api/settings", (c) => {
-    const row = sql.exec("SELECT value FROM settings WHERE key = 'main'").one();
-    if (!row) {
+    const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
+    if (rows.length === 0) {
       // First run — return defaults
       return c.json(DEFAULT_SETTINGS);
     }
@@ -199,8 +199,8 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
 
   app.get("/api/settings/:section", (c) => {
     const section = c.req.param("section");
-    const row = sql.exec("SELECT value FROM settings WHERE key = 'main'").one();
-    const settings = row ? parseJson(row.value, DEFAULT_SETTINGS) : DEFAULT_SETTINGS;
+    const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
+    const settings = rows.length > 0 ? parseJson(rows[0].value, DEFAULT_SETTINGS) : DEFAULT_SETTINGS;
     const deobfuscated = deobfuscateSettings(settings);
 
     if (!(section in deobfuscated)) {
@@ -216,8 +216,8 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
     const section = c.req.param("section");
     const data = await c.req.json();
 
-    const row = sql.exec("SELECT value FROM settings WHERE key = 'main'").one();
-    const settings = row ? parseJson(row.value, DEFAULT_SETTINGS) : { ...DEFAULT_SETTINGS };
+    const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
+    const settings = rows.length > 0 ? parseJson(rows[0].value, DEFAULT_SETTINGS) : { ...DEFAULT_SETTINGS };
     const deobfuscated = deobfuscateSettings(settings);
 
     if (!(section in deobfuscated)) {

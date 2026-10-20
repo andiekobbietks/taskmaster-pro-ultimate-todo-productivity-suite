@@ -253,10 +253,10 @@ function rowToHackathon(r: any): Hackathon {
 // ── Default user profile (Andie's actual profile) ────────────────────
 
 const DEFAULT_PROFILE: UserProfile = {
-  citizenships: ["IT"],           // Italian passport
-  residencies: ["GB"],             // UK resident
-  residency_status: "settled",     // EU settled status
-  age: 25,
+  citizenships: [],               // Set via PUT /api/hackathons/profile
+  residencies: [],
+  residency_status: "none",
+  age: 0,
   is_student: false,
   team_size: 1,
   employed_by_sponsor: false,
@@ -293,62 +293,6 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
     return c.json(rows.map(rowToHackathon));
   });
 
-  // Get single
-  app.get("/api/hackathons/:id", (c) => {
-    const row = sql.exec("SELECT * FROM hackathons WHERE id = ?", c.req.param("id")).one();
-    if (!row) return c.json({ error: "Not found" }, 404);
-    return c.json(rowToHackathon(row));
-  });
-
-  // Create
-  app.post("/api/hackathons", async (c) => {
-    const data = await c.req.json();
-    if (!data.name?.trim()) return c.json({ error: "Name required" }, 400);
-    const id = `hack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const ts = now();
-    sql.exec(
-      `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      id, data.name.trim(), data.platform || "manual", data.url || "", data.description || "", data.prize || "", data.start_date || null, data.end_date || null, data.registration_deadline || null, data.submission_deadline || null, JSON.stringify(data.eligibility || {}), data.status || "open", data.notes || "", ts, ts
-    );
-    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
-    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
-    return c.json(rowToHackathon(rows[0]), 201);
-  });
-
-  // Update
-  app.patch("/api/hackathons/:id", async (c) => {
-    const id = c.req.param("id");
-    const data = await c.req.json();
-    const existing = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).one();
-    if (!existing) return c.json({ error: "Not found" }, 404);
-
-    const fieldMap: Record<string, string> = {
-      name: "name", platform: "platform", url: "url", description: "description",
-      prize: "prize", start_date: "start_date", end_date: "end_date",
-      registration_deadline: "registration_deadline", submission_deadline: "submission_deadline",
-      status: "status", notes: "notes",
-    };
-    const sets: string[] = [];
-    const params: any[] = [];
-    for (const [key, col] of Object.entries(fieldMap)) {
-      if (key in data) { sets.push(`${col} = ?`); params.push(data[key]); }
-    }
-    if ("eligibility" in data) { sets.push("eligibility_json = ?"); params.push(JSON.stringify(data.eligibility)); }
-    if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
-    sets.push("updated_at = ?"); params.push(now()); params.push(id);
-    sql.exec(`UPDATE hackathons SET ${sets.join(", ")} WHERE id = ?`, ...params);
-    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
-    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
-    return c.json(rowToHackathon(rows[0]));
-  });
-
-  // Delete
-  app.delete("/api/hackathons/:id", (c) => {
-    const result = sql.exec("DELETE FROM hackathons WHERE id = ?", c.req.param("id"));
-    if (result.changes === 0) return c.json({ error: "Not found" }, 404);
-    return c.json({ success: true });
-  });
-
   // Eligibility check — evaluates ALL open hackathons against user profile
   app.get("/api/hackathons/eligibility", (c) => {
     const profile = getUserProfile(sql);
@@ -359,6 +303,7 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
       return { hackathon: h, eligible, reasons, qualification_path };
     }));
   });
+
 
   // User profile
   app.get("/api/hackathons/profile", (c) => c.json(getUserProfile(sql)));
@@ -392,4 +337,61 @@ function getUserProfile(sql: any): UserProfile {
     if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
   } catch {}
   return { ...DEFAULT_PROFILE };
+
+  // Get single
+  app.get("/api/hackathons/:id", (c) => {
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", c.req.param("id")).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]));
+  });
+
+  // Create
+  app.post("/api/hackathons", async (c) => {
+    const data = await c.req.json();
+    if (!data.name?.trim()) return c.json({ error: "Name required" }, 400);
+    const id = `hack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ts = now();
+    sql.exec(
+      `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      id, data.name.trim(), data.platform || "manual", data.url || "", data.description || "", data.prize || "", data.start_date || null, data.end_date || null, data.registration_deadline || null, data.submission_deadline || null, JSON.stringify(data.eligibility || {}), data.status || "open", data.notes || "", ts, ts
+    );
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]), 201);
+  });
+
+  // Update
+  app.patch("/api/hackathons/:id", async (c) => {
+    const id = c.req.param("id");
+    const data = await c.req.json();
+    const existingRows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (existingRows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    const existing = existingRows[0];
+    const fieldMap: Record<string, string> = {
+      name: "name", platform: "platform", url: "url", description: "description",
+      prize: "prize", start_date: "start_date", end_date: "end_date",
+      registration_deadline: "registration_deadline", submission_deadline: "submission_deadline",
+      status: "status", notes: "notes",
+    };
+    const sets: string[] = [];
+    const params: any[] = [];
+    for (const [key, col] of Object.entries(fieldMap)) {
+      if (key in data) { sets.push(`${col} = ?`); params.push(data[key]); }
+    }
+    if ("eligibility" in data) { sets.push("eligibility_json = ?"); params.push(JSON.stringify(data.eligibility)); }
+    if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
+    sets.push("updated_at = ?"); params.push(now()); params.push(id);
+    sql.exec(`UPDATE hackathons SET ${sets.join(", ")} WHERE id = ?`, ...params);
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]));
+  });
+
+  // Delete
+  app.delete("/api/hackathons/:id", (c) => {
+    const before = sql.exec("SELECT id FROM hackathons WHERE id = ?", c.req.param("id")).toArray();
+    if (before.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    sql.exec("DELETE FROM hackathons WHERE id = ?", c.req.param("id"));
+  });
+
 }

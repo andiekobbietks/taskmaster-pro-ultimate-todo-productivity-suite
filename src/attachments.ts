@@ -49,15 +49,15 @@ export function registerAttachmentRoutes(app: Hono, sql: any) {
     const ticketId = c.req.param("id");
 
     // Verify the ticket exists
-    const ticket = sql
+    const ticketRows = sql
       .exec("SELECT id FROM hackathons WHERE id = ?", ticketId)
-      .one();
-    if (!ticket) {
+      .toArray();
+    if (ticketRows.length === 0) {
       // Also check todos table
-      const todo = sql
+      const todoRows = sql
         .exec("SELECT id FROM todos WHERE id = ?", ticketId)
-        .one();
-      if (!todo) {
+        .toArray();
+      if (todoRows.length === 0) {
         return c.json({ error: "Ticket not found" }, 404);
       }
     }
@@ -86,11 +86,12 @@ export function registerAttachmentRoutes(app: Hono, sql: any) {
       ts,
     );
 
-    const row = sql
+    const rows = sql
       .exec("SELECT id, ticket_id, filename, mime_type, size, created_at FROM attachments WHERE id = ?", id)
-      .one();
+      .toArray();
 
-    return c.json(row, 201);
+    if (rows.length === 0) return c.json({ error: "Attachment not found" }, 404);
+    return c.json(rows[0], 201);
   });
 
   // --- List attachments for a ticket ---------------------------------------

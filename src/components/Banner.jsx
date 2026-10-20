@@ -1,5 +1,5 @@
 /**
- * Banner â€” reusable alert banner.
+ * Banner — reusable alert banner.
  *
  * Variants: error, success, info, warning
  */

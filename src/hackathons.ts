@@ -253,10 +253,10 @@ function rowToHackathon(r: any): Hackathon {
 // ── Default user profile (Andie's actual profile) ────────────────────
 
 const DEFAULT_PROFILE: UserProfile = {
-  citizenships: ["IT"],           // Italian passport
-  residencies: ["GB"],             // UK resident
-  residency_status: "settled",     // EU settled status
-  age: 25,
+  citizenships: [],               // Set via PUT /api/hackathons/profile
+  residencies: [],
+  residency_status: "none",
+  age: 0,
   is_student: false,
   team_size: 1,
   employed_by_sponsor: false,
@@ -292,6 +292,51 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
     const rows = sql.exec(query, ...params).toArray();
     return c.json(rows.map(rowToHackathon));
   });
+
+  // Eligibility check — evaluates ALL open hackathons against user profile
+  app.get("/api/hackathons/eligibility", (c) => {
+    const profile = getUserProfile(sql);
+    const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
+    return c.json(rows.map((r: any) => {
+      const h = rowToHackathon(r);
+      const { eligible, reasons, qualification_path } = evaluateEligibility(h.eligibility, profile);
+      return { hackathon: h, eligible, reasons, qualification_path };
+    }));
+  });
+
+
+  // User profile
+  app.get("/api/hackathons/profile", (c) => c.json(getUserProfile(sql)));
+  app.put("/api/hackathons/profile", async (c) => {
+    const data = await c.req.json();
+    const profile: UserProfile = {
+      citizenships: data.citizenships || ["IT"],
+      residencies: data.residencies || ["GB"],
+      residency_status: data.residency_status || "settled",
+      age: data.age ?? 25,
+      is_student: data.is_student ?? false,
+      team_size: data.team_size ?? 1,
+      employed_by_sponsor: data.employed_by_sponsor ?? false,
+    };
+    const json = JSON.stringify(profile);
+    sql.exec(
+      `INSERT INTO hackathon_profile (id, profile_json, updated_at) VALUES ('default', ?, ?)
+       ON CONFLICT(id) DO UPDATE SET profile_json = ?, updated_at = ?`,
+      json, now(), json, now()
+    );
+    return c.json(profile);
+  });
+}
+
+// ── User profile ─────────────────────────────────────────────────────
+
+function getUserProfile(sql: any): UserProfile {
+  try {
+    const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
+    const row = rows.length > 0 ? rows[0] : null;
+    if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
+  } catch {}
+  return { ...DEFAULT_PROFILE };
 
   // Get single
   app.get("/api/hackathons/:id", (c) => {
@@ -349,47 +394,4 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
     return c.json({ success: true });
   });
 
-  // Eligibility check — evaluates ALL open hackathons against user profile
-  app.get("/api/hackathons/eligibility", (c) => {
-    const profile = getUserProfile(sql);
-    const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
-    return c.json(rows.map((r: any) => {
-      const h = rowToHackathon(r);
-      const { eligible, reasons, qualification_path } = evaluateEligibility(h.eligibility, profile);
-      return { hackathon: h, eligible, reasons, qualification_path };
-    }));
-  });
-
-  // User profile
-  app.get("/api/hackathons/profile", (c) => c.json(getUserProfile(sql)));
-  app.put("/api/hackathons/profile", async (c) => {
-    const data = await c.req.json();
-    const profile: UserProfile = {
-      citizenships: data.citizenships || ["IT"],
-      residencies: data.residencies || ["GB"],
-      residency_status: data.residency_status || "settled",
-      age: data.age ?? 25,
-      is_student: data.is_student ?? false,
-      team_size: data.team_size ?? 1,
-      employed_by_sponsor: data.employed_by_sponsor ?? false,
-    };
-    const json = JSON.stringify(profile);
-    sql.exec(
-      `INSERT INTO hackathon_profile (id, profile_json, updated_at) VALUES ('default', ?, ?)
-       ON CONFLICT(id) DO UPDATE SET profile_json = ?, updated_at = ?`,
-      json, now(), json, now()
-    );
-    return c.json(profile);
-  });
-}
-
-// ── User profile ─────────────────────────────────────────────────────
-
-function getUserProfile(sql: any): UserProfile {
-  try {
-    const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
-    const row = rows.length > 0 ? rows[0] : null;
-    if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
-  } catch {}
-  return { ...DEFAULT_PROFILE };
 }

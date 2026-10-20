@@ -165,7 +165,7 @@ export function registerArchiveRoutes(app: Hono, sql: any) {
       `INSERT INTO archive_sources (id, name, type, api_key, enabled, base_url, created_at)
        VALUES (?, ?, ?, ?, 1, ?, ?)`,
       id, name, type, api_key || null, base_url || "", Date.now()
-    );
+    ).toArray();
 
     return c.json({ id, name, type, enabled: true, base_url: base_url || "" }, 201);
   });
@@ -214,7 +214,7 @@ export function registerArchiveRoutes(app: Hono, sql: any) {
         `INSERT INTO attachments (id, ticket_id, filename, mime_type, data, size, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         id, ticketId, `archive-${snapshot.timestamp}.html`, "text/html", blob, blob.length, Date.now()
-      );
+      ).toArray();
     }
 
     return c.json({

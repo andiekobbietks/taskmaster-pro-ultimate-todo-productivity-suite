@@ -190,7 +190,7 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
       `INSERT INTO settings (key, value, updated_at) VALUES ('main', ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`,
       JSON.stringify(obfuscated), now(), JSON.stringify(obfuscated), now()
-    );
+    ).toArray();
 
     return c.json(settings);
   });
@@ -231,7 +231,7 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
       `INSERT INTO settings (key, value, updated_at) VALUES ('main', ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`,
       JSON.stringify(obfuscated), now(), JSON.stringify(obfuscated), now()
-    );
+    ).toArray();
 
     return c.json(deobfuscated[section as keyof Settings]);
   });

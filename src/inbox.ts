@@ -227,7 +227,7 @@ export function registerInboxRoutes(app: Hono, sql: any) {
       is_platform || platform !== null ? 1 : 0,
       platform, ticketId, ts,
       Math.round(match.confidence * 100) / 100, match.method
-    );
+    ).toArray();
 
     const row = sql.exec("SELECT * FROM inbox WHERE id = ?", id).toArray();
     if (row.length === 0) return c.json({ error: "Failed to create inbox item" }, 500);
@@ -263,6 +263,16 @@ export function registerInboxRoutes(app: Hono, sql: any) {
   });
 
   // --- Get single inbox item -----------------------------------------
+
+  // --- Get inbox stats ------------------------------------------------
+
+  app.get("/api/inbox/stats", (c) => {
+    const total = sql.exec("SELECT COUNT(*) as c FROM inbox").one().c;
+    const unread = sql.exec("SELECT COUNT(*) as c FROM inbox WHERE read = 0").one().c;
+    const unprocessed = sql.exec("SELECT COUNT(*) as c FROM inbox WHERE processed = 0").one().c;
+    const platform = sql.exec("SELECT COUNT(*) as c FROM inbox WHERE is_platform = 1").one().c;
+    return c.json({ total, unread, unprocessed, platform });
+  });
 
   app.get("/api/inbox/:id", (c) => {
     const rows = sql.exec("SELECT * FROM inbox WHERE id = ?", c.req.param("id")).toArray();
@@ -300,7 +310,7 @@ export function registerInboxRoutes(app: Hono, sql: any) {
     }
 
     params.push(id);
-    sql.exec(`UPDATE inbox SET ${sets.join(", ")} WHERE id = ?`, ...params);
+    sql.exec(`UPDATE inbox SET ${sets.join(", ")} WHERE id = ?`, ...params).toArray();
 
     const updated = sql.exec("SELECT * FROM inbox WHERE id = ?", id).toArray();
     return c.json(rowToInboxItem(updated[0]));
@@ -339,13 +349,4 @@ export function registerInboxRoutes(app: Hono, sql: any) {
     return c.json(rowToInboxItem(updated[0]));
   });
 
-  // --- Get inbox stats ------------------------------------------------
-
-  app.get("/api/inbox/stats", (c) => {
-    const total = sql.exec("SELECT COUNT(*) as c FROM inbox").one().c;
-    const unread = sql.exec("SELECT COUNT(*) as c FROM inbox WHERE read = 0").one().c;
-    const unprocessed = sql.exec("SELECT COUNT(*) as c FROM inbox WHERE processed = 0").one().c;
-    const platform = sql.exec("SELECT COUNT(*) as c FROM inbox WHERE is_platform = 1").one().c;
-    return c.json({ total, unread, unprocessed, platform });
-  });
 }

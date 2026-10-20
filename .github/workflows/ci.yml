@@ -103,3 +103,19 @@ jobs:
       # fixture is caught here instead of during someone's test session.
       - name: Validate seed fixtures
         run: node scripts/validate-seed.mjs
+
+  test:
+    name: API tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # The API tests drive the real Hono routes against an in-memory SQLite
+      # database. They need no Worker runtime, so they are fast and cannot
+      # flake the way a live dev server can.
+      - name: Run API tests
+        run: npm test

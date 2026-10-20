@@ -777,6 +777,27 @@
       ],
       "gaps": [],
       "notes": "Restored. The mount effect had been reduced to todos/lists/stats only, so the hackathon, archive, digest and inbox views opened empty."
+    },
+    {
+      "id": "FEAT-048",
+      "name": "Inbox UI primitives (split view)",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET /api/inbox, GET /api/inbox/stats, PATCH/DELETE /api/inbox/:id",
+      "frontend": "src/components/InboxPrimitives.jsx \u2014 split view, list row, detail panel, skeleton",
+      "evidence": "src/components/InboxPrimitives.jsx:1-260, src/lib/email.js:1-140, src/app.jsx:1211-1290",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-024",
+        "COMP-027"
+      ],
+      "gaps": [
+        "No compose panel \u2014 the inbox is receive-only",
+        "No threading \u2014 each email is its own row"
+      ],
+      "notes": "Interaction patterns follow cloudflare/agentic-inbox (Apache-2.0): split view, unread dot, role=button rows with Enter/Space activation, sender avatar, skeleton placeholders. Implemented against TaskMaster Pro's own design tokens \u2014 brand palette, Inter, and the existing component library. Email bodies render as plain text, so no HTML sanitiser is involved."
     }
   ],
   "summary": {

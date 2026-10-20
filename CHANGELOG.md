@@ -98,6 +98,13 @@ changelog is the single source of truth for what a release contains.
   same platform stay distinguishable. A match records its confidence and the
   method used. Ambiguous emails are left unlinked rather than guessed, and
   `POST /api/inbox/:id/relink` lets you fix a link by hand.
+- **Inbox rebuilt on reusable UI primitives.** A split view puts the list
+  beside a detail panel, rows are keyboard reachable (Enter or Space opens one),
+  and the sender avatar, unread dot, match confidence and attachment list follow
+  the interaction patterns of cloudflare/agentic-inbox (Apache-2.0), rebuilt on
+  TaskMaster Pro's own tokens. Email bodies render as plain text, so no HTML
+  sanitiser is involved.
+
 - **API test suite.** Thirty-six checks drive the real Hono routes against an
   in-memory SQLite database. They run in CI on every push.
 

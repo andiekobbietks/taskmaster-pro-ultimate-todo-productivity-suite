@@ -1,5 +1,5 @@
 /**
- * Badge â€” reusable badge component.
+ * Badge — reusable badge component.
  *
  * Variants: success, warning, danger, info, neutral, brand
  * Sizes: sm, md

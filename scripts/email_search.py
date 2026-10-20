@@ -4,13 +4,13 @@ Simpler than OAuth — just use app passwords.
 
 Setup (one-time, 2 minutes each):
 
-  Outlook (andiekobbietks@outlook.com):
+  Outlook (your-outlook-email@example.com):
     1. Go to: https://account.microsoft.com/security
     2. Click "Advanced security options"
     3. Under "App passwords", click "Create a new app password"
     4. Copy the generated password
 
-  Yahoo (andre.enne@yahoo.com):
+  Yahoo (your-yahoo-email@example.com):
     1. Go to: https://login.yahoo.com/account/security
     2. Click "Generate app password"
     3. Select "Other app" and name it "taskmaster"
@@ -18,9 +18,9 @@ Setup (one-time, 2 minutes each):
 
 Usage:
     python email_search_imap.py \
-      --outlook-email andiekobbietks@outlook.com \
+      --outlook-email your-outlook-email@example.com \
       --outlook-password <app-password> \
-      --yahoo-email andre.enne@yahoo.com \
+      --yahoo-email your-yahoo-email@example.com \
       --yahoo-password <app-password>
 
 Output: hackathon_emails.json (importable into taskmaster-pro)
@@ -169,9 +169,9 @@ def main():
 
     parser = argparse.ArgumentParser(description="Search Outlook and Yahoo for hackathon emails via IMAP")
     parser.add_argument("--outlook-email", help="Outlook email address")
-    parser.add_argument("--outlook-password", help="Outlook app password")
+    parser.add_argument("--outlook-password", help="Outlook app password (or set OUTLOOK_PASSWORD env var)")
     parser.add_argument("--yahoo-email", help="Yahoo email address")
-    parser.add_argument("--yahoo-password", help="Yahoo app password")
+    parser.add_argument("--yahoo-password", help="Yahoo app password (or set YAHOO_PASSWORD env var)")
     parser.add_argument("--output", default="hackathon_emails.json", help="Output file")
     args = parser.parse_args()
 

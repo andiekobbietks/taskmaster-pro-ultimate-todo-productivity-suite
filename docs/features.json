@@ -560,6 +560,135 @@
         "Scraping not implemented \u2014 sources disabled pending actual scraper implementation"
       ],
       "notes": "Scaffold for Devpost/MLH/lablab.ai sync. Idempotent upsert by (platform, external_id)."
+    },
+    {
+      "id": "FEAT-036",
+      "name": "Attachment system",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "POST/GET/DELETE /api/todos/:id/attachments, GET /api/attachments/:id",
+      "frontend": "Attachment badges on hackathon cards, preview modal, upload picker",
+      "evidence": "src/attachments.ts:1-140, src/app.jsx:1300-1360",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-019"
+      ],
+      "gaps": [
+        "Stored as BLOBs in SQLite \u2014 no size limit beyond the Durable Object's 10GB cap"
+      ],
+      "notes": "Screenshots are immutable evidence. Previewed inline via a modal with a download link."
+    },
+    {
+      "id": "FEAT-037",
+      "name": "Archive integration (Wayback Machine)",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET/POST/DELETE /api/archive/sources, POST /api/archive/fetch, POST /api/archive/bulk, GET /api/archive/check",
+      "frontend": "Archives view \u2014 URL checker, source list, fetch button on each card",
+      "evidence": "src/archive.ts:1-190, src/app.jsx:1100-1190",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-020"
+      ],
+      "gaps": [
+        "HTML parser uses regex, not a DOM \u2014 it catches the common deadline/prize patterns but not every layout"
+      ],
+      "notes": "Avoids scraping live platforms. Archived snapshots are public and immutable."
+    },
+    {
+      "id": "FEAT-038",
+      "name": "Settings (storage, profile, notifications, email)",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET/PUT/PATCH /api/settings, POST /api/settings/reset, POST /api/settings/test-storage",
+      "frontend": "Settings view with four tabs",
+      "evidence": "src/settings.ts:1-250, src/app.jsx:800-1100",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-021"
+      ],
+      "gaps": [
+        "Sensitive values use XOR obfuscation, not real secret management"
+      ],
+      "notes": "Storage backend is swappable \u2014 R2, S3, or Azure Blob Storage \u2014 so the deployment is not locked to one provider."
+    },
+    {
+      "id": "FEAT-039",
+      "name": "Capacity planner + daily digest",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET/PUT /api/capacity, GET /api/digest, GET /api/digest/weekly, GET /api/digest/priority",
+      "frontend": "Today view \u2014 summary banner, focus tasks, conflicts, upcoming, weekly capacity grid",
+      "evidence": "src/capacity.ts:1-280, src/app.jsx:1195-1300",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-022"
+      ],
+      "gaps": [
+        "Available hours are entered by hand \u2014 no calendar inference yet"
+      ],
+      "notes": "The answer to 'what should I do today given my constraints' rather than a plain deadline list."
+    },
+    {
+      "id": "FEAT-040",
+      "name": "JMAP email protocol client",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "src/jmap.ts \u2014 session discovery, batched calls, search, body, attachment download",
+      "frontend": "n/a \u2014 library module used by the settings email configuration",
+      "evidence": "src/jmap.ts:1-160",
+      "dependsOn": [
+        "COMP-003",
+        "COMP-023"
+      ],
+      "gaps": [
+        "Requires a JMAP-compatible server (Fastmail, Stalwart, Cyrus) \u2014 Outlook and Yahoo are IMAP-only"
+      ],
+      "notes": "JSON instead of MIME parsing. RFC 8620/8621 \u2014 the open standard La Suite numerique uses."
+    },
+    {
+      "id": "FEAT-041",
+      "name": "Email inbox ingestion",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "POST/GET/PATCH/DELETE /api/inbox, GET /api/inbox/stats",
+      "frontend": "n/a \u2014 inbox is populated by the Email Worker, surfaced through the hackathon ticket view",
+      "evidence": "src/inbox.ts:1-200, scripts/email_worker.ts:1-90",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-024",
+        "COMP-025"
+      ],
+      "gaps": [
+        "Requires a domain on Cloudflare with Email Routing enabled \u2014 not yet deployed"
+      ],
+      "notes": "Replaces manual forwarding. Non-hackathon mail is forwarded to the personal inbox."
+    },
+    {
+      "id": "FEAT-042",
+      "name": "Error boundary + health check + rate limiting + security headers",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET /health, 100 req/min per IP, CSP/X-Frame-Options/X-Content-Type-Options headers",
+      "frontend": "ErrorBoundary wraps the app root",
+      "evidence": "src/index.ts:20-90 (middleware), src/components/ErrorBoundary.jsx:1-60, src/app.jsx:1690",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-026"
+      ],
+      "gaps": [],
+      "notes": "The four quick wins: a crash in one component no longer blanks the app, and the Worker answers a health check."
     }
   ],
   "summary": {

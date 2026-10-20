@@ -117,5 +117,8 @@ jobs:
       # The API tests drive the real Hono routes against an in-memory SQLite
       # database. They need no Worker runtime, so they are fast and cannot
       # flake the way a live dev server can.
+      - name: Install dependencies
+        run: npm install
+
       - name: Run API tests
         run: npm test

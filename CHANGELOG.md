@@ -87,7 +87,7 @@ changelog is the single source of truth for what a release contains.
   page load), the Tailwind Play CDN, and the esm.sh importmap for
   react/react-dom/lucide-react in a single move. Those libraries are pinned
   npm packages bundled into `app.js`, so **no third-party script executes at
-  page view any more** â€” the only remaining external request is Google Fonts.
+  page view any more** — the only remaining external request is Google Fonts.
   It also removes the first-paint compile cost.
 - `docs/features.json`, `docs/architecture.json` and
   `docs/sbom.cyclonedx.json` were re-anchored to the new file layout: the
@@ -117,20 +117,20 @@ First tagged release. Everything below is new relative to "no releases at all".
 
 ### Added
 
-- **Todos** â€” create, update, complete, and delete tasks.
-- **Priorities** â€” `low`, `medium`, `high`, `urgent`, filterable.
-- **Tags and lists** â€” free-form tags stored as JSON per todo; lists are
+- **Todos** — create, update, complete, and delete tasks.
+- **Priorities** — `low`, `medium`, `high`, `urgent`, filterable.
+- **Tags and lists** — free-form tags stored as JSON per todo; lists are
   first-class rows with a colour and icon.
-- **Pinning** â€” pinned todos sort to the top ahead of every other criterion.
-- **Due dates** â€” todos sort by `due_date ASC` ahead of `created_at DESC`.
-- **Search** â€” substring search across title and description.
-- **Stats dashboard** â€” totals, completed, active, high-priority, due-today, and
+- **Pinning** — pinned todos sort to the top ahead of every other criterion.
+- **Due dates** — todos sort by `due_date ASC` ahead of `created_at DESC`.
+- **Search** — substring search across title and description.
+- **Stats dashboard** — totals, completed, active, high-priority, due-today, and
   pomodoro counts.
-- **Pomodoro tracking** â€” estimated and completed pomodoro counts per todo.
-- **Durable Object backend** â€” a single `App` Durable Object holding an embedded
+- **Pomodoro tracking** — estimated and completed pomodoro counts per todo.
+- **Durable Object backend** — a single `App` Durable Object holding an embedded
   SQLite database for persistent per-user state, exposed through a Hono REST API.
-- **Static front end** â€” a single-page app served as Workers static assets.
-- **Self-describing docs** â€” generated maturity checklist, feature and
+- **Static front end** — a single-page app served as Workers static assets.
+- **Self-describing docs** — generated maturity checklist, feature and
   architecture inventories, an SBOM, and a maintenance guide under `docs/`.
 
 ### Security

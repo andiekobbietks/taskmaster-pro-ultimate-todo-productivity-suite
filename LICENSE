@@ -45,3 +45,30 @@ For commercial licensing inquiries: andiekobbietks@outlook.com
 
 This software is provided "as is" without warranty of any kind. The author is
 not liable for any damages arising from the use of this software.
+
+---
+
+## Third-party components
+
+Parts of this repository are derived from **cloudflare/agentic-inbox**
+(https://github.com/cloudflare/agentic-inbox), Copyright (c) 2026
+Cloudflare, Inc., used under the Apache License, Version 2.0.
+
+The affected files are:
+
+- `src/components/InboxPrimitives.jsx`
+- `src/lib/email.js`
+
+These files are licensed under the Apache License, Version 2.0, and that
+licence governs them. A copy of the Apache Licence 2.0 is included at
+`THIRD-PARTY-LICENSES/Apache-2.0.txt`. Attribution and a statement of
+modifications are in `NOTICE`.
+
+The rest of this repository — including all other source files not
+listed above — is governed by the TaskMaster Pro Open Core License at the
+top of this file, which permits use, study and modification for
+personal and non-commercial purposes, and prohibits forking,
+redistribution, commercial use and derivative works.
+
+The Apache-2.0 components may be used, modified and redistributed under
+the terms of the Apache Licence 2.0, including for commercial purposes.

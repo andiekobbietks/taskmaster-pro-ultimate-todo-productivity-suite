@@ -165,8 +165,8 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
     // Get today's available hours
     let availableHours = 0;
     try {
-      const row = sql.exec("SELECT hours_available FROM capacity WHERE day_of_week = ?", dayOfWeek).one();
-      availableHours = row?.hours_available || 0;
+      const rows = sql.exec("SELECT hours_available FROM capacity WHERE day_of_week = ?", dayOfWeek).toArray();
+      availableHours = rows.length > 0 ? rows[0].hours_available || 0 : 0;
     } catch {
       // Use default
       const defaults: Record<number, number> = { 0: 4, 1: 2, 2: 2, 3: 3, 4: 2, 5: 0, 6: 6 };
@@ -188,7 +188,8 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
     // Get user profile
     let profile = null;
     try {
-      const prow = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").one();
+      const prows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
+    const prow = prows.length > 0 ? prows[0] : null;
       if (prow?.profile_json) profile = parseJson(prow.profile_json, null);
     } catch {}
 

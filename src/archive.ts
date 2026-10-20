@@ -172,8 +172,9 @@ export function registerArchiveRoutes(app: Hono, sql: any) {
 
   app.delete("/api/archive/sources/:id", (c) => {
     const id = c.req.param("id");
-    const result = sql.exec("DELETE FROM archive_sources WHERE id = ?", id);
-    if (result.changes === 0) return c.json({ error: "Source not found" }, 404);
+    const before = sql.exec("SELECT id FROM archive_sources WHERE id = ?", id).toArray();
+    if (before.length === 0) return c.json({ error: "Source not found" }, 404);
+    sql.exec("DELETE FROM archive_sources WHERE id = ?", id);
     return c.json({ success: true });
   });
 

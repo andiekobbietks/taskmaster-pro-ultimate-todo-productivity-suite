@@ -1,22 +1,22 @@
 [
   {
     "ticket_id": "hack-1",
-    "url": "https://devpost.com/hackathons",
+    "url": "https://devpost.com/hackathons/amazon-developer-hackathon",
     "name": "Amazon Developer Hackathon"
   },
   {
     "ticket_id": "hack-2",
-    "url": "https://devpost.com/hackathons",
+    "url": "https://devpost.com/hackathons/aws-cds-agentic-ai",
     "name": "AWS CDS Agentic AI Partner Hackathon"
   },
   {
     "ticket_id": "hack-3",
-    "url": "https://devpost.com/hackathons",
+    "url": "https://devpost.com/hackathons/nebius-nvidia-global-ai",
     "name": "Nebius x NVIDIA Global AI Hackathon"
   },
   {
     "ticket_id": "hack-4",
-    "url": "https://devpost.com/hackathons",
+    "url": "https://devpost.com/hackathons/qloo-agentic",
     "name": "Qloo Agentic Hackathon"
   },
   {

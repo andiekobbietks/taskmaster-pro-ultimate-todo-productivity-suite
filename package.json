@@ -10,7 +10,9 @@
     "deploy": "npm run build && npx wrangler deploy",
     "seed": "node scripts/seed.mjs",
     "seed:validate": "node scripts/validate-seed.mjs",
-    "docs:readiness": "node docs/scripts/readiness.mjs"
+    "docs:readiness": "node docs/scripts/readiness.mjs",
+    "test": "node --experimental-strip-types scripts/test-inprocess.mjs",
+    "test:watch": "node --experimental-strip-types --watch scripts/test-inprocess.mjs"
   },
   "dependencies": {
     "hono": "^4.6.0",

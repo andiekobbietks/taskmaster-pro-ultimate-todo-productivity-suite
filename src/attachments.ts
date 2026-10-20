@@ -84,7 +84,7 @@ export function registerAttachmentRoutes(app: Hono, sql: any) {
       data,
       data.length,
       ts,
-    );
+    ).toArray();
 
     const rows = sql
       .exec("SELECT id, ticket_id, filename, mime_type, size, created_at FROM attachments WHERE id = ?", id)
@@ -93,6 +93,12 @@ export function registerAttachmentRoutes(app: Hono, sql: any) {
     if (rows.length === 0) return c.json({ error: "Attachment not found" }, 404);
     return c.json(rows[0], 201);
   };
+
+  // Primary route: /api/tickets/:id/attachments — a ticket is either a
+  // hackathon or a todo, so the namespace must not say "todos".
+  app.post("/api/tickets/:id/attachments", uploadHandler);
+  // Backwards-compatible alias for older clients.
+  app.post("/api/todos/:id/attachments", uploadHandler);
 
   // --- List attachments for a ticket ---------------------------------------
 
@@ -107,6 +113,9 @@ export function registerAttachmentRoutes(app: Hono, sql: any) {
 
     return c.json(rows);
   };
+
+  app.get("/api/tickets/:id/attachments", listHandler);
+  app.get("/api/todos/:id/attachments", listHandler);
 
   // --- Download/preview an attachment --------------------------------------
 

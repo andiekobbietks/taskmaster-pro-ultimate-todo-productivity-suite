@@ -144,7 +144,7 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
          ON CONFLICT(day_of_week) DO UPDATE SET hours_available = ?, notes = ?`,
         day.day_of_week, day.hours_available, day.notes || "",
         day.hours_available, day.notes || ""
-      );
+      ).toArray();
     }
 
     const rows = sql.exec("SELECT * FROM capacity ORDER BY day_of_week").toArray();

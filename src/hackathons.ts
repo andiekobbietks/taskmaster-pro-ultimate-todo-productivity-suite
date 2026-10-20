@@ -323,21 +323,9 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
       `INSERT INTO hackathon_profile (id, profile_json, updated_at) VALUES ('default', ?, ?)
        ON CONFLICT(id) DO UPDATE SET profile_json = ?, updated_at = ?`,
       json, now(), json, now()
-    );
+    ).toArray();
     return c.json(profile);
   });
-}
-
-// ── User profile ─────────────────────────────────────────────────────
-
-function getUserProfile(sql: any): UserProfile {
-  try {
-    const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
-    const row = rows.length > 0 ? rows[0] : null;
-    if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
-  } catch {}
-  return { ...DEFAULT_PROFILE };
-
   // Get single
   app.get("/api/hackathons/:id", (c) => {
     const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", c.req.param("id")).toArray();
@@ -354,7 +342,7 @@ function getUserProfile(sql: any): UserProfile {
     sql.exec(
       `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       id, data.name.trim(), data.platform || "manual", data.url || "", data.description || "", data.prize || "", data.start_date || null, data.end_date || null, data.registration_deadline || null, data.submission_deadline || null, JSON.stringify(data.eligibility || {}), data.status || "open", data.notes || "", ts, ts
-    );
+    ).toArray();
     const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
     if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
     return c.json(rowToHackathon(rows[0]), 201);
@@ -381,7 +369,7 @@ function getUserProfile(sql: any): UserProfile {
     if ("eligibility" in data) { sets.push("eligibility_json = ?"); params.push(JSON.stringify(data.eligibility)); }
     if (sets.length === 0) return c.json({ error: "No fields to update" }, 400);
     sets.push("updated_at = ?"); params.push(now()); params.push(id);
-    sql.exec(`UPDATE hackathons SET ${sets.join(", ")} WHERE id = ?`, ...params);
+    sql.exec(`UPDATE hackathons SET ${sets.join(", ")} WHERE id = ?`, ...params).toArray();
     const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
     if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
     return c.json(rowToHackathon(rows[0]));
@@ -393,5 +381,13 @@ function getUserProfile(sql: any): UserProfile {
     if (before.length === 0) return c.json({ error: "Hackathon not found" }, 404);
     sql.exec("DELETE FROM hackathons WHERE id = ?", c.req.param("id"));
   });
+}
 
+function getUserProfile(sql: any): UserProfile {
+  try {
+    const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
+    const row = rows.length > 0 ? rows[0] : null;
+    if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
+  } catch {}
+  return { ...DEFAULT_PROFILE };
 }

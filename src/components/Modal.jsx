@@ -1,5 +1,5 @@
 /**
- * Modal â€” reusable modal overlay.
+ * Modal — reusable modal overlay.
  *
  * Features: overlay, header, content, footer, close button, animation
  */

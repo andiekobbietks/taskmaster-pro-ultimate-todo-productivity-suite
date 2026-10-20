@@ -15,3 +15,10 @@ public/assets/
 
 # Local wrangler overrides. Commit the example, never the real file.
 .dev.vars
+
+# Local wrangler / dev server logs. Never committed.
+*.log
+*.err
+w*.log
+w*.err
+dist/

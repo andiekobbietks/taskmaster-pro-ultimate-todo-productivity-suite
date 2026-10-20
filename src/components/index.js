@@ -11,3 +11,4 @@ export { Badge } from "./Badge";
 export { Modal } from "./Modal";
 export { Banner } from "./Banner";
 export { EmptyState } from "./EmptyState";
+export { ErrorBoundary } from "./ErrorBoundary";

@@ -22,6 +22,7 @@ import {
   Flame, MoreHorizontal, ArrowRight, X, Menu, Settings, Check, HelpCircle
 } from "lucide-react";
 import { api, describeError } from "./lib/api.js";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 /**
  * A dismissible banner that tells the person what failed and offers a retry.
@@ -1762,4 +1763,8 @@ function App() {
       );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);

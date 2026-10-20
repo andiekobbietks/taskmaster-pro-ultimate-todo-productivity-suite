@@ -111,7 +111,7 @@ function App() {
 
   // Hackathon Tracker state
   const [hackathons, setHackathons] = useState([]);
-  const [activeView, setActiveView] = useState('tasks'); // 'tasks', 'today', 'hackathons', 'archives', 'settings'
+  const [activeView, setActiveView] = useState('tasks'); // 'tasks', 'today', 'hackathons', 'inbox', 'archives', 'settings'
   const [hackathonProfile, setHackathonProfile] = useState(null);
   const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
@@ -130,6 +130,10 @@ function App() {
   const [archiveResult, setArchiveResult] = useState(null);
   const [checkingArchive, setCheckingArchive] = useState(false);
   const [attachments, setAttachments] = useState({});
+  const [inboxItems, setInboxItems] = useState([]);
+  const [inboxStats, setInboxStats] = useState({ total: 0, unread: 0, unprocessed: 0, platform: 0 });
+  const [eligibility, setEligibility] = useState({});
+  const [expandedEmail, setExpandedEmail] = useState(null);
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
@@ -342,6 +346,83 @@ function App() {
     }
   }, []);
 
+  const loadInbox = useCallback(async () => {
+    try {
+      const data = await api("./api/inbox");
+      setInboxItems(Array.isArray(data) ? data : []);
+    } catch (err) {
+      fail("Loading inbox", loadInbox)(err);
+    }
+  }, [fail]);
+
+  const loadInboxStats = useCallback(async () => {
+    try {
+      const data = await api("./api/inbox/stats");
+      setInboxStats(data);
+    } catch (err) {
+      // stats are optional
+    }
+  }, []);
+
+  const markEmailRead = useCallback(async (emailId, read) => {
+    try {
+      await api(`./api/inbox/${emailId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ read }),
+      });
+      await loadInbox();
+      await loadInboxStats();
+    } catch (err) {
+      fail("Updating email", () => markEmailRead(emailId, read))(err);
+    }
+  }, [loadInbox, loadInboxStats, fail]);
+
+  const markEmailProcessed = useCallback(async (emailId, processed) => {
+    try {
+      await api(`./api/inbox/${emailId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ processed }),
+      });
+      await loadInbox();
+      await loadInboxStats();
+    } catch (err) {
+      fail("Updating email", () => markEmailProcessed(emailId, processed))(err);
+    }
+  }, [loadInbox, loadInboxStats, fail]);
+
+  const deleteEmail = useCallback(async (emailId) => {
+    try {
+      await api(`./api/inbox/${emailId}`, { method: "DELETE" });
+      await loadInbox();
+      await loadInboxStats();
+    } catch (err) {
+      fail("Deleting email", () => deleteEmail(emailId))(err);
+    }
+  }, [loadInbox, loadInboxStats, fail]);
+
+  const loadEligibility = useCallback(async () => {
+    try {
+      const data = await api("./api/hackathons/eligibility");
+      const map = {};
+      if (Array.isArray(data)) {
+        for (const e of data) {
+          if (e.hackathon && e.hackathon.id) {
+            map[e.hackathon.id] = {
+              eligible: e.eligible,
+              reasons: e.reasons || [],
+              qualification_path: e.qualification_path || "",
+            };
+          }
+        }
+      }
+      setEligibility(map);
+    } catch (err) {
+      // eligibility is optional
+    }
+  }, []);
+
   const fetchHackathonProfile = useCallback(async () => {
     try {
       const data = await api("./api/hackathons/profile");
@@ -370,6 +451,18 @@ function App() {
     }
   }, [fail]);
 
+  // Load everything on mount. This is the only place the app fetches
+  // initial state, so it must cover every view's data: todos, lists, stats,
+  // hackathons, the inbox, and the eligibility verdicts.
+  useEffect(() => {
+    fetchTodos();
+    fetchLists();
+    fetchStats();
+    loadHackathons();
+    loadInbox();
+    loadInboxStats();
+    loadEligibility();
+  }, [fetchTodos, fetchLists, fetchStats, loadHackathons, loadInbox, loadInboxStats, loadEligibility]);
 
   const handleCreateTodo = async (e) => {
     e.preventDefault();
@@ -660,6 +753,23 @@ function App() {
                       <span className="ml-auto text-xs bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded-full">
                         {hackathons.length}
                       </span>
+                    </button>
+
+                    <button
+                      onClick={() => { setActiveView('inbox'); setActiveTab("all"); setActiveListId("all"); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        activeView === 'inbox'
+                          ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 009.586 13H20" /></svg>
+                      <span>Inbox</span>
+                      {inboxStats.unread > 0 && (
+                        <span className="ml-auto text-xs bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full">
+                          {inboxStats.unread}
+                        </span>
+                      )}
                     </button>
 
                     <button
@@ -1098,6 +1208,127 @@ function App() {
                   </div>
                 )}
 
+                {/* Inbox View */}
+                {activeView === 'inbox' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold tracking-tight">Inbox</h2>
+                        <p className="text-sm text-neutral-500">
+                          {inboxStats.total} email{inboxStats.total === 1 ? '' : 's'} · {inboxStats.unread} unread · {inboxStats.unprocessed} unprocessed
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { loadInbox(); loadInboxStats(); }}
+                        className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+
+                    {inboxItems.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                        <svg className="w-10 h-10 text-amber-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 009.586 13H20" /></svg>
+                        <h3 className="text-base font-semibold">Inbox is empty</h3>
+                        <p className="text-sm text-neutral-500 mt-1 max-w-xs">
+                          Forward competition emails here, or set up the Cloudflare Email Worker and they arrive automatically.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {inboxItems.map((email) => {
+                          const linked = email.ticket_id
+                            ? hackathons.find((h) => h.id === email.ticket_id)
+                            : null;
+                          const isOpen = expandedEmail === email.id;
+                          return (
+                            <div
+                              key={email.id}
+                              className={`p-4 bg-white dark:bg-[#111827] rounded-xl border transition-colors ${
+                                email.read
+                                  ? 'border-neutral-200 dark:border-neutral-800'
+                                  : 'border-amber-300 dark:border-amber-800'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <button
+                                  onClick={() => {
+                                    setExpandedEmail(isOpen ? null : email.id);
+                                    if (!email.read) markEmailRead(email.id, true);
+                                  }}
+                                  className="flex-1 min-w-0 text-left"
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {!email.read && (
+                                      <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                    )}
+                                    <span className={`text-sm ${email.read ? 'font-medium' : 'font-semibold'} truncate`}>
+                                      {email.subject || '(no subject)'}
+                                    </span>
+                                    {email.is_platform && email.platform && (
+                                      <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                                        {email.platform}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-neutral-500 flex-wrap">
+                                    <span className="truncate max-w-xs">{email.sender}</span>
+                                    {email.received_at && (
+                                      <span>{new Date(email.received_at).toLocaleDateString()}</span>
+                                    )}
+                                    {linked ? (
+                                      <span className="inline-flex items-center gap-1 text-green-600 font-medium">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m3 3a4 4 0 010-5.656l-3-3a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
+                                        {linked.name}
+                                      </span>
+                                    ) : email.is_platform ? (
+                                      <span className="text-amber-600">no match — several {email.platform} entries, not sure which</span>
+                                    ) : null}
+                                  </div>
+                                </button>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    onClick={() => markEmailProcessed(email.id, !email.processed)}
+                                    title={email.processed ? 'Mark unprocessed' : 'Mark processed'}
+                                    className={`p-1.5 rounded transition-colors ${email.processed ? 'text-green-600' : 'text-neutral-400 hover:text-neutral-600'}`}
+                                  >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                  </button>
+                                  <button
+                                    onClick={() => deleteEmail(email.id)}
+                                    title="Delete"
+                                    className="p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {isOpen && (
+                                <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                                  {email.body_preview ? (
+                                    <p className="text-xs text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap leading-relaxed">
+                                      {email.body_preview}
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs text-neutral-400 italic">No preview available.</p>
+                                  )}
+                                  {email.has_attachments && email.attachment_names && email.attachment_names.length > 0 && (
+                                    <p className="text-[11px] text-neutral-500 mt-2">
+                                      Attachments: {email.attachment_names.join(', ')}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Archive View */}
                 {activeView === 'archives' && (
                   <div className="space-y-4">
@@ -1354,6 +1585,21 @@ function App() {
                                   <div className="flex items-center gap-3 mt-2 text-[11px] text-neutral-500">
                                     {h.prize && (
                                       <span className="font-medium text-amber-600">{h.prize}</span>
+                                    )}
+                                    {eligibility[h.id] && (
+                                      <span
+                                        className={`inline-flex items-center gap-1 font-medium ${eligibility[h.id].eligible ? 'text-green-600' : 'text-red-500'}`}
+                                        title={eligibility[h.id].reasons.join('; ') || eligibility[h.id].qualification_path}
+                                      >
+                                        {eligibility[h.id].eligible ? (
+                                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        ) : (
+                                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        )}
+                                        {eligibility[h.id].eligible
+                                          ? eligibility[h.id].qualification_path
+                                          : eligibility[h.id].reasons[0]}
+                                      </span>
                                     )}
                                     {deadline && (
                                       <span className={`inline-flex items-center gap-1 ${daysLeft !== null && daysLeft <= 3 ? 'text-red-500 font-medium' : ''}`}>

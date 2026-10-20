@@ -689,6 +689,94 @@
       ],
       "gaps": [],
       "notes": "The four quick wins: a crash in one component no longer blanks the app, and the Worker answers a health check."
+    },
+    {
+      "id": "FEAT-043",
+      "name": "Ticket-scoped attachment routes",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "POST/GET /api/tickets/:id/attachments (alias: /api/todos/:id/attachments)",
+      "frontend": "Upload + list + preview on any ticket",
+      "evidence": "src/attachments.ts:45-115",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-019"
+      ],
+      "gaps": [
+        "Attachments still stored as BLOBs in SQLite \u2014 R2 migration is a separate change"
+      ],
+      "notes": "A ticket is either a hackathon or a todo, so the route namespace no longer says 'todos'. The old path still works for older clients."
+    },
+    {
+      "id": "FEAT-044",
+      "name": "Content-based inbox matching",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "POST /api/inbox (auto-links on subject vs hackathon name), POST /api/inbox/:id/relink",
+      "frontend": "Inbox view shows the linked ticket and the match method",
+      "evidence": "src/inbox.ts:88-200, src/app.jsx:1211-1310",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-024"
+      ],
+      "gaps": [
+        "Matching is lexical, not semantic \u2014 an email that names no hackathon leaves the item unlinked"
+      ],
+      "notes": "Two competitions on the same platform are now distinguishable: the subject is scored against each hackathon name. Falls back to the platform only when that platform has exactly one entry, and refuses to guess when it does not."
+    },
+    {
+      "id": "FEAT-045",
+      "name": "Inbox view",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET /api/inbox, GET /api/inbox/stats, PATCH /api/inbox/:id, DELETE /api/inbox/:id",
+      "frontend": "Inbox sidebar item \u2014 unread markers, expandable body, mark read/processed, delete",
+      "evidence": "src/app.jsx:1211-1310, src/inbox.ts:110-220",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-024"
+      ],
+      "gaps": [
+        "No manual re-link control in the UI yet \u2014 the API supports it"
+      ],
+      "notes": "Makes the inbox visible. Emails from a known platform show a green link to the ticket they matched."
+    },
+    {
+      "id": "FEAT-046",
+      "name": "Eligibility verdict in the UI",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "GET /api/hackathons/eligibility",
+      "frontend": "Green/red badge on each hackathon card with the qualification path",
+      "evidence": "src/app.jsx:1453-1478",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-018"
+      ],
+      "gaps": [],
+      "notes": "The engine existed but nothing displayed it. Now each card shows eligible or the blocking reason, and the tooltip carries the full path."
+    },
+    {
+      "id": "FEAT-047",
+      "name": "Mount effect covers every view",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "n/a",
+      "frontend": "useEffect on mount loads todos, lists, stats, hackathons, inbox, eligibility",
+      "evidence": "src/app.jsx:454-470",
+      "dependsOn": [
+        "COMP-006"
+      ],
+      "gaps": [],
+      "notes": "Restored. The mount effect had been reduced to todos/lists/stats only, so the hackathon, archive, digest and inbox views opened empty."
     }
   ],
   "summary": {

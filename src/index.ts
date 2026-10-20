@@ -421,7 +421,9 @@ export class App extends DurableObject {
         ticket_id TEXT DEFAULT NULL,
         read INTEGER DEFAULT 0,
         processed INTEGER DEFAULT 0,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        match_confidence REAL DEFAULT 0,
+        match_method TEXT DEFAULT 'none'
       )
     `);
 

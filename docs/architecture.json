@@ -325,7 +325,7 @@
       "id": "COMP-019",
       "name": "Attachment routes module",
       "layer": "backend",
-      "role": "Hono routes for attachment upload, list, download, and delete. Screenshots stored as BLOBs in the same SQLite database as the tickets.",
+      "role": "Hono routes for attachment upload, list, download, and delete, scoped to a ticket (a hackathon or a todo). Screenshots are stored as BLOBs in the same SQLite database as the tickets.",
       "entry": "src/attachments.ts:1 export function registerAttachmentRoutes",
       "evidence": "src/attachments.ts:1-140, src/index.ts:16 (import), src/index.ts:262 (registration)",
       "dependsOn": [
@@ -339,7 +339,7 @@
       "dataAtRest": "attachments",
       "maturity": "adequate",
       "risk": "medium",
-      "notes": "BLOB storage in SQLite \u2014 no size limit until the DO's 10GB cap. Images are immutable evidence of what a competition page showed."
+      "notes": "BLOB storage in SQLite \u2014 no size limit until the DO's 10GB cap. Route is /api/tickets/:id/attachments, with /api/todos/:id kept as a backwards-compatible alias. Images are immutable evidence of what a competition page showed."
     },
     {
       "id": "COMP-020",
@@ -423,7 +423,7 @@
       "id": "COMP-024",
       "name": "Inbox routes module",
       "layer": "backend",
-      "role": "Receives parsed emails from the Cloudflare Email Worker, stores them as inbox items, and links them to hackathon tickets by sender domain.",
+      "role": "Receives parsed emails from the Cloudflare Email Worker, stores them as inbox items, and links them to hackathon tickets by content matching on the email subject against hackathon names.",
       "entry": "src/inbox.ts:1 export function registerInboxRoutes",
       "evidence": "src/inbox.ts:1-200, src/index.ts:20 (import), src/index.ts:266 (registration)",
       "dependsOn": [
@@ -437,7 +437,7 @@
       "dataAtRest": "inbox",
       "maturity": "adequate",
       "risk": "medium",
-      "notes": "Stores extracted metadata only, not raw email \u2014 data minimisation per GDPR. Sensitive values are excluded at ingest."
+      "notes": "Stores extracted metadata only, not raw email \u2014 data minimisation per GDPR. Links by content first (subject vs hackathon name) so two competitions on the same platform stay distinguishable; falls back to the platform only when it holds exactly one entry, and refuses to guess otherwise."
     },
     {
       "id": "COMP-025",

@@ -1,5 +1,5 @@
 /**
- * Input â€” reusable input component.
+ * Input — reusable input component.
  *
  * Types: text, number, email, password, url, time, date
  * Features: label, placeholder, error state, required

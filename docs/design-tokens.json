@@ -1,18 +1,18 @@
 {
   "name": "TaskMaster Pro Design Tokens",
   "version": "1.0.0",
-  "description": "Design tokens for TaskMaster Pro â€” extracted from tailwind.config.cjs and src/tailwind.css",
+  "description": "Design tokens for TaskMaster Pro — extracted from tailwind.config.cjs and src/tailwind.css",
   "tokens": {
     "color": {
       "brand": {
-        "50": { "value": "#EEF0FB", "type": "color", "description": "Lightest brand tint â€” backgrounds, hover states" },
-        "100": { "value": "#DDE0F7", "type": "color", "description": "Light brand tint â€” subtle backgrounds" },
-        "200": { "value": "#B9C0EF", "type": "color", "description": "Light brand â€” borders, dividers" },
-        "500": { "value": "#7B85DC", "type": "color", "description": "Mid brand â€” secondary text, icons" },
-        "600": { "value": "#5E6AD2", "type": "color", "description": "Primary brand â€” buttons, links, active states" },
-        "700": { "value": "#4A56C0", "type": "color", "description": "Dark brand â€” hover states on primary" },
-        "800": { "value": "#3A45A8", "type": "color", "description": "Darker brand â€” pressed states" },
-        "900": { "value": "#2A3284", "type": "color", "description": "Darkest brand â€” headings on light bg" }
+        "50": { "value": "#EEF0FB", "type": "color", "description": "Lightest brand tint — backgrounds, hover states" },
+        "100": { "value": "#DDE0F7", "type": "color", "description": "Light brand tint — subtle backgrounds" },
+        "200": { "value": "#B9C0EF", "type": "color", "description": "Light brand — borders, dividers" },
+        "500": { "value": "#7B85DC", "type": "color", "description": "Mid brand — secondary text, icons" },
+        "600": { "value": "#5E6AD2", "type": "color", "description": "Primary brand — buttons, links, active states" },
+        "700": { "value": "#4A56C0", "type": "color", "description": "Dark brand — hover states on primary" },
+        "800": { "value": "#3A45A8", "type": "color", "description": "Darker brand — pressed states" },
+        "900": { "value": "#2A3284", "type": "color", "description": "Darkest brand — headings on light bg" }
       },
       "neutral": {
         "50": { "value": "#F8FAFC", "type": "color", "description": "Page background (light mode)" },
@@ -46,12 +46,12 @@
         "mono": { "value": "JetBrains Mono, monospace", "type": "fontFamily", "description": "Code, timestamps, counts" }
       },
       "fontSize": {
-        "xs": { "value": "0.75rem", "type": "fontSize", "description": "12px â€” badges, captions" },
-        "sm": { "value": "0.875rem", "type": "fontSize", "description": "14px â€” body text, labels" },
-        "base": { "value": "1rem", "type": "fontSize", "description": "16px â€” default" },
-        "lg": { "value": "1.125rem", "type": "fontSize", "description": "18px â€” section headings" },
-        "xl": { "value": "1.25rem", "type": "fontSize", "description": "20px â€” page titles" },
-        "2xl": { "value": "1.5rem", "type": "fontSize", "description": "24px â€” hero headings" }
+        "xs": { "value": "0.75rem", "type": "fontSize", "description": "12px — badges, captions" },
+        "sm": { "value": "0.875rem", "type": "fontSize", "description": "14px — body text, labels" },
+        "base": { "value": "1rem", "type": "fontSize", "description": "16px — default" },
+        "lg": { "value": "1.125rem", "type": "fontSize", "description": "18px — section headings" },
+        "xl": { "value": "1.25rem", "type": "fontSize", "description": "20px — page titles" },
+        "2xl": { "value": "1.5rem", "type": "fontSize", "description": "24px — hero headings" }
       },
       "fontWeight": {
         "normal": { "value": "400", "type": "fontWeight" },

@@ -82,6 +82,51 @@ changelog is the single source of truth for what a release contains.
   This affects the changelog, the design system document, the design tokens,
   and seven component files.
 
+## [1.2.0] - 2026-10-20
+
+### Added
+
+- **Inbox view.** A sidebar entry listing every email the Email Worker has
+  filed, with unread markers, expandable bodies, mark-read and mark-processed,
+  and delete. Unread count badges the sidebar item.
+- **Eligibility verdicts on hackathon cards.** Each card now shows whether you
+  qualify and, if you do, by which route — "eligible via EU citizenship (IT)",
+  "eligible via UK residency (GB, settled)". Ineligible entries show the
+  blocking reason. The engine existed; nothing displayed it.
+- **Content-based inbox matching.** An email is matched to a hackathon by
+  scoring its subject against each hackathon's name, so two competitions on the
+  same platform stay distinguishable. A match records its confidence and the
+  method used. Ambiguous emails are left unlinked rather than guessed, and
+  `POST /api/inbox/:id/relink` lets you fix a link by hand.
+- **API test suite.** Thirty-six checks drive the real Hono routes against an
+  in-memory SQLite database. They run in CI on every push.
+
+### Fixed
+
+- **Routes that never registered.** A misplaced brace in the hackathon module
+  closed the registration function early, so the single-hackathon, create,
+  update and delete routes were orphaned outside it and never ran. The same
+  shape of error left the attachment upload and list handlers defined but
+  unregistered. All routes now register exactly once.
+- **Writes that were not reliably applied.** Route modules inserted rows and
+  updated them without consuming the statement's cursor, so a read-back
+  immediately afterwards could miss a row that had in fact been written. The
+  original todos route already did this correctly; the newer modules now match
+  it.
+- **Route shadowing.** `/api/inbox/stats` was being swallowed by
+  `/api/inbox/:id`. Literal paths are now registered before their parameter
+  siblings.
+- **Data that never loaded.** The mount effect had been narrowed to todos,
+  lists and stats, so the hackathon, archive, digest and inbox views all
+  opened empty. It now loads every view's data.
+- **A ticket namespace that lied.** Attachments were uploaded to
+  `/api/todos/:id/attachments` while carrying hackathon ids. The primary route
+  is now `/api/tickets/:id/attachments`; the old path still works.
+- **Mangled UTF-8.** Twelve files had an em dash decoded as Windows-1252 and
+  re-encoded. They now hold the original bytes.
+- **`.gitattributes`** added so line endings stay LF and binary files are never
+  touched.
+
 ## [Unreleased]
 
 ### Added

@@ -1,5 +1,5 @@
 /**
- * Card â€” reusable card container.
+ * Card — reusable card container.
  *
  * Features: border, shadow, hover effect, dark mode
  */

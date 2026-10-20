@@ -150,7 +150,7 @@
       "prize": "$3,500",
       "start_date": "2026-10-01",
       "end_date": "2026-11-30",
-      "registration_deadline": null,
+      "registration_deadline": "2026-10-01",
       "submission_deadline": "2026-11-30",
       "eligibility": {
         "eligibility_type": "unrestricted",
@@ -254,8 +254,8 @@
           "Global"
         ]
       },
-      "status": "open",
-      "notes": "Online. Free. 13+. Monthly recurring."
+      "status": "closed",
+      "notes": "Online. Free. 13+. Monthly recurring. (Ended Oct 15, 2026)"
     }
   ],
   "test_cases": [

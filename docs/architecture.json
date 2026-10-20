@@ -300,7 +300,7 @@
       "notes": "Isolation currently relies entirely on the platform fact that one DO instance serves one deployment. That is single-tenant by architecture, not by access control - it protects a private deploy but cannot support a shared beta."
     },
     {
-      "id": "COMP-016",
+      "id": "COMP-018",
       "name": "Hackathon routes module",
       "layer": "backend",
       "role": "Hono routes for hackathon CRUD, eligibility engine, and user profile. Registered in the App DO constructor.",
@@ -320,6 +320,160 @@
       "maturity": "adequate",
       "risk": "low",
       "notes": "All SQL parameterised. Eligibility engine is a pure function \u2014 rules stored as JSON per hackathon."
+    },
+    {
+      "id": "COMP-019",
+      "name": "Attachment routes module",
+      "layer": "backend",
+      "role": "Hono routes for attachment upload, list, download, and delete. Screenshots stored as BLOBs in the same SQLite database as the tickets.",
+      "entry": "src/attachments.ts:1 export function registerAttachmentRoutes",
+      "evidence": "src/attachments.ts:1-140, src/index.ts:16 (import), src/index.ts:262 (registration)",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
+      "usedBy": [
+        "FEAT-036"
+      ],
+      "dataAtRest": "attachments",
+      "maturity": "adequate",
+      "risk": "medium",
+      "notes": "BLOB storage in SQLite \u2014 no size limit until the DO's 10GB cap. Images are immutable evidence of what a competition page showed."
+    },
+    {
+      "id": "COMP-020",
+      "name": "Archive routes module",
+      "layer": "backend",
+      "role": "Wayback Machine CDX API adapter. Fetches archived snapshots, parses HTML for deadlines/prizes/rules, stores snapshots as attachments.",
+      "entry": "src/archive.ts:1 export function registerArchiveRoutes",
+      "evidence": "src/archive.ts:1-190, src/index.ts:17 (import), src/index.ts:263 (registration)",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
+      "usedBy": [
+        "FEAT-037"
+      ],
+      "dataAtRest": "archive_sources",
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "Avoids scraping live platforms \u2014 the Wayback Machine archives are public and immutable. No ToS exposure."
+    },
+    {
+      "id": "COMP-021",
+      "name": "Settings routes module",
+      "layer": "backend",
+      "role": "Configurable backend settings: storage backend (R2/S3/Azure), user profile, notification preferences, email/IMAP. Sensitive values obfuscated before storage.",
+      "entry": "src/settings.ts:1 export function registerSettingsRoutes",
+      "evidence": "src/settings.ts:1-250, src/index.ts:18 (import), src/index.ts:264 (registration)",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
+      "usedBy": [
+        "FEAT-038"
+      ],
+      "dataAtRest": "settings",
+      "maturity": "adequate",
+      "risk": "medium",
+      "notes": "Obfuscation is XOR-based \u2014 prevents casual reading, not a substitute for real secret management. Documented as such."
+    },
+    {
+      "id": "COMP-022",
+      "name": "Capacity planner module",
+      "layer": "backend",
+      "role": "Weekly available-hours template, daily digest with prioritised tasks, conflict detection, and weekly plan.",
+      "entry": "src/capacity.ts:1 export function registerCapacityRoutes",
+      "evidence": "src/capacity.ts:1-280, src/index.ts:19 (import), src/index.ts:265 (registration)",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
+      "usedBy": [
+        "FEAT-039"
+      ],
+      "dataAtRest": "capacity",
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "Greedy assignment of tasks to available hours. The prioritisation score is urgency x 0.4 + prize x 0.3 + eligibility x 0.3."
+    },
+    {
+      "id": "COMP-023",
+      "name": "JMAP email client",
+      "layer": "backend",
+      "role": "JMAP (RFC 8620/8621) client for JMAP-compatible email servers. Session discovery, batched API calls, email search, body retrieval, attachment download.",
+      "entry": "src/jmap.ts:1 export async function discoverJMAPSession",
+      "evidence": "src/jmap.ts:1-160",
+      "dependsOn": [
+        "COMP-003"
+      ],
+      "usedBy": [
+        "FEAT-040"
+      ],
+      "dataAtRest": "none",
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "JSON-based alternative to IMAP \u2014 no MIME parsing, stateless, push-capable. The open standard the French government uses via La Suite numerique."
+    },
+    {
+      "id": "COMP-024",
+      "name": "Inbox routes module",
+      "layer": "backend",
+      "role": "Receives parsed emails from the Cloudflare Email Worker, stores them as inbox items, and links them to hackathon tickets by sender domain.",
+      "entry": "src/inbox.ts:1 export function registerInboxRoutes",
+      "evidence": "src/inbox.ts:1-200, src/index.ts:20 (import), src/index.ts:266 (registration)",
+      "dependsOn": [
+        "COMP-002",
+        "COMP-003",
+        "COMP-004"
+      ],
+      "usedBy": [
+        "FEAT-041"
+      ],
+      "dataAtRest": "inbox",
+      "maturity": "adequate",
+      "risk": "medium",
+      "notes": "Stores extracted metadata only, not raw email \u2014 data minimisation per GDPR. Sensitive values are excluded at ingest."
+    },
+    {
+      "id": "COMP-025",
+      "name": "Cloudflare Email Worker",
+      "layer": "backend",
+      "role": "Separate Worker that receives inbound mail via Cloudflare Email Routing, parses it with postal-mime, and POSTs the extracted data to the taskmaster inbox API.",
+      "entry": "scripts/email_worker.ts:1 export default { async email(message, env, ctx) }",
+      "evidence": "scripts/email_worker.ts:1-90",
+      "dependsOn": [
+        "COMP-003"
+      ],
+      "usedBy": [
+        "FEAT-041"
+      ],
+      "dataAtRest": "none",
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "Deployed separately from the main Worker \u2014 it is an email handler, not an HTTP handler. postal-mime is MIT licensed."
+    },
+    {
+      "id": "COMP-026",
+      "name": "React error boundary",
+      "layer": "frontend",
+      "role": "Catches render errors in the component tree and shows a recoverable fallback instead of a blank page.",
+      "entry": "src/components/ErrorBoundary.jsx:1 export class ErrorBoundary",
+      "evidence": "src/components/ErrorBoundary.jsx:1-60, src/app.jsx:25 (import), src/app.jsx:1690 (wrap)",
+      "dependsOn": [
+        "COMP-006"
+      ],
+      "usedBy": [
+        "FEAT-042"
+      ],
+      "dataAtRest": "none",
+      "maturity": "adequate",
+      "risk": "low",
+      "notes": "The one thing a single-component crash must not take down is the whole app."
     }
   ],
   "dataFlow": [

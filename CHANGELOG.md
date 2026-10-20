@@ -9,6 +9,64 @@ Each tagged release on GitHub is generated from the matching section below by
 [`.github/workflows/release.yml`](.github/workflows/release.yml), so the
 changelog is the single source of truth for what a release contains.
 
+## [1.1.0] - 2026-10-20
+
+### Added
+
+- **Hackathon Tracker** — full CRUD over competitions with deadline countdowns,
+  prize display, platform badges, and status tracking.
+- **Policy-structure eligibility engine** — rules are stored as JSON per
+  hackathon, so a new hackathon needs no code change. Supports citizenship,
+  residency, and region (EU/EEA/Schengen/UK/US/Global) constraints, age
+  bounds, student-only, team size, and sponsor exclusions. Reports the
+  qualifying path, not just eligible/not eligible.
+- **Attachment system** — upload, list, download, and delete screenshots
+  against a ticket. Previews inline in a modal.
+- **Screenshot pipeline** — Playwright automation that visits competition
+  pages, captures full-page screenshots, and uploads them as attachments.
+- **Archive integration** — Wayback Machine CDX API adapter. Fetches archived
+  snapshots and extracts deadlines, prizes, and rules. No live-site scraping.
+- **Settings** — swappable storage backend (Cloudflare R2, Amazon S3, Azure
+  Blob Storage) with a connection test, plus profile, notification, and
+  email/IMAP configuration.
+- **Capacity planner and daily digest** — a weekly available-hours template
+  and a prioritised daily view: what fits today, what conflicts, what is due
+  this week, and how much capacity is left.
+- **JMAP email client** — RFC 8620/8621 support for JMAP-compatible servers.
+  JSON instead of MIME parsing, stateless, push-capable.
+- **Email inbox** — a Cloudflare Email Worker receives inbound mail, parses
+  it, and files it against the right ticket. Non-hackathon mail is forwarded
+  to the personal inbox.
+- **Design system** — tokens as JSON, a written specification, a reusable
+  component library, and a Storybook configuration.
+- **Error boundary, health check, rate limiting, and security headers** — a
+  crash in one component no longer blanks the app; the Worker answers
+  `GET /health`; requests are capped per IP; responses carry CSP and the
+  usual hardening headers.
+
+### Changed
+
+- Every SQL query that could throw on an empty result now uses an existence
+  check first, so the 404 branches actually run.
+- Delete handlers check for the row before deleting rather than reading a
+  property the SQL cursor does not have.
+- PATCH handlers validate that incoming values are strings or null before
+  binding them.
+- The view switcher uses a single `activeView` state, so exactly one of the
+  task, hackathon, archive, settings, and digest views renders at a time.
+- Route order puts the literal `/eligibility` and `/profile` paths ahead of
+  the `:id` pattern, which would otherwise shadow them.
+- Personal data in the seed file is anonymised, and the default profile ships
+  empty so nobody inherits someone else's citizenship or age.
+
+### Security
+
+- The seed file no longer contains a real person's citizenship, residency
+  status, or age.
+- Source docstrings no longer contain personal email addresses.
+- Screenshots and archived pages are stored per ticket; the inbox keeps
+  extracted metadata rather than raw mail.
+
 ## [Unreleased]
 
 ### Added
@@ -29,7 +87,7 @@ changelog is the single source of truth for what a release contains.
   page load), the Tailwind Play CDN, and the esm.sh importmap for
   react/react-dom/lucide-react in a single move. Those libraries are pinned
   npm packages bundled into `app.js`, so **no third-party script executes at
-  page view any more** — the only remaining external request is Google Fonts.
+  page view any more** â€” the only remaining external request is Google Fonts.
   It also removes the first-paint compile cost.
 - `docs/features.json`, `docs/architecture.json` and
   `docs/sbom.cyclonedx.json` were re-anchored to the new file layout: the
@@ -59,20 +117,20 @@ First tagged release. Everything below is new relative to "no releases at all".
 
 ### Added
 
-- **Todos** — create, update, complete, and delete tasks.
-- **Priorities** — `low`, `medium`, `high`, `urgent`, filterable.
-- **Tags and lists** — free-form tags stored as JSON per todo; lists are
+- **Todos** â€” create, update, complete, and delete tasks.
+- **Priorities** â€” `low`, `medium`, `high`, `urgent`, filterable.
+- **Tags and lists** â€” free-form tags stored as JSON per todo; lists are
   first-class rows with a colour and icon.
-- **Pinning** — pinned todos sort to the top ahead of every other criterion.
-- **Due dates** — todos sort by `due_date ASC` ahead of `created_at DESC`.
-- **Search** — substring search across title and description.
-- **Stats dashboard** — totals, completed, active, high-priority, due-today, and
+- **Pinning** â€” pinned todos sort to the top ahead of every other criterion.
+- **Due dates** â€” todos sort by `due_date ASC` ahead of `created_at DESC`.
+- **Search** â€” substring search across title and description.
+- **Stats dashboard** â€” totals, completed, active, high-priority, due-today, and
   pomodoro counts.
-- **Pomodoro tracking** — estimated and completed pomodoro counts per todo.
-- **Durable Object backend** — a single `App` Durable Object holding an embedded
+- **Pomodoro tracking** â€” estimated and completed pomodoro counts per todo.
+- **Durable Object backend** â€” a single `App` Durable Object holding an embedded
   SQLite database for persistent per-user state, exposed through a Hono REST API.
-- **Static front end** — a single-page app served as Workers static assets.
-- **Self-describing docs** — generated maturity checklist, feature and
+- **Static front end** â€” a single-page app served as Workers static assets.
+- **Self-describing docs** â€” generated maturity checklist, feature and
   architecture inventories, an SBOM, and a maintenance guide under `docs/`.
 
 ### Security

@@ -180,3 +180,13 @@ Because this repository already holds the history, the safe move is always: keep
 ## 📄 License
 
 MIT — see [`LICENSE`](LICENSE).
+
+## Third-party components
+
+`src/components/InboxPrimitives.jsx` and `src/lib/email.js` are derived
+from [cloudflare/agentic-inbox](https://github.com/cloudflare/agentic-inbox)
+(Apache-2.0). They are re-implemented against this project's own design
+tokens rather than importing that project's component library. See
+[NOTICE](NOTICE) for the full attribution and the statement of
+modifications, and `THIRD-PARTY-LICENSES/Apache-2.0.txt` for the licence
+text.

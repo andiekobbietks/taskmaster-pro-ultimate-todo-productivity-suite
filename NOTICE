@@ -1,0 +1,38 @@
+TaskMaster Pro
+Copyright (c) 2026 AndieKobbieTech
+
+This product includes software developed at Cloudflare, Inc.
+(https://github.com/cloudflare/agentic-inbox), licensed under the
+Apache License, Version 2.0.
+
+The following files in this repository contain work derived from
+cloudflare/agentic-inbox:
+
+  src/components/InboxPrimitives.jsx
+      The inbox split-view geometry, the accessible list-row pattern
+      (role="button" with tabIndex and Enter/Space activation), the
+      sender avatar, the unread indicator and the loading skeleton shapes
+      follow the corresponding components in that project.
+
+  src/lib/email.js
+      The date formatting, HTML-to-text stripping, snippet extraction and
+      byte formatting helpers follow app/lib/utils.ts and shared/dates.ts
+      in that project.
+
+Modifications made for TaskMaster Pro:
+
+  - The visual implementation was rewritten against the TaskMaster Pro
+    design tokens (brand palette, Inter typeface, neutral ramp) rather
+    than the @cloudflare/kumo component library.
+  - Icons were inlined as SVG rather than taken from
+    @phosphor-icons/react.
+  - Email bodies are rendered as plain text rather than in a sandboxed
+    iframe, so no HTML sanitiser is involved.
+  - Ticket matching, match-confidence display, the platform badge and the
+    processed toggle are TaskMaster Pro additions with no counterpart in
+    the original.
+  - The split-view panel width was kept at the original 380px.
+
+The original work is Copyright (c) 2026 Cloudflare, Inc. and is used
+under the Apache License, Version 2.0. A copy of that licence is
+included at THIRD-PARTY-LICENSES/Apache-2.0.txt.

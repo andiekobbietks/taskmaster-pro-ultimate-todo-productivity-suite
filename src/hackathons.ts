@@ -340,9 +340,9 @@ function getUserProfile(sql: any): UserProfile {
 
   // Get single
   app.get("/api/hackathons/:id", (c) => {
-    const row = sql.exec("SELECT * FROM hackathons WHERE id = ?", c.req.param("id")).one();
-    if (!row) return c.json({ error: "Not found" }, 404);
-    return c.json(rowToHackathon(row));
+    const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", c.req.param("id")).toArray();
+    if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    return c.json(rowToHackathon(rows[0]));
   });
 
   // Create
@@ -364,9 +364,9 @@ function getUserProfile(sql: any): UserProfile {
   app.patch("/api/hackathons/:id", async (c) => {
     const id = c.req.param("id");
     const data = await c.req.json();
-    const existing = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).one();
-    if (!existing) return c.json({ error: "Not found" }, 404);
-
+    const existingRows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
+    if (existingRows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
+    const existing = existingRows[0];
     const fieldMap: Record<string, string> = {
       name: "name", platform: "platform", url: "url", description: "description",
       prize: "prize", start_date: "start_date", end_date: "end_date",

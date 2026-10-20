@@ -67,6 +67,21 @@ changelog is the single source of truth for what a release contains.
 - Screenshots and archived pages are stored per ticket; the inbox keeps
   extracted metadata rather than raw mail.
 
+## [1.1.1] - 2026-10-20
+
+### Fixed
+
+- **`src/archive.ts` no longer breaks the Worker bundle.** The file opened with
+  a Python-style triple quote, which TypeScript reads as a string that never
+  closes, so `wrangler deploy --dry-run` failed and CI was red. It now opens
+  with a normal block comment.
+- A stray `import json` with no module specifier was removed from the same
+  file. It was dead code and a second parse error.
+- Twelve files carried mangled UTF-8 sequences, where an em dash had been
+  decoded as Windows-1252 and re-encoded. They now hold the original bytes.
+  This affects the changelog, the design system document, the design tokens,
+  and seven component files.
+
 ## [Unreleased]
 
 ### Added

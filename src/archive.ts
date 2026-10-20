@@ -1,20 +1,23 @@
-"""Archive integration module — fetch hackathon data from web archives.
+/**
+ * Archive integration module — fetch hackathon data from web archives.
+ * 
+ * Instead of scraping live sites (ToS issues, rate limits, maintenance burden),
+ * this module fetches from public web archives like the Wayback Machine.
+ * 
+ * Design:
+ * - Archive sources are configurable via settings API
+ * - Each source has a fetch function that returns archived HTML
+ * - HTML is parsed for hackathon metadata (deadlines, prizes, rules)
+ * - Archived snapshots are stored as attachments (immutable records)
+ * - Drift detection: compare archived vs current data
+ * 
+ * Supported sources:
+ * 1. Wayback Machine (web.archive.org) — free, no auth, CDX API
+ * 2. archive.today — free, limited API
+ * 3. Perma.cc — free tier, API key required
+ * 
+ */
 
-Instead of scraping live sites (ToS issues, rate limits, maintenance burden),
-this module fetches from public web archives like the Wayback Machine.
-
-Design:
-- Archive sources are configurable via settings API
-- Each source has a fetch function that returns archived HTML
-- HTML is parsed for hackathon metadata (deadlines, prizes, rules)
-- Archived snapshots are stored as attachments (immutable records)
-- Drift detection: compare archived vs current data
-
-Supported sources:
-  1. Wayback Machine (web.archive.org) — free, no auth, CDX API
-  2. archive.today — free, limited API
-  3. Perma.cc — free tier, API key required
-"""
 import { Hono } from "hono";
 import json
 

@@ -27,3 +27,6 @@ dist/
 # are large; the app holds the competitions that came out of them.
 captures/
 screenshots/
+
+# Local-only drafts - never publish (kept out after the 2aa2ab4 incident)
+docs/blog/

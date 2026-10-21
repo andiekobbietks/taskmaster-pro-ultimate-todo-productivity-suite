@@ -28,9 +28,14 @@ import {
  * @param {function} props.onSelect - Called when the row is activated
  * @param {function} props.onToggleProcessed - Called by the processed toggle
  * @param {function} props.onDelete - Called by the delete button
+ * @param {boolean} [props.isChecked] - Whether the row is ticked for bulk actions
+ * @param {function} [props.onToggleCheck] - When given, a checkbox is shown and
+ *   this is called with the email when it is ticked. The checkbox stops the
+ *   click and keypress from reaching the row, so ticking never opens the panel.
  */
 export function EmailListItem({
   email, isSelected, panelOpen, onSelect, onToggleProcessed, onDelete,
+  isChecked, onToggleCheck,
 }) {
   const snippet = getSnippetText(email.body_preview, 120);
   const linked = email.ticket_id;
@@ -57,6 +62,21 @@ export function EmailListItem({
         ? "bg-brand-50 dark:bg-brand-950/40"
         : "hover:bg-neutral-50 dark:hover:bg-neutral-800/50"}`}
     >
+      {/* Bulk-selection checkbox */}
+      {onToggleCheck && (
+        <div className="shrink-0 flex justify-center pt-1">
+          <input
+            type="checkbox"
+            checked={!!isChecked}
+            onChange={() => onToggleCheck(email)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            aria-label={`Select email: ${email.subject || "(no subject)"}`}
+            className="rounded border-neutral-300 dark:border-neutral-600 text-brand-600 focus:ring-brand-500/40 cursor-pointer"
+          />
+        </div>
+      )}
+
       {/* Unread dot */}
       <div className="w-2.5 shrink-0 flex justify-center pt-1.5">
         {!email.read && (

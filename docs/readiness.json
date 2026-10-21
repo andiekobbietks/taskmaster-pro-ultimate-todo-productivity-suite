@@ -2,7 +2,7 @@
   "schema": "readiness-state/1.0",
   "project": "taskmaster-pro",
   "version": "0.2.0-alpha",
-  "generated": "2026-10-20T21:16:06.968Z",
+  "generated": "2026-10-21T03:43:42.078Z",
   "sourceInventories": [
     "features.json",
     "architecture.json",

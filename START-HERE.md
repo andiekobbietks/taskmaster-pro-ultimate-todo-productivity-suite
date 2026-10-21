@@ -74,6 +74,13 @@ clears that folder first, so a renamed or dropped component does not leave a
 stale sample behind, and it skips the components that cover the viewport
 rather than cropping them.
 
+## Where the work goes next
+
+`docs/ROADMAP.md` holds the to-do list, ordered by your journey rather
+than by feature, split into Must / Should / Could / Won't, with the
+critical path marked. Each item names the file and the line, so the first
+move is an editor rather than a decision.
+
 ## Branches
 
 | Branch | What it is |

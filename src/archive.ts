@@ -19,7 +19,16 @@
  */
 
 import { Hono } from "hono";
-import { readWacz, findResponse, recordText } from "./wacz.ts";
+import { readWacz, findResponse, recordText, MAX_INFLATED_BYTES } from "./wacz.ts";
+
+/**
+ * The most a capture may be on the wire.
+ *
+ * The Durable Object is single-threaded: one large upload stalls every
+ * request the app serves. A real capture of a competition page is a few
+ * megabytes.
+ */
+const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
 
 /**
  * The page's own title, cleaned up.
@@ -208,16 +217,26 @@ export function registerArchiveRoutes(app: Hono, sql: any) {
       const file = form.get("file");
       targetUrl = String(form.get("url") || "");
       if (file instanceof File) {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          return c.json({ error: "The capture is larger than " + MAX_UPLOAD_BYTES + " bytes" }, 413);
+        }
         bytes = new Uint8Array(await file.arrayBuffer());
       }
     } else {
       // The raw file, with the URL in a header.
       targetUrl = c.req.header("x-target-url") || "";
+      const declared = parseInt(c.req.header("content-length") || "0", 10);
+      if (declared > MAX_UPLOAD_BYTES) {
+        return c.json({ error: "The capture is larger than " + MAX_UPLOAD_BYTES + " bytes" }, 413);
+      }
       bytes = new Uint8Array(await c.req.arrayBuffer());
     }
 
     if (!bytes || bytes.length === 0) {
       return c.json({ error: "No WACZ file was sent" }, 400);
+    }
+    if (bytes.length > MAX_UPLOAD_BYTES) {
+      return c.json({ error: "The capture is larger than " + MAX_UPLOAD_BYTES + " bytes" }, 413);
     }
 
     let archive;

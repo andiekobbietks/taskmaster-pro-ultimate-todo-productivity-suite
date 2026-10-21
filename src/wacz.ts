@@ -92,16 +92,61 @@ export async function readZipEntry(data: Uint8Array, entry: ZipEntry): Promise<U
   throw new Error("unsupported zip compression method " + entry.method);
 }
 
+/**
+ * The most a single entry may inflate to.
+ *
+ * A zip bomb is small on the wire and enormous once inflated. The Durable
+ * Object is single-threaded, so a runaway inflation stalls every request
+ * the app serves. 64 MB is far more than any real capture needs.
+ */
+export const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
+
+/**
+ * The most one WARC record's body may be.
+ */
+export const MAX_RECORD_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Read a stream, stopping at the limit.
+ *
+ * DecompressionStream has no ceiling of its own, so the bytes are read in
+ * chunks and the reader is cancelled as soon as the limit is passed.
+ */
+async function readCapped(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > limit) {
+        await reader.cancel();
+        throw new Error("the archive expands past " + limit + " bytes");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    try { reader.releaseLock(); } catch { /* already released */ }
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+  return out;
+}
+
 async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
   const stream = new Blob([data as unknown as BlobPart]).stream()
     .pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  return readCapped(stream, MAX_INFLATED_BYTES);
 }
 
 async function gunzip(data: Uint8Array): Promise<Uint8Array> {
   const stream = new Blob([data as unknown as BlobPart]).stream()
     .pipeThrough(new DecompressionStream("gzip"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  return readCapped(stream, MAX_INFLATED_BYTES);
 }
 
 // ── WACZ ──────────────────────────────────────────────────────────────
@@ -218,7 +263,13 @@ export function parseWarc(data: Uint8Array): WarcRecord[] {
     }
 
     const bodyStart = headerEnd.after;
-    const length = parseInt(headers["content-length"] || "0", 10);
+    // The record declares its own length. A record that declares a huge
+    // one is capped, and the cap is the length that is read.
+    const declared = parseInt(headers["content-length"] || "0", 10);
+    const length = Math.min(
+      Number.isNaN(declared) ? 0 : declared,
+      MAX_RECORD_BYTES
+    );
     const body = data.subarray(bodyStart, bodyStart + length);
 
     // The request line gives the URL and the method.

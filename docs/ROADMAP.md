@@ -246,6 +246,31 @@ Every sample is captured at one width.
 
 ---
 
+## The security findings
+
+`docs/THREAT-MODEL.md` is a STRIDE walk of the whole app, written
+2026-10-21. Seven findings. Two were fixed during the walk; five are open.
+
+| # | Finding | Severity | State |
+|---|---|---|---|
+| 1 | No authentication on any `/api/*` route | Critical | **open** |
+| 2 | No audit trail | High | **open** |
+| 3 | The capture runner does not validate the URL it is given | High | fixed 2026-10-21 |
+| 4 | Secrets are XOR-obfuscated, not encrypted | Medium | open |
+| 5 | The Durable Object is a single thread | Medium | open |
+| 6 | Captured pages and mail are untrusted input to an agent | Medium | open, inherent |
+| 7 | The rate limit is per IP, in one shared object | Low | open |
+
+**Finding 3 was not fully fixed.** The upload and the decompressed
+archive are now capped, but the runner still does not check the scheme
+or reject private address ranges. That is the next thing to do with it.
+
+**On Vault and Supabase:** neither is implemented, and neither should be.
+The threat note has the reasoning. The three things that should exist
+instead are Cloudflare Workers Secrets for the deployment secrets, Web
+Crypto for the per-user credentials at rest, and a token on the routes.
+The token is finding 1, and it is the only one that is critical.
+
 ## Dependency graph
 
 ```

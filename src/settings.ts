@@ -167,6 +167,23 @@ function deobfuscateSettings(settings: any): any {
 // ── Route registration ───────────────────────────────────────────────
 
 /**
+ * Read the whole settings object.
+ *
+ * The profile comes from the canonical table rather than the settings
+ * blob, so what the screen shows and what the eligibility engine reads
+ * are the same thing.
+ */
+export function readSettings(sql: any): any {
+  const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
+  const settings = rows.length > 0
+    ? parseJson(rows[0].value, DEFAULT_SETTINGS)
+    : { ...DEFAULT_SETTINGS };
+  const deobfuscated = deobfuscateSettings(settings);
+  deobfuscated.profile = readProfile(sql);
+  return deobfuscated;
+}
+
+/**
  * Register all settings-related API routes on the Hono app.
  *
  * Routes:
@@ -185,15 +202,7 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
   // --- Get all settings -----------------------------------------------
 
   app.get("/api/settings", (c) => {
-    const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
-    const settings = rows.length > 0
-      ? parseJson(rows[0].value, DEFAULT_SETTINGS)
-      : { ...DEFAULT_SETTINGS };
-    const deobfuscated = deobfuscateSettings(settings);
-    // The profile is authoritative in hackathon_profile — the table the
-    // eligibility engine reads. Return it from there, not from the blob.
-    deobfuscated.profile = readProfile(sql);
-    return c.json(deobfuscated);
+    return c.json(readSettings(sql));
   });
 
   // --- Update all settings --------------------------------------------

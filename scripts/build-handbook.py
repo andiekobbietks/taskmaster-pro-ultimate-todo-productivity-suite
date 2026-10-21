@@ -418,7 +418,7 @@ def main():
         ("Archive integration", "Wayback Machine adapter extracts deadlines, prizes and rules from archived pages.", "Reads competition pages without scraping live sites."),
         ("Capacity planner", "A weekly template of available hours.", "Turns a list of deadlines into a plan that fits the hours actually available."),
         ("Daily digest", "Today's tasks, conflicts, the week ahead, and the capacity left.", "One screen that answers 'what should I do today'."),
-        ("Settings", "Profile, notifications, email configuration, and a storage-backend credential test.", "One place for the settings that change how the app behaves. Note: the storage provider is tested, not yet used — attachments still go to SQLite."),
+        ("Settings", "Profile, notifications, mail configuration, and a storage-backend credential test.", "One place for the settings that change how the app behaves. The mail settings drive the hourly poll; the storage provider is tested, not yet used — attachments still go to SQLite."),
     ]
     rows = [["Module", "What it does", "Why it is there"]]
     for m in modules:
@@ -486,6 +486,7 @@ def main():
         ["", "GET /api/attachments/:id", "Download or preview an attachment"],
         ["", "DELETE /api/attachments/:id", "Delete an attachment"],
         ["Inbox", "POST /api/inbox", "Receive a parsed email and link it by content"],
+        ["", "POST /api/inbox/fetch", "Pull new mail from the configured server"],
         ["", "GET /api/inbox", "List, filter by unread or platform"],
         ["", "GET /api/inbox/stats", "Counts by read, processed and platform"],
         ["", "PATCH /api/inbox/:id", "Mark read, processed, or relink"],
@@ -533,6 +534,7 @@ def main():
         ["src/settings.ts", "Configurable settings, with sensitive values obfuscated at rest"],
         ["src/profile.ts", "The eligibility profile: one type, one default, read by both the engine and the Settings screen"],
         ["src/jmap.ts", "JMAP client for JMAP-compatible mail servers"],
+        ["src/mail.ts", "Mail ingestion: reads the configured server and hands the messages to the inbox"],
         ["src/app.jsx", "The whole front end — one file, compiled by esbuild"],
         ["src/components/", "Reusable interface components"],
         ["src/lib/", "Shared helpers: the API client, and email formatting"],
@@ -550,11 +552,11 @@ def main():
         ["No authentication — anyone with the URL has full read and write", "All routes", "Must not be deployed publicly without it. A token scheme is the first item of work before any paid offering."],
         ["Attachments stored as BLOBs in SQLite, with no object-storage path behind them", "src/attachments.ts", "Known gap. The provider setting only runs a credential test: there is no R2 binding in wrangler.json and nothing uploads. Moving attachments to R2 is a code change, not a setting change."],
         ["BLOBs share the Durable Object's 10GB ceiling with everything else", "src/index.ts", "Same fix. The storage path has to be written before it can be moved."],
-        ["The daily digest is computed when the Today view opens — nothing schedules it and nothing sends it", "src/capacity.ts", "Known gap. There is no cron trigger in wrangler.json, and the daily_digest and digest_time settings have no consumer."],
-        ["The digest treats every open hackathon as eligible", "src/capacity.ts", "The eligibility term in its score is a constant, so it never separates one hackathon from another. The eligibility engine exists; the digest does not call it."],
+        ["The daily digest is computed when the Today view opens — nothing sends it", "src/capacity.ts", "Known gap. There is now an hourly cron, but it polls mail rather than sending a digest. The daily_digest and digest_time settings still have no consumer."],
+        ["The digest ranks competitions but not your own tasks", "src/capacity.ts", "The digest never reads the todos table, so it cannot tell what is already committed. Its today_tasks field holds competitions, not tasks, which the heading in the Today view gets wrong."],
         ["Email body rendered as plain text, so rich email loses its formatting", "src/components/InboxPrimitives.jsx", "Deliberate. Injecting HTML would need a sanitiser; plain text has nothing to sanitise."],
         ["The seed fixtures contain example personal data", "seed/hackathons.json", "Anonymised to placeholder country codes. The real profile is supplied through the API."],
-        ["Mail credentials are stored but nothing reads them - no IMAP client exists, and src/jmap.ts is not wired to any route", "src/settings.ts, src/jmap.ts", "Known gap. The inbox is populated by POST /api/inbox. The settings and the JMAP client are in place; the ingestion route is the next piece of work."],
+        ["Only JMAP is supported, so the IMAP settings do nothing", "src/settings.ts, src/mail.ts", "Known gap. Mail is fetched over JMAP (RFC 8620) by an hourly cron, or by the Fetch mail now button. There is no IMAP client, so a Yahoo or Gmail user has to use a JMAP provider or keep forwarding mail to POST /api/inbox."],
     ]
     story.append(mk_table(risks, [150, 110, 170]))
 

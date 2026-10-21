@@ -345,6 +345,73 @@ export const MCP_TOOLS: McpTool[] = [
   ),
 
   tool(
+    "eligible_hackathons",
+    "The open competitions the user's profile makes them eligible for, with " +
+      "prize, deadline, qualification path and reasons.",
+    {
+      limit: z.number().optional().describe("How many. Default 20."),
+      featured_only: z.boolean().optional().describe("Only featured events."),
+    },
+    async (args, sql) => {
+      const profile = readProfile(sql);
+      const limit = Math.min(Number(args.limit) || 20, 200);
+      const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
+      const eligible = [];
+      for (const r of rows) {
+        if (args.featured_only && !r.featured) continue;
+        const rules = safeJson(r.eligibility_json) as EligibilityRules;
+        const v = evaluateEligibility(rules || ({} as any), profile);
+        if (!v.eligible) continue;
+        eligible.push({
+          id: r.id, name: r.name, prize: r.prize,
+          deadline: r.submission_deadline || r.end_date,
+          eligible: true,
+          qualification_path: v.qualification_path,
+          reasons: v.reasons,
+          displayed_location: r.displayed_location || "",
+          prizes_counts: r.prizes_counts || "",
+          featured: !!r.featured,
+        });
+      }
+      return JSON.stringify({ count: eligible.length, competitions: eligible.slice(0, limit) }, null, 2);
+    }
+  ),
+
+  tool(
+    "upcoming_hackathons",
+    "The open competitions closing soon, ordered by deadline, with prize, " +
+      "location, featured flag and time left.",
+    {
+      days: z.number().optional().describe("Within how many days. Default 14."),
+      featured_only: z.boolean().optional().describe("Only featured events."),
+    },
+    async (args, sql) => {
+      const profile = readProfile(sql);
+      const days = Math.min(Number(args.days) || 14, 90);
+      const cutoff = Date.now() + days * 86400000;
+      const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
+      const upcoming = [];
+      for (const r of rows) {
+        const dl = r.submission_deadline || r.end_date || r.start_date;
+        if (!dl) continue;
+        const ts = new Date(String(dl)).getTime();
+        if (ts > cutoff) continue;
+        if (args.featured_only && !r.featured) continue;
+        upcoming.push({
+          id: r.id, name: r.name, prize: r.prize,
+          deadline: String(dl).slice(0, 10),
+          displayed_location: r.displayed_location || "",
+          prizes_counts: r.prizes_counts || "",
+          featured: !!r.featured,
+          time_left_to_submission: r.time_left_to_submission ?? null,
+        });
+      }
+      upcoming.sort((a, b) => (new Date(a.deadline).getTime() - new Date(b.deadline).getTime()));
+      return JSON.stringify({ count: upcoming.length, competitions: upcoming }, null, 2);
+    }
+  ),
+
+  tool(
     "get_settings",
     "The settings, with the sensitive values masked. The profile is the one " +
       "the eligibility engine reads.",

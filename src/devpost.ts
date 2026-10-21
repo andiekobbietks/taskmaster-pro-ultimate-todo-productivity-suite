@@ -124,6 +124,15 @@ export async function fetchDevpostPage(
     url: String(h.url ?? ""),
     open_state: String(h.open_state ?? "open"),
     prize_amount: plainPrize(h.prize_amount),
+    // Batch 1: the four fields that were being dropped on the floor.
+    // Without them the prize, location and deadline filters cannot
+    // answer anything except "unknown".
+    displayed_location: String(h.displayed_location?.location ?? ""),
+    prizes_counts: plainPrize(h.prizes_counts),
+    time_left_to_submission: Number.isFinite(Number(h.time_left_to_submission))
+      ? Number(h.time_left_to_submission)
+      : null,
+    featured: Boolean(h.featured),
     themes: Array.isArray(h.themes) ? h.themes : [],
     submissions: Number(h.registrations_count) || 0,
     tagged: String(h.organization_name ?? ""),
@@ -202,24 +211,32 @@ export async function ingestDevpost(
       if (existing.length > 0) {
         sql.exec(
           `UPDATE hackathons SET name=?, url=?, prize=?, start_date=?, end_date=?,
-           submission_deadline=?, eligibility_json=?, status=?, notes=?, updated_at=?
-           WHERE id=?`,
+           submission_deadline=?, eligibility_json=?, status=?, notes=?,
+           displayed_location=?, prizes_counts=?, time_left_to_submission=?,
+           featured=?, updated_at=? WHERE id=?`,
           h.title, h.url, h.prize_amount, dates.start, dates.end,
           dates.end, JSON.stringify(eligibility),
-          h.open_state === "open" ? "open" : h.open_state, notes, ts, id
+          h.open_state === "open" ? "open" : h.open_state, notes,
+          String(h.displayed_location?.location ?? ""), plainPrize(h.prizes_counts),
+          Number.isFinite(Number(h.time_left_to_submission)) ? Number(h.time_left_to_submission) : null,
+          Boolean(h.featured) ? 1 : 0, ts, id
         ).toArray();
         updated++;
       } else {
         sql.exec(
           `INSERT INTO hackathons (id, name, platform, url, description, prize,
            start_date, end_date, registration_deadline, submission_deadline,
-           eligibility_json, status, notes, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           eligibility_json, status, notes, displayed_location, prizes_counts,
+           time_left_to_submission, featured, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           id, h.title, "devpost", h.url,
           "Imported from the Devpost listing API", h.prize_amount,
           dates.start, dates.end, dates.start, dates.end,
           JSON.stringify(eligibility),
-          h.open_state === "open" ? "open" : h.open_state, notes, ts, ts
+          h.open_state === "open" ? "open" : h.open_state, notes,
+          String(h.displayed_location?.location ?? ""), plainPrize(h.prizes_counts),
+          Number.isFinite(Number(h.time_left_to_submission)) ? Number(h.time_left_to_submission) : null,
+          Boolean(h.featured) ? 1 : 0, ts, ts
         ).toArray();
         imported++;
       }

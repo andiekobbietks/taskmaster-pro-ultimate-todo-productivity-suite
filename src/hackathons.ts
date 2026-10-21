@@ -76,6 +76,17 @@ export interface Hackathon {
   notes: string;
   created_at: number;
   updated_at: number;
+  // ── Batch 1: the four Devpost fields that were being dropped ──────
+  // These are what make the prize, location and deadline filters
+  // answerable instead of returning "unknown".
+  /** Where the event says it is held, e.g. "Dublin, Ireland". */
+  displayed_location: string;
+  /** The prize breakdown as the organiser wrote it, e.g. "$5,000 in prizes". */
+  prizes_counts: string;
+  /** Hours until the submission deadline, as Devpost counted it. Null when unknown. */
+  time_left_to_submission: number | null;
+  /** Whether Devpost marks the event as featured. */
+  featured: boolean;
 }
 
 // ── Eligibility engine ───────────────────────────────────────────────
@@ -242,6 +253,12 @@ function rowToHackathon(r: any): Hackathon {
     submission_deadline: r.submission_deadline,
     eligibility: parseJson(r.eligibility_json, {}),
     status: r.status, notes: r.notes,
+    displayed_location: String(r.displayed_location || ""),
+    prizes_counts: String(r.prizes_counts || ""),
+    time_left_to_submission: r.time_left_to_submission === null || r.time_left_to_submission === undefined
+      ? null
+      : Number(r.time_left_to_submission),
+    featured: !!r.featured,
     created_at: r.created_at, updated_at: r.updated_at,
   };
 }
@@ -273,10 +290,14 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
   app.get("/api/hackathons", (c) => {
     const status = c.req.query("status");
     const search = c.req.query("search");
+    const featured = c.req.query("featured");
+    const location = c.req.query("location");
     let query = "SELECT * FROM hackathons WHERE 1=1";
     const params: any[] = [];
     if (status && status !== "all") { query += " AND status = ?"; params.push(status); }
-    if (search) { query += " AND (name LIKE ? OR description LIKE ?)"; params.push(`%${search}%`, `%${search}%`); }
+    if (search) { query += " AND (name LIKE ? OR description LIKE ? OR displayed_location LIKE ?)"; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+    if (featured === "1" || featured === "true") { query += " AND featured = 1"; }
+    if (location) { query += " AND displayed_location LIKE ?"; params.push(`%${location}%`); }
     query += " ORDER BY COALESCE(submission_deadline, end_date, start_date) ASC";
     const rows = sql.exec(query, ...params).toArray();
     return c.json(rows.map(rowToHackathon));
@@ -345,8 +366,10 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
     const id = `hack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const ts = now();
     sql.exec(
-      `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      id, data.name.trim(), data.platform || "manual", data.url || "", data.description || "", data.prize || "", data.start_date || null, data.end_date || null, data.registration_deadline || null, data.submission_deadline || null, JSON.stringify(data.eligibility || {}), data.status || "open", data.notes || "", ts, ts
+      `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, displayed_location, prizes_counts, time_left_to_submission, featured, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      id, data.name.trim(), data.platform || "manual", data.url || "", data.description || "", data.prize || "", data.start_date || null, data.end_date || null, data.registration_deadline || null, data.submission_deadline || null, JSON.stringify(data.eligibility || {}), data.status || "open", data.notes || "",
+      String(data.displayed_location || ""), String(data.prizes_counts || data.prize || ""),
+      data.time_left_to_submission ?? null, data.featured ? 1 : 0, ts, ts
     ).toArray();
     const rows = sql.exec("SELECT * FROM hackathons WHERE id = ?", id).toArray();
     if (rows.length === 0) return c.json({ error: "Hackathon not found" }, 404);
@@ -365,6 +388,8 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
       prize: "prize", start_date: "start_date", end_date: "end_date",
       registration_deadline: "registration_deadline", submission_deadline: "submission_deadline",
       status: "status", notes: "notes",
+      displayed_location: "displayed_location", prizes_counts: "prizes_counts",
+      time_left_to_submission: "time_left_to_submission", featured: "featured",
     };
     const sets: string[] = [];
     const params: any[] = [];

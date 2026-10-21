@@ -93,6 +93,11 @@ you type it.
 
 ## Capturing a competition page as a WACZ
 
+A capture records the traffic that made a page, not a picture of it, so
+the API calls survive with it. The archive lands in `captures/`, and the
+app reads it, extracts the deadline, prize and rules, and keeps the raw
+HTML for the compiler pipeline.
+
 ```powershell
 pip install warcio                                  # to validate the result
 python scripts/capture-wacz.py --url https://devpost.com/hackathons/your-hackathon --name "Your Hackathon"
@@ -103,6 +108,12 @@ there, with no configuration file of your own:
 
 ```powershell
 python scripts/capture-wacz.py --from-app
+```
+
+To check an archive without the app:
+
+```powershell
+python scripts/validate-wacz.py captures/Your-Hackathon.wacz
 ```
 
 ### Driving the capture without running anything
@@ -121,19 +132,8 @@ five tools:
 
 So the capture can be driven by an agent rather than by a script you
 remember to run. It needs the app running on port 8787. The server lives
-in `~/.config/opencode/mcp/taskmaster-capture/`, and it takes
-\`TM_API\` and \`TM_REPO\` from the environment.
-
-That records the page's traffic into a WACZ and posts it to
-`POST /api/archive/wacz`, where the app reads it, extracts the deadline,
-prize and rules, and keeps the raw HTML for the compiler pipeline. The
-archive lands in `captures/`.
-
-To check an archive without the app:
-
-```powershell
-python scripts/validate-wacz.py captures/Your-Hackathon.wacz
-```
+in `~/.config/opencode/mcp/taskmaster-capture/`, and it takes `TM_API`
+and `TM_REPO` from the environment.
 
 ## Where the work goes next
 

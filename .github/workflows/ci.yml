@@ -182,6 +182,22 @@ jobs:
           TM_SHOTS: ${{ runner.temp }}/tm-screenshots
         run: python scripts/verify-ui.py
 
+      # The capture side of the archive route: record a page as a WACZ and
+      # check it with warcio, which is not the code that wrote it. If warcio
+      # can read the archive, the WARC is well formed enough for pywb and
+      # the rest of the webrecorder tooling.
+      - name: Install warcio
+        run: pip install warcio
+
+      - name: Capture a page as a WACZ and validate it
+        run: |
+          python scripts/capture-wacz.py \
+            --url "http://127.0.0.1:8821/" \
+            --name "CI Capture" \
+            --output-dir "$RUNNER_TEMP/captures" \
+            --dry-run
+          python scripts/validate-wacz.py "$RUNNER_TEMP/captures/CI-Capture.wacz"
+
       - name: Stop the mock API
         if: always()
         run: kill "$SERVER_PID" || true

@@ -38,8 +38,8 @@ this environment.
 There are two more checks you can run:
 
 ```powershell
-node --experimental-strip-types scripts/test-bugfixes.mjs   # 30 checks on the repaired routes
-python scripts/verify-ui.py                                 # 19 checks in a real browser
+node --experimental-strip-types scripts/test-bugfixes.mjs   # 90 route checks
+python scripts/verify-ui.py                                 # 22 checks in a real browser
 ```
 
 `verify-ui.py` needs a server on port 8821 (`npm run storybook:serve`) and
@@ -74,6 +74,24 @@ The capture scripts publish into `docs/samples` and `docs/samples/views`.
 They clear those folders first, so a renamed or dropped component does not
 leave a stale sample behind, and they skip the components that cover the
 viewport rather than cropping them.
+
+## Capturing a competition page as a WACZ
+
+```powershell
+pip install warcio                                  # to validate the result
+python scripts/capture-wacz.py --url https://devpost.com/hackathons/your-hackathon --name "Your Hackathon"
+```
+
+That records the page's traffic into a WACZ and posts it to
+`POST /api/archive/wacz`, where the app reads it, extracts the deadline,
+prize and rules, and keeps the raw HTML for the compiler pipeline. The
+archive lands in `captures/`.
+
+To check an archive without the app:
+
+```powershell
+python scripts/validate-wacz.py captures/Your-Hackathon.wacz
+```
 
 ## Where the work goes next
 

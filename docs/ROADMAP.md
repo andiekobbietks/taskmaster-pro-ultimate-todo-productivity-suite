@@ -87,22 +87,33 @@ Broken chain, or no safety net. In critical-path order.
 The journey works but is manual, or the product is incomplete for the
 person it is for.
 
-### S1 — Make bulk capture real — PART DONE
+### S1 — Make bulk capture real — DONE
 
-The capture side is done: `src/wacz.ts` reads a WACZ archive and
-`POST /api/archive/wacz` ingests one, extracting the same fields the
-Wayback route does and returning the raw HTML so the compiler can work
-from it. Eighteen checks run against a real WACZ in
-`scripts/fixtures/sample-capture.wacz`.
+**The capture side is done too.** `scripts/capture-wacz.py` drives
+Playwright, records every response the page makes, writes a WARC, and
+packages it as a WACZ. It then posts the archive to
+`POST /api/archive/wacz`.
 
-**The capture side is not done.** Nothing yet produces a WACZ. The
-screenshot pipeline records a picture; a WACZ needs the network traffic.
-Two ways, neither of them needs the Wayback Machine:
+| Piece | Where |
+|---|---|
+| The WACZ reader | `src/wacz.ts` |
+| The ingest route | `POST /api/archive/wacz` in `src/archive.ts` |
+| The capture | `scripts/capture-wacz.py` |
+| The validator | `scripts/validate-wacz.py` |
+| A real WACZ to test against | `scripts/fixtures/sample-capture.wacz` |
 
-| Way | What it needs | Note |
-|---|---|---|
-| **Record the network with Playwright** | `warcio` from PyPI, one small package | The screenshot pipeline already drives Playwright. Listen to the response events, write a WARC, zip it as a WACZ. |
-| **`@harvard-lil/scoop`** | One npm package | A service worker injected into the page that records the traffic itself. |
+The capture records the same-origin traffic by default, so a capture holds
+the page and its assets rather than the analytics and font hosts the page
+happened to call. `--allow-external` turns that off.
+
+CI captures a page and checks the archive with **warcio**, which is not
+the code that wrote it. If warcio can read the archive, the WARC is well
+formed enough for pywb and the rest of the webrecorder tooling.
+
+**Still not done:** `scripts/sync-hackathons.mjs:22` has all three sources
+set to `enabled: false` — Devpost, MLH and lablab. That is a separate
+problem from the format, and the answer to it is still "pick one
+platform".
 
 The WACZ format, from the Webrecorder specification 1.1.1:
 

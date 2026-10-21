@@ -9,6 +9,8 @@
  * - Prioritization: urgency × prize × eligibility, sorted by score
  */
 import { Hono } from "hono";
+import { evaluateEligibility, type EligibilityRules } from "./hackathons.ts";
+import { readProfile, type UserProfile } from "./profile.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -185,19 +187,19 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
       eligibility_json: r.eligibility_json,
     }));
 
-    // Get user profile
-    let profile = null;
-    try {
-      const prows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
-    const prow = prows.length > 0 ? prows[0] : null;
-      if (prow?.profile_json) profile = parseJson(prow.profile_json, null);
-    } catch {}
+    // Get user profile. The canonical table, so the digest and the
+    // Settings screen cannot disagree about who you are.
+    const profile: UserProfile = readProfile(sql);
 
     // Evaluate eligibility and calculate scores
     const scored = hackathons.map((h: any) => {
       const deadline = h.submission_deadline || h.end_date;
       const daysLeft = daysUntil(deadline);
-      const eligible = true; // Simplified — full eligibility check would use the engine
+      // The same engine the eligibility route uses, so the plan and the
+      // badge on the competition card can never disagree.
+      const rules = parseJson(h.eligibility_json, {}) as EligibilityRules;
+      const verdict = evaluateEligibility(rules, profile);
+      const eligible = verdict.eligible;
       const estHours = estimateHours(h.platform, h.name);
       const prizeNorm = normalizePrize(h.prize);
       const urgency = daysLeft <= 0 ? 1.0 : Math.min(1.0, 1.0 / daysLeft);
@@ -213,7 +215,8 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
         estimated_hours: estHours,
         priority_score: Math.round(score * 100) / 100,
         eligible,
-        qualification_path: "eligible (no restrictions)",
+        qualification_path: verdict.qualification_path,
+        reasons: verdict.reasons,
       };
     });
 
@@ -316,13 +319,18 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
 
   app.get("/api/digest/priority", (c) => {
     const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
+    const profile: UserProfile = readProfile(sql);
     const scored = rows.map((r: any) => {
       const deadline = r.submission_deadline || r.end_date;
       const daysLeft = daysUntil(deadline);
       const estHours = estimateHours(r.platform, r.name);
       const prizeNorm = normalizePrize(r.prize);
       const urgency = daysLeft <= 0 ? 1.0 : Math.min(1.0, 1.0 / daysLeft);
-      const score = (urgency * 0.4) + (prizeNorm * 0.3) + 0.3; // eligible bonus
+      // The same engine the eligibility route uses. This used to add a flat
+      // 0.3 "eligible bonus" to every competition regardless of eligibility.
+      const rules = parseJson(r.eligibility_json, {}) as EligibilityRules;
+      const verdict = evaluateEligibility(rules, profile);
+      const score = (urgency * 0.4) + (prizeNorm * 0.3) + (verdict.eligible ? 0.3 : 0.0);
       return {
         id: r.id,
         name: r.name,
@@ -332,6 +340,9 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
         days_remaining: daysLeft,
         estimated_hours: estHours,
         priority_score: Math.round(score * 100) / 100,
+        eligible: verdict.eligible,
+        qualification_path: verdict.qualification_path,
+        reasons: verdict.reasons,
       };
     });
     scored.sort((a: any, b: any) => b.priority_score - a.priority_score);

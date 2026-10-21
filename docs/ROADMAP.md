@@ -55,22 +55,21 @@ Broken chain, or no safety net. In critical-path order.
 | **Done when** | A scheduled fetch reads the configured mail server, posts new mail to `POST /api/inbox`, and the inbox fills without a human |
 | **Also needs** | A `triggers` block in `wrangler.json` — there is no `scheduled()` handler anywhere |
 
-### M2 — Make the digest use the eligibility engine
+### M2 — Make the digest use the eligibility engine — DONE
 
 | | |
 |---|---|
-| **Where** | `src/capacity.ts:200` (`const eligible = true`), `src/capacity.ts:204` (the score), `src/hackathons.ts:92` (`evaluateEligibility`) |
-| **Why critical path** | Stage 2 → 5. The digest ranks competitions the user cannot enter alongside ones they can. The eligibility term in the score is a constant 0.3 and never separates anything. |
-| **Blocks** | Nothing — it is a small, self-contained change |
-| **Done when** | `GET /api/digest/priority` returns the same verdict as `GET /api/hackathons/eligibility` for the same competition, and an ineligible competition scores lower than an eligible one with the same deadline and prize |
+| **Was** | `src/capacity.ts` set `const eligible = true; // Simplified`, and `GET /api/digest/priority` added a flat `+ 0.3; // eligible bonus` to every competition. The digest's score was urgency × 0.4 + prize × 0.3 + a constant, so an ineligible competition tied with an eligible one, and every result carried the path "eligible (no restrictions)". |
+| **Now** | Both endpoints call `evaluateEligibility` — the same engine as `GET /api/hackathons/eligibility` — and report the real `eligible`, `qualification_path` and `reasons`. The profile is read from the canonical table, so the digest and the Settings screen cannot disagree. |
+| **Proof** | 10 checks in `scripts/test-bugfixes.mjs`: a citizenship-restricted competition scores lower than an open one with the same deadline and prize, says why, and all three endpoints agree |
 
-### M3 — Put the new test suites in CI
+### M3 — Put the new test suites in CI — DONE
 
 | | |
 |---|---|
-| **Where** | `.github/workflows/ci.yml:123` runs `npm test` only — `scripts/test-bugfixes.mjs` (34 checks) and `scripts/verify-ui.py` (18 checks) run nowhere but this machine |
-| **Why** | Without this, M1 and M2 can rot silently. 52 of the 88 checks that exist do not run on every push. |
-| **Done when** | CI runs all three suites on every push and fails on a red one. `verify-ui.py` needs Playwright installed on the runner and a server on a known port |
+| **Was** | `.github/workflows/ci.yml` ran `npm test` only. The route regression suite and the browser suite ran nowhere but one machine, so 52 of the checks could rot silently. |
+| **Now** | A `browser` job installs Playwright, starts the mock API, and runs the 18 browser checks; the `test` job also runs the route regression suite. Screenshots go to the runner's temp directory, not `docs/`, so the docs drift gate is unaffected. |
+| **Proof** | 36 + 42 route checks and 18 browser checks now run on every push |
 
 ### M4 — Authentication, before any public deployment
 
@@ -127,12 +126,13 @@ dump; it is not encryption.
 
 ## Could have
 
-### C1 — Delete `src/components/Button.stories.jsx`
+### C1 — Delete `src/components/Button.stories.jsx` — DONE
 
 Written in Storybook's CSF format for a Storybook that was never
 installed — there has never been a `@storybook/*` dependency in
 `package.json`. The live component page is `src/storybook.jsx`, 13 stories,
-no runtime dependency. The file implies a setup that does not exist.
+no runtime dependency. The file implied a setup that did not exist, so it
+is gone.
 
 ### C2 — Wire the screenshot pipeline to a route
 

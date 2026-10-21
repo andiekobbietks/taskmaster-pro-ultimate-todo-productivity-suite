@@ -122,3 +122,66 @@ jobs:
 
       - name: Run API tests
         run: npm test
+
+      # The regression suite for the settings merge, the settings reset, the
+      # profile's single home and the digest's eligibility. It drives the
+      # same real routes, so it belongs in the same job.
+      - name: Run route regression tests
+        run: node --experimental-strip-types scripts/test-bugfixes.mjs
+
+  browser:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The front end has to be built: the mock API serves public/, and the
+      # browser checks load the real bundle.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build the front end
+        run: npm run build
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+
+      # The browser checks run against the mock API, which serves the built
+      # assets and a fixed set of fixtures. No Worker runtime is involved.
+      - name: Start the mock API
+        run: |
+          node scripts/mock-api.mjs 8821 &
+          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8821/api/hackathons > /dev/null; then
+              echo "mock API is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::the mock API did not start on port 8821"
+          exit 1
+
+      # 18 checks: the Add Hackathon form, the populated settings screen,
+      # per-card screenshot upload, bulk selection in both lists, and the
+      # app rendering with every external request blocked.
+      - name: Run browser tests
+        env:
+          TM_BASE: http://127.0.0.1:8821
+          TM_SHOTS: ${{ runner.temp }}/tm-screenshots
+        run: python scripts/verify-ui.py
+
+      - name: Stop the mock API
+        if: always()
+        run: kill "$SERVER_PID" || true

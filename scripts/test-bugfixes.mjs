@@ -250,6 +250,73 @@ console.log("\n=== 7. Reset clears the canonical profile too ===");
     settings.profile.age + " vs " + after.age);
 }
 
+
+console.log("\n=== 8. The digest uses the real eligibility engine ===");
+{
+  // Profile: Italian citizen, living in the UK, 25.
+  await call("PUT", "/api/settings/profile", {
+    citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
+    age: 25, is_student: false, team_size: 1, employed_by_sponsor: false,
+  });
+
+  // Two competitions with the same deadline and the same prize. One is open
+  // to everyone; one needs a German passport.
+  // A deadline five days out, so both competitions reach the week view.
+  const soon = new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+
+  const mk = async (name, eligibility) => {
+    const r = await call("POST", "/api/hackathons", {
+      name, platform: "devpost", prize: "$10,000",
+      start_date: soon, end_date: soon,
+      submission_deadline: soon,
+      eligibility,
+    });
+    return (await r.json()).id;
+  };
+
+  const openId = await mk("Open To Everyone", {
+    eligibility_type: "unrestricted", regions: ["Global"], age_min: 13,
+  });
+  // REGIONS has no "DE" key, so this rule matches neither citizenship nor
+  // region for an Italian citizen living in the UK.
+  const germanId = await mk("German Passport Only", {
+    eligibility_type: "citizenship", citizenships: ["DE"], regions: ["DE"], age_min: 13,
+  });
+
+  const priority = await (await call("GET", "/api/digest/priority")).json();
+  const open = priority.find((p) => p.id === openId);
+  const german = priority.find((p) => p.id === germanId);
+
+  check("the digest lists both competitions", !!open && !!german);
+  check("the open one is eligible", open && open.eligible === true,
+        open ? open.qualification_path : "missing");
+  check("the German-only one is not eligible", german && german.eligible === false,
+        german ? JSON.stringify(german.reasons) : "missing");
+  check("the ineligible one says why",
+        german && Array.isArray(german.reasons) && german.reasons.length > 0,
+        german ? String(german.reasons && german.reasons[0]).slice(0, 60) : "missing");
+  check("the ineligible one scores lower",
+        german && open && german.priority_score < open.priority_score,
+        german && open ? german.priority_score + " vs " + open.priority_score : "missing");
+  check("the path is not the hardcoded string",
+        german && german.qualification_path !== "eligible (no restrictions)",
+        german ? german.qualification_path : "missing");
+
+  // The digest's own endpoint must agree with the priority endpoint.
+  const digest = await (await call("GET", "/api/digest")).json();
+  const digestUpcoming = (digest.upcoming_this_week || []).find((u) => u.hackathon_id === germanId);
+  check("the digest agrees the German-only one is not eligible",
+        digestUpcoming && digestUpcoming.eligible === false,
+        digestUpcoming ? String(digestUpcoming.eligible) : "not in the week");
+
+  // And the eligibility route must agree with both.
+  const elig = await (await call("GET", "/api/hackathons/eligibility")).json();
+  const eligGerman = elig.find((e) => e.hackathon && e.hackathon.id === germanId);
+  check("the eligibility route agrees too",
+        eligGerman && eligGerman.eligible === false,
+        eligGerman ? String(eligGerman.eligible) : "missing");
+}
+
 console.log("\n" + "=".repeat(60));
 console.log(`RESULT: ${pass} passed, ${fail} failed`);
 for (const f of failures) console.log("  FAILED: " + f);

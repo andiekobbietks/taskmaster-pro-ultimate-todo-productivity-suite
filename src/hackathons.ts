@@ -379,7 +379,8 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
   app.delete("/api/hackathons/:id", (c) => {
     const before = sql.exec("SELECT id FROM hackathons WHERE id = ?", c.req.param("id")).toArray();
     if (before.length === 0) return c.json({ error: "Hackathon not found" }, 404);
-    sql.exec("DELETE FROM hackathons WHERE id = ?", c.req.param("id"));
+    sql.exec("DELETE FROM hackathons WHERE id = ?", c.req.param("id")).toArray();
+    return c.json({ success: true });
   });
 }
 

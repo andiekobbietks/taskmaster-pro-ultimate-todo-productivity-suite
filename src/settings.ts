@@ -28,6 +28,10 @@ export interface Settings {
     imap_port: number;
     imap_user: string;
     imap_password: string;
+    // JMAP (RFC 8620) — the alternative to IMAP. See src/jmap.ts.
+    jmap_server_url: string;
+    jmap_username: string;
+    jmap_password: string;
   };
   notifications: {
     daily_digest: boolean;
@@ -62,6 +66,9 @@ const DEFAULT_SETTINGS: Settings = {
     imap_port: 993,
     imap_user: "",
     imap_password: "",
+    jmap_server_url: "",
+    jmap_username: "",
+    jmap_password: "",
   },
   notifications: {
     daily_digest: true,
@@ -81,6 +88,27 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+
+/**
+ * Merge a partial settings update into the stored settings.
+ *
+ * The Settings screen PUTs one section at a time, so a shallow spread
+ * over the defaults would wipe every section the request did not name.
+ * Merge per section and per key instead, against what is stored.
+ */
+function mergeSettings(stored: any, incoming: any): any {
+  const merged: any = { ...stored };
+  for (const key of Object.keys(incoming || {})) {
+    const value = incoming[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      merged[key] = { ...(stored[key] || {}), ...value };
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
 
 function now(): number { return Date.now(); }
 
@@ -119,7 +147,7 @@ function deobfuscate(value: string): string {
 
 // Fields that should be obfuscated in storage
 const SENSITIVE_FIELDS = new Set([
-  "imap_password", "azure_sas_token", "s3_secret_key",
+  "imap_password", "jmap_password", "azure_sas_token", "s3_secret_key",
 ]);
 
 function obfuscateSettings(settings: any): any {
@@ -166,24 +194,80 @@ function deobfuscateSettings(settings: any): any {
  * @param app - Hono application instance
  * @param sql - SQLite storage interface from Durable Object
  */
+
+/**
+ * Write the eligibility profile to its canonical home.
+ *
+ * The profile lives in the `hackathon_profile` table because that is what
+ * the eligibility engine reads (src/hackathons.ts). The settings blob
+ * keeps a copy so the Settings screen can render it, but the table is
+ * authoritative. Writing either place updates both, so the two can never
+ * drift apart.
+ */
+function writeProfile(sql: any, profile: any) {
+  const json = JSON.stringify(profile);
+  sql.exec(
+    `INSERT INTO hackathon_profile (id, profile_json, updated_at) VALUES ('default', ?, ?)
+     ON CONFLICT(id) DO UPDATE SET profile_json = ?, updated_at = ?`,
+    json, now(), json, now()
+  ).toArray();
+}
+
+/**
+ * Read the eligibility profile from its canonical home.
+ */
+function readProfile(sql: any): any {
+  const rows = sql
+    .exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'")
+    .toArray();
+  if (rows.length > 0 && rows[0].profile_json) {
+    try {
+      return JSON.parse(rows[0].profile_json);
+    } catch {
+      // fall through to the defaults
+    }
+  }
+  return { ...DEFAULT_SETTINGS.profile };
+}
+
 export function registerSettingsRoutes(app: Hono, sql: any) {
   // --- Get all settings -----------------------------------------------
 
   app.get("/api/settings", (c) => {
     const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
-    if (rows.length === 0) {
-      // First run — return defaults
-      return c.json(DEFAULT_SETTINGS);
-    }
-    const settings = parseJson(row.value, DEFAULT_SETTINGS);
-    return c.json(deobfuscateSettings(settings));
+    const settings = rows.length > 0
+      ? parseJson(rows[0].value, DEFAULT_SETTINGS)
+      : { ...DEFAULT_SETTINGS };
+    const deobfuscated = deobfuscateSettings(settings);
+    // The profile is authoritative in hackathon_profile — the table the
+    // eligibility engine reads. Return it from there, not from the blob.
+    deobfuscated.profile = readProfile(sql);
+    return c.json(deobfuscated);
   });
 
   // --- Update all settings --------------------------------------------
 
   app.put("/api/settings", async (c) => {
     const data = await c.req.json();
-    const settings = { ...DEFAULT_SETTINGS, ...data };
+
+    // Start from what is stored, not from the defaults — otherwise a
+    // one-section update resets every other section.
+    const storedRows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
+    const stored = storedRows.length > 0
+      ? deobfuscateSettings(parseJson(storedRows[0].value, DEFAULT_SETTINGS))
+      : { ...DEFAULT_SETTINGS };
+
+    const settings = mergeSettings(stored, data);
+
+    // If a profile came in, it wins and is written to the canonical table.
+    // Merge it against the stored profile first — the Settings screen sends
+    // one field at a time, and writing the partial profile straight to the
+    // table would drop the fields it did not mention.
+    if (data.profile) {
+      const mergedProfile = mergeSettings(readProfile(sql), data.profile);
+      writeProfile(sql, mergedProfile);
+      settings.profile = mergedProfile;
+    }
     const obfuscated = obfuscateSettings(settings);
 
     sql.exec(
@@ -192,7 +276,10 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
       JSON.stringify(obfuscated), now(), JSON.stringify(obfuscated), now()
     ).toArray();
 
-    return c.json(settings);
+    // Return the merged view, with the profile read from its canonical table.
+    const result = { ...settings };
+    result.profile = readProfile(sql);
+    return c.json(result);
   });
 
   // --- Get a specific section -----------------------------------------
@@ -224,7 +311,20 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
       return c.json({ error: "Unknown settings section" }, 404);
     }
 
-    deobfuscated[section as keyof Settings] = { ...deobfuscated[section as keyof Settings], ...data };
+    deobfuscated[section as keyof Settings] = mergeSettings(
+      deobfuscated[section as keyof Settings],
+      data
+    );
+
+    // A profile change must also land in hackathon_profile, which is what
+    // the eligibility engine reads. Without this the Settings screen and
+    // the engine disagree about who you are. Merge against the canonical
+    // profile so a one-field edit does not drop the others.
+    if (section === "profile") {
+      const mergedProfile = mergeSettings(readProfile(sql), data);
+      writeProfile(sql, mergedProfile);
+      deobfuscated.profile = mergedProfile;
+    }
 
     const obfuscated = obfuscateSettings(deobfuscated);
     sql.exec(

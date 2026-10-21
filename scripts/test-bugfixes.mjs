@@ -225,6 +225,31 @@ console.log("\n=== 6. Settings merge instead of reset ===");
         JSON.stringify(eng).slice(0, 80));
 }
 
+
+console.log("\n=== 7. Reset clears the canonical profile too ===");
+{
+  // Put a distinctive profile in place.
+  await call("PUT", "/api/settings", {
+    profile: { citizenships: ["FR"], residencies: ["FR"], age: 61 },
+  });
+  const seeded = await (await call("GET", "/api/hackathons/profile")).json();
+  check("the profile was written", seeded.age === 61, String(seeded.age));
+
+  // Reset.
+  const r = await call("POST", "/api/settings/reset");
+  check("reset returns 200", r.status === 200, "HTTP " + r.status);
+
+  const after = await (await call("GET", "/api/hackathons/profile")).json();
+  check("the engine sees the default profile, not the old one",
+    after.age !== 61 && !(after.citizenships || []).includes("FR"),
+    JSON.stringify(after).slice(0, 80));
+
+  const settings = await (await call("GET", "/api/settings")).json();
+  check("the settings screen shows the same default profile",
+    settings.profile.age === after.age,
+    settings.profile.age + " vs " + after.age);
+}
+
 console.log("\n" + "=".repeat(60));
 console.log(`RESULT: ${pass} passed, ${fail} failed`);
 for (const f of failures) console.log("  FAILED: " + f);

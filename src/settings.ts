@@ -9,6 +9,7 @@
  * - Archive sources are managed via the archive module, but surfaced here too.
  */
 import { Hono } from "hono";
+import { DEFAULT_PROFILE, type UserProfile } from "./profile.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -39,15 +40,8 @@ export interface Settings {
     conflict_alerts: boolean;
     deadline_reminders: boolean;
   };
-  profile: {
-    citizenships: string[];
-    residencies: string[];
-    residency_status: string;
-    age: number;
-    is_student: boolean;
-    team_size: number;
-    employed_by_sponsor: boolean;
-  };
+  // The same shape the eligibility engine reads. See src/profile.ts.
+  profile: UserProfile;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -76,15 +70,7 @@ const DEFAULT_SETTINGS: Settings = {
     conflict_alerts: true,
     deadline_reminders: true,
   },
-  profile: {
-    citizenships: ["IT"],
-    residencies: ["GB"],
-    residency_status: "settled",
-    age: 25,
-    is_student: false,
-    team_size: 1,
-    employed_by_sponsor: false,
-  },
+  profile: { ...DEFAULT_PROFILE },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -227,7 +213,7 @@ function readProfile(sql: any): any {
       // fall through to the defaults
     }
   }
-  return { ...DEFAULT_SETTINGS.profile };
+  return { ...DEFAULT_PROFILE };
 }
 
 export function registerSettingsRoutes(app: Hono, sql: any) {
@@ -340,6 +326,10 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
 
   app.post("/api/settings/reset", (c) => {
     sql.exec("DELETE FROM settings WHERE key = 'main'");
+    // The profile also lives in hackathon_profile, which is what the
+    // eligibility engine reads. Clearing only the settings blob would leave
+    // the profile behind and the two would disagree.
+    sql.exec("DELETE FROM hackathon_profile WHERE id = 'default'");
     return c.json(DEFAULT_SETTINGS);
   });
 

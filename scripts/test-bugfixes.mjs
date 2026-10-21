@@ -16,6 +16,7 @@ import { registerCaptureRoutes } from "../src/capture.ts";
 import { registerMcpRoutes } from "../src/mcp-sdk.ts";
 import { registerFeedRoutes } from "../src/feed-routes.ts";
 import { registerDevpostRoutes } from "../src/devpost-routes.ts";
+import { registerCalendarRoutes } from "../src/calendar-routes.ts";
 import { buildRssFeed, parseFeed, findHackathonMentions } from "../src/feed.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
@@ -35,6 +36,7 @@ registerCaptureRoutes(app, sql);
 registerMcpRoutes(app, sql);
 registerFeedRoutes(app, sql);
 registerDevpostRoutes(app, sql);
+registerCalendarRoutes(app, sql);
 
 const call = (method, path, body, isForm, headers) => {
   const init = { method };
@@ -1052,6 +1054,101 @@ console.log("\n=== 17. Devpost, as a data source ===");
 async function rpcListToolNames() {
   const r = await call("POST", "/api/mcp", { jsonrpc: "2.0", id: 99, method: "tools/list" });
   return (await r.json()).result.tools.map((t) => t.name);
+}
+
+console.log("\n=== 18. The calendar ===");
+{
+  // A competition to put on a calendar.
+  await call("POST", "/api/hackathons", {
+    name: "Calendar Test Hackathon",
+    platform: "devpost",
+    prize: "$2,500",
+    url: "https://example.com/calendar-test",
+    start_date: "2026-09-01",
+    end_date: "2026-10-15",
+    eligibility: { eligibility_type: "unrestricted", regions: ["Global"], age_min: 13 },
+  });
+
+  // --- The simple JSON list -----------------------------------------
+  const simple = await (await call("GET", "/api/hackathons/simple")).json();
+  const one = simple.find((h) => h.title === "Calendar Test Hackathon");
+  check("the simple list is served", Array.isArray(simple), simple.length + " rows");
+  check("the competition is in the simple list", !!one, JSON.stringify(simple.map(h => h.title)));
+  check("the simple list has exactly the promised fields",
+        one && Object.keys(one).sort().join(",") === "eligibility,end,id,prize,start,title,url",
+        one ? Object.keys(one).sort().join(",") : "(none)");
+  check("the title is the name", one?.title === "Calendar Test Hackathon", one?.title || "(none)");
+  check("the start date is carried", one?.start === "2026-09-01", one?.start || "(none)");
+  check("the end date is carried", one?.end === "2026-10-15", one?.end || "(none)");
+  check("the prize is carried", one?.prize === "$2,500", one?.prize || "(none)");
+  check("the eligibility is carried", one?.eligibility === "unrestricted", one?.eligibility || "(none)");
+
+  // --- The iCal feed -------------------------------------------------
+  const ics = await call("GET", "/api/calendar.ics");
+  const body = await ics.text();
+  check("the calendar feed answers 200", ics.status === 200, "HTTP " + ics.status);
+  check("it is served as a calendar",
+        (ics.headers.get("content-type") || "").includes("text/calendar"),
+        ics.headers.get("content-type") || "(none)");
+  check("it opens as a VCALENDAR", body.startsWith("BEGIN:VCALENDAR"), body.slice(0, 40));
+  check("it closes as a VCALENDAR", body.trim().endsWith("END:VCALENDAR"), body.slice(-40));
+  check("it has a version", body.includes("VERSION:2.0"));
+  check("it has a product id", body.includes("PRODID:"));
+  check("the lines are CRLF, as the format requires", body.includes("\r\n"));
+  check("it carries the competition", body.includes("Calendar Test Hackathon"));
+  check("it carries the start date", body.includes("DTSTART:20260901"), "DTSTART missing");
+  check("it carries the end date", body.includes("DTEND:20261015"), "DTEND missing");
+  check("it carries the url", body.includes("URL:https://example.com/calendar-test"));
+  check("every event is closed", (body.match(/BEGIN:VEVENT/g) || []).length ===
+        (body.match(/END:VEVENT/g) || []).length, "unbalanced events");
+  check("the timestamp is a proper UTC stamp",
+        /DTSTAMP:\d{8}T\d{6}Z/.test(body),
+        (body.match(/DTSTAMP:[^\r\n]*/) || ["(none)"])[0]);
+  check("the uid is not doubled",
+        !body.includes("UID:hack-hack-"),
+        (body.match(/UID:[^\r\n]*/) || ["(none)"])[0]);
+  check("every uid is unique",
+        (() => {
+          const uids = body.match(/UID:[^\r\n]*/g) || [];
+          return new Set(uids).size === uids.length;
+        })(),
+        "duplicate uids");
+
+  // --- The download --------------------------------------------------
+  const dl = await call("GET", "/api/calendar/export.ics");
+  check("the download answers 200", dl.status === 200, "HTTP " + dl.status);
+  check("it is a download",
+        (dl.headers.get("content-disposition") || "").includes("attachment"),
+        dl.headers.get("content-disposition") || "(none)");
+
+  // --- The methods the wizard reads ----------------------------------
+  const methods = await (await call("GET", "/api/calendar/methods")).json();
+  const ids = (methods.methods || []).map((m) => m.id);
+  check("the wizard is told the four methods",
+        ["subscribe", "download", "graph", "caldav"].every((i) => ids.includes(i)),
+        ids.join(","));
+  const experimental = (methods.methods || []).filter((m) => m.stable === false);
+  check("the push methods are marked experimental", experimental.length === 2,
+        experimental.map((m) => m.id).join(","));
+  check("the subscribe method is stable",
+        (methods.methods || []).find((m) => m.id === "subscribe")?.stable === true);
+
+  // --- The push, which is not finished --------------------------------
+  const noPush = await call("POST", "/api/calendar/push", { method: "subscribe" });
+  check("subscribe is refused as a push method", noPush.status === 400, "HTTP " + noPush.status);
+
+  const graph = await call("POST", "/api/calendar/push", { method: "graph" });
+  const graphBody = await graph.json();
+  check("the graph push says it is not wired up", graph.status === 501, "HTTP " + graph.status);
+  check("it says so honestly", graphBody.experimental === true, JSON.stringify(graphBody).slice(0, 80));
+  check("it still shows what would be pushed", graphBody.would_push >= 1, graphBody.would_push);
+  check("it names what is missing", typeof graphBody.missing === "string" && graphBody.missing.length > 20);
+
+  // Clean up.
+  const hs = await (await call("GET", "/api/hackathons")).json();
+  for (const h of hs) {
+    if (h.name === "Calendar Test Hackathon") await call("DELETE", "/api/hackathons/" + h.id);
+  }
 }
 
 console.log("\n" + "=".repeat(60));

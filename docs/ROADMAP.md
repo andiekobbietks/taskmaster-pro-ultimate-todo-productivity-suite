@@ -110,6 +110,15 @@ CI captures a page and checks the archive with **warcio**, which is not
 the code that wrote it. If warcio can read the archive, the WARC is well
 formed enough for pywb and the rest of the webrecorder tooling.
 
+**The competitions reach a calendar.** `GET /api/calendar.ics` is a valid
+RFC 5545 feed of every open competition: subscribe to it from iPhone
+Settings, Outlook or Google Calendar and it refreshes on its own, no
+account and no token. `GET /api/hackathons/simple` is the JSON behind it
+(`id, title, start, end, prize, url, eligibility`). Settings → Calendar
+holds a four-step wizard (where, sign in, which, check); its two push
+paths — Microsoft Graph and CalDAV — are marked **(i)** experimental and
+answer HTTP 501 with what is missing rather than pretending to work.
+
 **The app is its own MCP server.** `POST /api/mcp` speaks the
 protocol, so any MCP client can connect to the deployed app and work
 with the competitions, the inbox and the capture queue. Fourteen tools

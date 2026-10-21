@@ -26,6 +26,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import {
   EmailListItem, EmailDetail, InboxSplitView, EmailListSkeleton,
 } from "./components/InboxPrimitives";
+import { CalendarWizard, ExperimentalBadge } from "./components/CalendarWizard";
 
 /**
  * A dismissible banner that tells the person what failed and offers a retry.
@@ -125,6 +126,7 @@ function App() {
   const [capacity, setCapacity] = useState([]);
   const [weeklyPlan, setWeeklyPlan] = useState([]);
   const [settingsTab, setSettingsTab] = useState('storage');
+const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [storageTestResult, setStorageTestResult] = useState(null);
   const [archiveSources, setArchiveSources] = useState([]);
@@ -1253,7 +1255,7 @@ function App() {
 
                     {/* Settings tabs */}
                     <div className="flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-800 pb-2">
-                      {['storage', 'profile', 'notifications', 'email', 'capture'].map(tab => (
+                      {['storage', 'profile', 'notifications', 'email', 'capture', 'calendar'].map(tab => (
                         <button
                           key={tab}
                           onClick={() => setSettingsTab(tab)}
@@ -1783,6 +1785,78 @@ function App() {
                               ))}
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Calendar settings */}
+                    {settingsTab === 'calendar' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-sm font-semibold">Calendar</h3>
+                            <ExperimentalBadge />
+                          </div>
+                          <p className="text-xs text-neutral-500 mb-3">
+                            The competitions on a calendar, so a deadline is a thing in
+                            your week and not a note you have to remember. The wizard
+                            walks you through it: pick the calendar, tick the
+                            competitions, check it, then write.
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsCalendarWizardOpen(true)}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors"
+                          >
+                            Open the calendar wizard
+                          </button>
+                        </div>
+
+                        {/* What is stable, and what is not */}
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Ways to subscribe</h3>
+                          <ul className="space-y-2">
+                            <li className="flex items-start gap-2 text-xs">
+                              <span className="mt-0.5 text-green-600 dark:text-green-400 font-bold">✓</span>
+                              <span>
+                                <strong>Subscribe to the feed</strong> — paste
+                                <code className="mx-1 px-1 rounded bg-neutral-100 dark:bg-neutral-800">
+                                  /api/calendar.ics
+                                </code>
+                                into iPhone Settings, Outlook or Google Calendar. It
+                                refreshes on its own.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2 text-xs">
+                              <span className="mt-0.5 text-green-600 dark:text-green-400 font-bold">✓</span>
+                              <span>
+                                <strong>Download the .ics file</strong> and drag it into
+                                your calendar app.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2 text-xs">
+                              <ExperimentalBadge className="mt-0.5" />
+                              <span>
+                                <strong>Push to Microsoft Outlook</strong> — writes
+                                events into your Microsoft 365 calendar. Needs a
+                                Microsoft sign-in; the OAuth flow is not finished, so
+                                this one is not working yet.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2 text-xs">
+                              <ExperimentalBadge className="mt-0.5" />
+                              <span>
+                                <strong>Push to CalDAV</strong> — iCloud or a
+                                self-hosted server. The write is not finished.
+                              </span>
+                            </li>
+                          </ul>
+                          <p className="text-xs text-neutral-400 mt-3">
+                            The two marked <strong>i</strong> are experimental: new,
+                            and they can change or be removed. The other two need
+                            nothing but the link.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -2358,6 +2432,12 @@ function App() {
                     </div>
                   </div>
                 )}
+
+                {/* The calendar wizard */}
+                <CalendarWizard
+                  isOpen={isCalendarWizardOpen}
+                  onClose={() => setIsCalendarWizardOpen(false)}
+                />
 
                 {/* Task List */}
                 {activeView === 'tasks' && (

@@ -281,6 +281,20 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
     return c.json(rows.map(rowToHackathon));
   });
 
+  // List hackathons in simple form: id, title, dates, prize, url, eligibility
+  app.get("/api/hackathons/simple", (c) => {
+    const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open' ORDER BY created_at DESC").toArray();
+    return c.json(rows.map((r: any) => ({
+      id: r.id,
+      title: r.name,
+      start: r.start_date || r.submission_deadline || null,
+      end: r.end_date || null,
+      prize: r.prize ? r.prize.replace(/<[^>]*>/g, "").trim() : "",
+      url: r.url || "",
+      eligibility: r.eligibility_json ? JSON.parse(r.eligibility_json).eligibility_type || "unknown" : "unknown",
+    })));
+  });
+
   // Eligibility check — evaluates ALL open hackathons against user profile
   app.get("/api/hackathons/eligibility", (c) => {
     const profile = getUserProfile(sql);

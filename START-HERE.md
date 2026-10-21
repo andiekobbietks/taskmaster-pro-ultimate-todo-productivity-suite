@@ -167,6 +167,38 @@ without `Accept: application/json, text/event-stream` is answered
 **HTTP 406** — the lean server accepted anything, and the test suite
 caught the difference when it was switched over.
 
+### The competitions on a calendar
+
+**`GET /api/calendar.ics`** is a valid RFC 5545 calendar of every open
+competition. It is the one path that needs no account, no token and no
+click: iPhone Settings → Calendar → Add Calendar → Subscribe, then paste
+the URL. Outlook: File → Add calendar → From internet. Google Calendar:
+the "+" → From URL. The events refresh on their own.
+
+**`GET /api/hackathons/simple`** is the JSON behind it, and only the
+fields a subscriber needs: `{id, title, start, end, prize, url,
+eligibility}`.
+
+**Settings → Calendar** holds a four-step wizard (where, sign in, which,
+check) that walks through putting a chosen set on a calendar. Two of its
+four paths are marked **(i)** — experimental, new, and they can change:
+
+| Path | State | What it needs |
+|---|---|---|
+| Subscribe to the feed | stable | Nothing but the URL |
+| Download the .ics file | stable | Nothing |
+| Push to Microsoft Outlook **(i)** | experimental | An OAuth token with `Calendars.ReadWrite` — the flow is not wired up yet |
+| Push to CalDAV **(i)** | experimental | A server URL and a write-capable account — the write is not wired up yet |
+
+The experimental paths answer honestly: `POST /api/calendar/push` returns
+**HTTP 501** with the list of events it *would* write and a plain sentence
+saying what is missing. Nothing pretends to work.
+
+```powershell
+curl http://127.0.0.1:8787/api/calendar.ics
+curl http://127.0.0.1:8787/api/hackathons/simple
+```
+
 ### Driving the capture
 
 The capture needs a browser, so it cannot run in the Worker. There is a

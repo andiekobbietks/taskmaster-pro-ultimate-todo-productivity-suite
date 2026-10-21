@@ -26,9 +26,9 @@ changelog is the single source of truth for what a release contains.
   pages, captures full-page screenshots, and uploads them as attachments.
 - **Archive integration** — Wayback Machine CDX API adapter. Fetches archived
   snapshots and extracts deadlines, prizes, and rules. No live-site scraping.
-- **Settings** — swappable storage backend (Cloudflare R2, Amazon S3, Azure
-  Blob Storage) with a connection test, plus profile, notification, and
-  email/IMAP configuration.
+- **Settings** — a storage-backend credential test (Cloudflare R2, Amazon S3,
+  Azure Blob Storage), plus profile, notification, and email/IMAP
+  configuration. The provider is tested, not yet wired to an upload path.
 - **Capacity planner and daily digest** — a weekly available-hours template
   and a prioritised daily view: what fits today, what conflicts, what is due
   this week, and how much capacity is left.

@@ -614,9 +614,10 @@
         "COMP-021"
       ],
       "gaps": [
-        "Sensitive values use XOR obfuscation, not real secret management"
+        "Sensitive values use XOR obfuscation, not real secret management",
+        "The storage provider setting runs a credential test only. The R2 branch touches nothing, there is no r2_buckets binding in wrangler.json, and attachments always go to the SQLite BLOB table, so attachments are not swappable without a code change"
       ],
-      "notes": "Storage backend is swappable \u2014 R2, S3, or Azure Blob Storage \u2014 so the deployment is not locked to one provider."
+      "notes": "The provider setting tests credentials for R2, S3 or Azure Blob Storage. It is not wired to an upload path yet."
     },
     {
       "id": "FEAT-039",

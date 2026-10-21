@@ -187,7 +187,7 @@ jobs:
       # can read the archive, the WARC is well formed enough for pywb and
       # the rest of the webrecorder tooling.
       - name: Install warcio
-        run: pip install warcio
+        run: pip install warcio requests
 
       - name: Capture a page as a WACZ and validate it
         run: |

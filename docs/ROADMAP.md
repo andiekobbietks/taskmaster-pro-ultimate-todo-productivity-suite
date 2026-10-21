@@ -146,17 +146,60 @@ the capture, which is a small change to a script that already works; or
 a platform with a real API, where the data is clean but the prizes are
 smaller.
 
-### The mail transport — MOSTLY DONE
+### The mail transport — MOSTLY DONE, WITH A CATCH
 
-The Yahoo Mail API works, and the app fetches the mail itself with it,
-inside the Worker. Register an application at developer.yahoo.com with
-the Mail / Read permission, then put the client id, the client secret
-and the refresh token in Settings → Email. There is a button that checks
-them.
+The app fetches the mail itself, inside the Worker. The client id, the
+client secret and the refresh token go into **Settings → Email**, and
+there is a button that checks them.
+
+**The catch, found on 2026-10-21.** Yahoo's own developer-access page
+says:
+
+> "While we no longer support proprietary Mail API's we are happy to
+> provide access through standard interfaces such as IMAP, CardDav, and
+> CalDav with Oauth2 support."
+
+> "those scopes are not available for self-served setup in the developer
+> console. Instead, third parties ... have to apply for access."
+
+So the API the app is built on is **unsupported**, and the OAuth mail scope
+is **not self-serve**: it needs an application, a policy review, and a
+description of how the data is handled. `docs/YAHOO.md` has the detail,
+the form and the contact address.
+
+An app that already holds an approved token keeps working. A new one has
+three routes, and they are not equal:
+
+| Route | Self-serve? |
+|---|---|
+| **IMAP with a Yahoo app password** | Probably — worth confirming Yahoo still issues them for IMAP |
+| **IMAP with OAuth2** | No — the commercial-access application |
+| **A local bridge** | Yes — `scripts/email_worker.ts`, or the capture runner |
 
 **Still missing: IMAP.** A Gmail user has nothing to point the app at.
-They have to use the Yahoo API, a JMAP provider, or post the raw source
-in from outside. That is the last piece of the transport.
+They have to use the Yahoo API, a JMAP provider, a local bridge, or post
+the raw source in from outside.
+
+### The feed — DONE, and Yahoo is not the way
+
+Yahoo cannot build feeds any more. Pipes, YQL and the YQL host are all
+gone; `developer.yahoo.com/api/` now lists only the Fantasy Sports API
+and Sign In With Yahoo. `docs/YAHOO.md` has the measurements.
+
+So the app does it itself, in both directions:
+
+- `GET /api/feed.xml` publishes the competitions it tracks as RSS 2.0,
+  each item carrying the deadline, the prize and the eligibility verdict.
+- `POST /api/feed/fetch` reads any RSS or Atom feed and pulls out the
+  items that mention a hackathon.
+- `GET /api/feed/known` lists the feeds that work, by region, and the
+  ones that are dead.
+
+The measured result of reading the six working regional feeds: **120
+items, one mention, and it was a false positive.** The regional news
+feeds mention hackathons rarely. The feed route finds competitions
+occasionally, not systematically — the systematic route is still
+per-competition capture.
 
 The WACZ format, from the Webrecorder specification 1.1.1:
 

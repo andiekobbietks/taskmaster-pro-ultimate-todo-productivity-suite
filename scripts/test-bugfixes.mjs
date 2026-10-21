@@ -1,6 +1,7 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { SCHEMA } from "../src/schema.ts";
 import { Hono } from "hono";
 import { makeSql } from "./do-sql.mjs";
@@ -41,6 +42,65 @@ const call = (method, path, body, isForm, headers) => {
   }
   return app.request(path, init);
 };
+
+
+/**
+ * Build a WACZ in memory, so the tests do not need a file.
+ */
+function makeWacz(warcBytes) {
+  // The zip is written by hand: a stored entry is enough, and it keeps the
+  // test free of a dependency.
+  const name = "archive/data.warc.gz";
+  const data = gzipSync(Buffer.from(warcBytes));
+  const crc = crc32(data);
+  const nameBytes = Buffer.from(name, "utf8");
+
+  const local = Buffer.alloc(30 + nameBytes.length);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt16LE(0, 6);
+  local.writeUInt16LE(0, 8);          // stored
+  local.writeUInt32LE(crc, 14);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(data.length, 22);
+  local.writeUInt16LE(nameBytes.length, 26);
+  local.writeUInt16LE(0, 28);
+  nameBytes.copy(local, 30);
+
+  const central = Buffer.alloc(46 + nameBytes.length);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt16LE(0, 8);
+  central.writeUInt16LE(0, 10);
+  central.writeUInt32LE(crc, 16);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt32LE(data.length, 24);
+  central.writeUInt16LE(nameBytes.length, 28);
+  // The local header is the first thing in the file, so its offset is zero.
+  central.writeUInt32LE(0, 42);
+  nameBytes.copy(central, 46);
+
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(1, 8);
+  eocd.writeUInt16LE(1, 10);
+  eocd.writeUInt32LE(central.length, 12);
+  // The central directory starts after the local header AND the file data.
+  eocd.writeUInt32LE(local.length + data.length, 16);
+
+  return new Uint8Array(Buffer.concat([local, data, central, eocd]));
+}
+
+/** The CRC-32 that a zip entry carries. */
+function crc32(buf) {
+  let c = ~0;
+  for (let i = 0; i < buf.length; i++) {
+    c ^= buf[i];
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return (~c) >>> 0;
+}
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -604,6 +664,81 @@ console.log("\n=== 13. The Yahoo application ===");
   check("the refresh token is not handed back in the clear",
         settings.email.yahoo_refresh_token !== "not-a-real-token",
         "the token came back in the clear");
+}
+
+
+console.log("\n=== 14. The archive extraction on real page shapes ===");
+{
+  // A page that publishes JSON-LD, which is the common case.
+  const withLd = `<!doctype html><html><head>
+<script type="application/ld+json">
+{"@type":"Event","name":"Amazon Developer Hackathon",
+ "startDate":"2026-10-01","endDate":"2026-11-18",
+ "description":"Open to all developers."}
+</script></head><body><h1>Amazon Developer Hackathon</h1></body></html>`;
+
+  // A page that only says it in prose.
+  const prose = `<html><body>
+  <p>Submissions close November 18, 2026 at 11:59pm.</p>
+  <p>There is $138,000 in prizes.</p>
+  <p>Open to all developers, anywhere.</p>
+  <p>Submission format: a GitHub repository and a video demo.</p>
+  </body></html>`;
+
+  // A page whose JavaScript mentions the word "rules". It must not end up
+  // as an eligibility rule.
+  const noisy = `<html><head>
+  <script>var Rules = {length: 2}; function deleteRule(x){ Rules.length ? x.deleteRule(x) : 0 }</script>
+  <style>.rules { color: red }</style>
+  </head><body><p>Nothing here.</p></body></html>`;
+
+  const ld = await call("POST", "/api/archive/wacz", { raw: null });
+  void ld;
+
+  // The extraction is exercised through the route, with a WACZ built from
+  // each page.
+  const build = async (html) => {
+    const http = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n" + html;
+    const head = "WARC/1.0\r\nWARC-Type: response\r\nWARC-Date: 2026-10-21T08:32:12Z\r\n" +
+      "WARC-Record-ID: <urn:uuid:1>\r\nWARC-Target-URI: https://example.com/x\r\n" +
+      "Content-Type: application/http; msgtype=response\r\n" +
+      "Content-Length: " + http.length + "\r\n\r\n";
+    const warc = head + http + "\r\n\r\n";
+    const zip = await makeWacz(warc);
+    const r = await call("POST", "/api/archive/wacz", zip, false, {
+      "x-target-url": "https://example.com/x",
+    });
+    return r;
+  };
+
+  const a = await build(withLd);
+  const aBody = await a.json();
+  check("the JSON-LD name is read", aBody.extracted?.name === "Amazon Developer Hackathon",
+        aBody.extracted?.name || "(none)");
+  check("the JSON-LD end date is the deadline",
+        aBody.extracted?.deadline === "2026-11-18", aBody.extracted?.deadline || "(none)");
+  check("the JSON-LD start date is read",
+        aBody.extracted?.start_date === "2026-10-01", aBody.extracted?.start_date || "(none)");
+
+  const b = await build(prose);
+  const bBody = await b.json();
+  check("a deadline in prose is read",
+        /November 18, 2026/.test(bBody.extracted?.deadline || ""),
+        bBody.extracted?.deadline || "(none)");
+  check("a prize in prose is read",
+        bBody.extracted?.prize === "$138,000", bBody.extracted?.prize || "(none)");
+  check("an eligibility line is read",
+        /all developers/i.test(bBody.extracted?.eligibility || ""),
+        (bBody.extracted?.eligibility || "").slice(0, 60));
+  check("the submission format is read",
+        /GitHub/i.test(bBody.extracted?.submission_format || ""),
+        (bBody.extracted?.submission_format || "").slice(0, 60));
+
+  const c = await build(noisy);
+  const cBody = await c.json();
+  check("a rule is not read out of the JavaScript",
+        !/deleteRule|Rules\.length/.test(cBody.extracted?.eligibility || ""),
+        (cBody.extracted?.eligibility || "(nothing)").slice(0, 70));
 }
 
 console.log("\n" + "=".repeat(60));

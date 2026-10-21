@@ -144,43 +144,124 @@ async function waybackFetchSnapshot(snapshotUrl: string): Promise<string | null>
 
 // ── HTML parser for hackathon data ───────────────────────────────────
 
+/**
+ * Pull the useful fields out of a competition page.
+ *
+ * Three sources, in the order that works best:
+ *
+ *   1. The structured data. Most competition pages publish JSON-LD with an
+ *      Event or a CreativeWork, which carries the name, the dates and
+ *      sometimes the description.
+ *   2. The visible prose, with patterns loose enough to match how people
+ *      actually write: "submissions close", "ends on", "due by".
+ *   3. The money, wherever it is next to a word that means prize.
+ *
+ * The scripts and the styles are removed first. Without that, a pattern
+ * for "rules" matches JavaScript - which is how "Rules.length ?
+ * d.deleteRule(x)" ended up as an eligibility rule.
+ */
 function extractHackathonData(html: string): ArchivedPage["extracted"] {
   const result: ArchivedPage["extracted"] = {};
 
-  // Extract deadline patterns
-  const deadlinePatterns = [
-    /deadline[:\s]*([A-Za-z]+ \d{1,2},? \d{4})/i,
-    /submit by[:\s]*([A-Za-z]+ \d{1,2},? \d{4})/i,
-    /submission deadline[:\s]*([A-Za-z]+ \d{1,2},? \d{4})/i,
-    /due[:\s]*([A-Za-z]+ \d{1,2},? \d{4})/i,
-  ];
-  for (const pat of deadlinePatterns) {
-    const m = html.match(pat);
-    if (m) { result.deadline = m[1].trim(); break; }
+  // 1. The structured data.
+  const ld = findJsonLd(html);
+  if (ld) {
+    const events = Array.isArray(ld) ? ld : [ld];
+    for (const node of events) {
+      if (!node || typeof node !== "object") continue;
+      const type = String(node["@type"] || "").toLowerCase();
+      if (type !== "event" && type !== "hackathon" && type !== "contest") continue;
+      if (node.name && !result.name) result.name = String(node.name).slice(0, 160);
+      if (node.endDate && !result.deadline) {
+        result.deadline = String(node.endDate).slice(0, 40);
+      }
+      if (node.startDate && !result.start_date) {
+        result.start_date = String(node.startDate).slice(0, 40);
+      }
+      if (node.description && !result.eligibility) {
+        result.eligibility = String(node.description).replace(/\s+/g, " ").slice(0, 300);
+      }
+    }
   }
 
-  // Extract prize patterns
-  const prizePatterns = [
-    /prize[:\s]*\$([\d,]+)/i,
-    /\$([\d,]+)\s*(in prizes|prize pool|total prize)/i,
-    /prize pool[:\s]*\$([\d,]+)/i,
-  ];
-  for (const pat of prizePatterns) {
-    const m = html.match(pat);
-    if (m) { result.prize = "$" + m[1].trim(); break; }
+  // The visible text, with the scripts and the styles out of the way.
+  const text = stripNoise(html);
+
+  // 2. The deadline.
+  if (!result.deadline) {
+    const deadlinePatterns = [
+      /\b(?:submissions?|entries|projects?|registration|applications?)\s+(?:close[sd]?|ends?|end|deadline|due)\s*(?:on|at|by)?\s*[:\-]?\s*([A-Za-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})/i,
+      /\b(?:deadline|due|closes|ends|until)\s+(?:on|at|by|is)?\s*[:\-]?\s*([A-Za-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})/i,
+      /\b([A-Za-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})[^<]{0,40}\b(?:deadline|closing|closes|submissions? close|ends)\b/i,
+      /\b(\d{4}-\d{2}-\d{2})\b/,
+    ];
+    for (const pat of deadlinePatterns) {
+      const m = text.match(pat);
+      if (m) { result.deadline = m[1].trim().replace(/\s+/g, " "); break; }
+    }
   }
 
-  // Extract eligibility/rules snippets
-  const rulesMatch = html.match(/eligibility[^<]{0,200}/i);
-  if (rulesMatch) result.eligibility = rulesMatch[0].trim();
+  // 3. The money.
+  if (!result.prize) {
+    const prizePatterns = [
+      /\bprize(?:s)?\b[^$£€]{0,60}\$([\d,]{3,})/i,
+      /\$([\d,]{3,})[^<]{0,40}\b(?:prize|in prizes|prize pool|total prize|reward)\b/i,
+      /\b(?:prize pool|total prize|prize money)\b[^$£€]{0,40}\$([\d,]{3,})/i,
+      /\b(?:USD|EUR|GBP)\s*([\d,]{3,})/i,
+    ];
+    for (const pat of prizePatterns) {
+      const m = text.match(pat);
+      if (m) { result.prize = "$" + m[1].trim(); break; }
+    }
+  }
 
-  const rulesSection = html.match(/rules[^<]{0,300}/i);
-  if (rulesSection) result.rules = rulesSection[0].trim();
-
-  const formatMatch = html.match(/submission format[^<]{0,200}/i);
-  if (formatMatch) result.submission_format = formatMatch[0].trim();
+  // 4. The rules and the format.
+  if (!result.eligibility) {
+    const m = text.match(/\b(?:eligib\w+|who can (?:enter|participate|join)|open to|open only to)\b[^.]{0,220}/i);
+    if (m) result.eligibility = m[0].split(/\s+/).join(" ").slice(0, 300);
+  }
+  if (!result.submission_format) {
+    const m = text.match(/\bsubmission format\b[^.]{0,200}/i);
+    if (m) result.submission_format = m[0].split(/\s+/).join(" ").slice(0, 220);
+  }
 
   return result;
+}
+
+/**
+ * Remove the scripts, the styles and the tags, so a pattern for a word
+ * cannot land in the JavaScript.
+ */
+function stripNoise(html: string): string {
+  return html
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#(\d+);/g, (_m, d) => String.fromCharCode(Number(d)))
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * The JSON-LD blocks a page publishes, parsed.
+ */
+function findJsonLd(html: string): any[] {
+  const out: any[] = [];
+  const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1].trim());
+      if (Array.isArray(parsed)) out.push(...parsed);
+      else if (parsed && parsed["@graph"]) out.push(...parsed["@graph"]);
+      else out.push(parsed);
+    } catch {
+      // A malformed block is skipped.
+    }
+  }
+  return out;
 }
 
 // ── Route registration ───────────────────────────────────────────────

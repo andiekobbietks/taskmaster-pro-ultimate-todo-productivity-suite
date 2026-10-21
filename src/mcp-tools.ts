@@ -55,6 +55,39 @@ function safeJson(value: any): any {
   }
 }
 
+/**
+ * Does a location string match what the reader asked for?
+ *
+ * Devpost writes locations free-hand: "Dublin, Ireland", "London, GB",
+ * "Online". The reader asks for "Dublin", "GB" or "UK". Three rules
+ * cover it:
+ *
+ *   1. The query appears in the location ("dublin" in "dublin, ireland").
+ *   2. A two-letter query is matched as a whole word, not as a
+ *      fragment — "gb" must not match "middgbrough".
+ *   3. "UK" and "United Kingdom" both mean "GB".
+ */
+export function locationMatches(location: string, query: string): boolean {
+  const loc = String(location || "").toLowerCase().trim();
+  const q = String(query || "").toLowerCase().trim();
+  if (!q) return true;
+  if (!loc) return false;
+  if (loc.includes(q)) return true;
+
+  // Rule 3: the UK's spellings.
+  const ukAliases = ["uk", "united kingdom", "great britain", "england", "scotland", "wales", "ni"];
+  const qIsUk = ukAliases.includes(q);
+  const locIsUk = ukAliases.some((a) => new RegExp("(^|[^a-z])" + a + "([^a-z]|$)").test(loc));
+  if (qIsUk && (locIsUk || loc.includes("gb") || loc.includes("great britain"))) return true;
+  if ((q === "gb" || q === "gb") && (locIsUk || loc.includes("gb"))) return true;
+
+  // Rule 2: a two-letter code as a whole word.
+  if (q.length === 2) {
+    return new RegExp("(^|[^a-z])" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z]|$)").test(loc);
+  }
+  return false;
+}
+
 export const MCP_TOOLS: McpTool[] = [
   tool(
     "list_competitions",
@@ -374,6 +407,114 @@ export const MCP_TOOLS: McpTool[] = [
         });
       }
       return JSON.stringify({ count: eligible.length, competitions: eligible.slice(0, limit) }, null, 2);
+    }
+  ),
+
+  tool(
+    "high_prize_hackathons",
+    "Open competitions with a prize at or above a threshold, sorted by prize value. " +
+      "Requires Batch 1's prizes_counts field.",
+    {
+      min_prize: z.string().optional().describe("Minimum prize value, e.g. 5000 or $5,000"),
+      featured_only: z.boolean().optional(),
+      limit: z.number().optional(),
+    },
+    async (args, sql) => {
+      const profile = readProfile(sql);
+      const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
+      const results = [];
+      for (const r of rows) {
+        if (args.featured_only && !r.featured) continue;
+        const rules = safeJson(r.eligibility_json) || {};
+        const eligible = evaluateEligibility(rules, profile);
+        if (!eligible.eligible) continue;
+        const prizeCount = (String(r.prizes_counts || r.prize || "").match(/[\d,]+/g) || [""])[0].replace(/,/g, "");
+        const value = Number(prizeCount) || 0;
+        if (args.min_prize) {
+          const minStr = String(args.min_prize).replace(/[$,\s]/g, "");
+          const minVal = Number(minStr) || 0;
+          if (value < minVal) continue;
+        }
+        results.push({
+          id: r.id, name: r.name, prize: r.prize,
+          prizes_counts: r.prizes_counts || "", prize_value: value,
+          deadline: r.submission_deadline || r.end_date,
+          featured: !!r.featured,
+          eligible: true,
+        });
+      }
+      return JSON.stringify({ count: results.length, competitions: results.slice(0, Math.min(Number(args.limit) || 20, 100)) }, null, 2);
+    }
+  ),
+
+  tool(
+    "competitions_near_me",
+    "Open competitions whose displayed_location matches a region or query, " +
+      "eligible for the user's profile.",
+    {
+      location: z.string().optional().describe("Location filter, e.g. Dublin or GB"),
+      featured_only: z.boolean().optional(),
+      limit: z.number().optional(),
+    },
+    async (args, sql) => {
+      const profile = readProfile(sql);
+      const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
+      const results = [];
+      const q = String(args.location || "").trim();
+      for (const r of rows) {
+        if (args.featured_only && !r.featured) continue;
+        const rules = safeJson(r.eligibility_json) || {};
+        const eligible = evaluateEligibility(rules, profile);
+        if (!eligible.eligible) continue;
+        const loc = String(r.displayed_location || "").toLowerCase();
+        if (q && !locationMatches(loc, q)) continue;
+        results.push({
+          id: r.id, name: r.name, prize: r.prize,
+          displayed_location: r.displayed_location || "",
+          deadline: r.submission_deadline || r.end_date,
+          eligible: true,
+          qualification_path: eligible.qualification_path,
+        });
+      }
+      return JSON.stringify({ count: results.length, competitions: results.slice(0, Math.min(Number(args.limit) || 20, 100)) }, null, 2);
+    }
+  ),
+
+  tool(
+    "closing_soon",
+    "Open competitions closing within a number of days, ordered by closest deadline. " +
+      "Requires Batch 1's time_left_to_submission.",
+    {
+      days: z.number().optional().describe("Within how many days. Default 14."),
+      featured_only: z.boolean().optional(),
+      limit: z.number().optional(),
+    },
+    async (args, sql) => {
+      const profile = readProfile(sql);
+      const days = Math.min(Number(args.days) || 14, 90);
+      const rows = sql.exec("SELECT * FROM hackathons WHERE status = 'open'").toArray();
+      const results = [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + days);
+      for (const r of rows) {
+        if (args.featured_only && !r.featured) continue;
+        const rules = safeJson(r.eligibility_json) || {};
+        const eligible = evaluateEligibility(rules, profile);
+        if (!eligible.eligible) continue;
+        const dlStr = r.submission_deadline || r.end_date;
+        if (!dlStr) continue;
+        const dl = new Date(dlStr);
+        if (dl > cutoff) continue;
+        results.push({
+          id: r.id, name: r.name, prize: r.prize,
+          deadline: String(dlStr).slice(0, 10),
+          time_left_to_submission: r.time_left_to_submission ?? null,
+          featured: !!r.featured,
+          eligible: true,
+        });
+      }
+      results.sort((a: any, b: any) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+      return JSON.stringify({ count: results.length, competitions: results.slice(0, Math.min(Number(args.limit) || 20, 100)) }, null, 2);
     }
   ),
 

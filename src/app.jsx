@@ -564,7 +564,10 @@ function App() {
     loadInboxStats();
     loadEligibility();
     loadSettings();
-  }, [fetchTodos, fetchLists, fetchStats, loadHackathons, loadInbox, loadInboxStats, loadEligibility, loadSettings]);
+    fetchDigest();
+    fetchCapacity();
+    fetchWeeklyPlan();
+  }, [fetchTodos, fetchLists, fetchStats, loadHackathons, loadInbox, loadInboxStats, loadEligibility, loadSettings, fetchDigest, fetchCapacity, fetchWeeklyPlan]);
 
   // --- Hackathon CRUD -------------------------------------------------
 
@@ -976,7 +979,7 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setActiveView('today'); setArchiveView(false); setSettingsView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('today'); setArchiveView(false); setSettingsView(false); setActiveTab("all"); setActiveListId("all"); fetchDigest(); fetchWeeklyPlan(); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         activeView === 'today'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"

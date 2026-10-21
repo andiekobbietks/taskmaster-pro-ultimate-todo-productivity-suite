@@ -101,12 +101,25 @@ the `todos` table. Note that `digest.today_tasks` (`src/capacity.ts:225`)
 holds **competitions**, not todo items — the frontend's "Focus today"
 heading is misleading. Renaming it and adding the real todos closes that.
 
-### S3 — Extend the handbook from components to views
+### S3 — Extend the handbook from components to views — DONE
 
-The handbook documents 11 components. It does not document the views a
+The handbook documented 11 components. It did not document the views a
 product manager actually looks at: Today, Hackathons, Settings, Archives.
-Those are the screens the user judges the product by, and they have no
+Those are the screens the user judges the product by, and they had no
 pixel samples.
+
+`scripts/capture-views.py` drives the running app with Playwright and
+captures each view at two times resolution into `docs/samples/views/`. The
+handbook has a new section 3, "The views", and what followed it is
+renumbered. The samples are cropped to the content, and the sidebar is
+left out: it is the same on every screen, and in a document page it takes
+a third of the width.
+
+While capturing them, a bug surfaced that the component samples had
+hidden: `fetchDigest`, `fetchCapacity` and `fetchWeeklyPlan` were defined
+and **never called**, so the Today view showed "Loading..." until you
+pressed Refresh. Same family as the settings screen — a loader written
+and then not wired to anything.
 
 ### S4 — Storage path to R2, with signed URLs
 

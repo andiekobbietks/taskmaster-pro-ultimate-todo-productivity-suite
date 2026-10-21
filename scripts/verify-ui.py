@@ -15,6 +15,7 @@ Exit code 0 means every check passed.
 """
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -131,6 +132,19 @@ def check(name, ok, detail=""):
 
 
 def run(page, results):
+    # ── The Today view must load its own data ──
+    # fetchDigest, fetchCapacity and fetchWeeklyPlan were defined and never
+    # called, so the view showed "Loading..." until you pressed Refresh.
+    page.locator("button", has_text=re.compile(r"^\s*Today")).first.click()
+    time.sleep(1.5)
+    results.append(("the Today view loads its digest",
+                    page.locator("text=Loading...").count() == 0))
+    results.append(("the digest shows the available hours",
+                    page.locator("text=Available:").count() > 0))
+    results.append(("the weekly capacity grid renders",
+                    page.locator("text=Weekly capacity").count() > 0))
+    page.screenshot(path=os.path.join(SHOTS, "tm-today-digest.png"), full_page=True)
+
     page.click("text=Hackathons")
     time.sleep(1)
     print("--- Hackathons ---")

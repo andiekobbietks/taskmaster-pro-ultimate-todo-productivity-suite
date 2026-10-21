@@ -10,6 +10,7 @@ export function Banner({
   onDismiss,
   onRetry,
   className = "",
+  inline = false,
 }) {
   const variants = {
     error: {
@@ -44,10 +45,18 @@ export function Banner({
 
   const v = variants[variant];
 
+  // By default the banner is a fixed toast in the bottom centre of the
+  // viewport. `inline` renders it in the normal flow instead, which is what
+  // the component library needs to show more than one variant at a time —
+  // fixed banners all land on the same spot and hide each other.
+  const placement = inline
+    ? "relative w-full"
+    : "fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[min(92vw,32rem)]";
+
   return (
     <div
       role="alert"
-      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[min(92vw,32rem)] rounded-xl border ${v.border} ${v.bg} shadow-lg animate-scaleIn ${className}`}
+      className={`rounded-xl border ${v.border} ${v.bg} shadow-lg ${inline ? "" : "animate-scaleIn"} ${placement} ${className}`}
     >
       <div className="flex items-start gap-3 p-4">
         <svg className={`w-5 h-5 ${v.icon} shrink-0 mt-0.5`} fill="none" viewBox="0 0 24 24" stroke="currentColor">

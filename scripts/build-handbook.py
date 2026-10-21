@@ -14,7 +14,7 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas as pdfcanvas
 
 SHOTS = r"C:\Users\Admin\AppData\Local\Temp\opencode\storybook-shots"
-OUT = r"C:\Users\Admin\AppData\Local\Temp\opencode\TaskMaster_Pro_Design_System_Handbook.pdf"
+OUT = r"C:\Users\Admin\Documents\TaskMaster_Pro_Design_System_Handbook.pdf"
 DOCS = r"C:\Users\Admin\AppData\Local\Temp\opencode\tp"
 
 BRAND = {"50": "#EEF0FB", "100": "#DDE0F7", "200": "#B9C0EF", "500": "#7B85DC",
@@ -80,12 +80,13 @@ COMPONENTS = [
      "usage": '<Badge variant="success" size="sm">Open</Badge>'},
     {"file": "05-banner.png", "name": "Banner", "shot": "05-banner.png",
      "path": "src/components/Banner.jsx",
-     "desc": "Failure and status messaging, pinned to the bottom of the screen. The retry action is the point of this component: the app never leaves a stale screen without saying so.",
+     "desc": "Failure and status messaging in four tones: error, info, success and warning. The retry action is the point of this component: the app never leaves a stale screen without saying so. By default the banner is pinned to the bottom of the viewport; inline puts it in the normal flow instead, which is what the library uses to show more than one tone at a time.",
      "props": [("variant", "error | success | info | warning", "Tone of the message"),
                ("title", "string", "Bold first line"),
                ("message", "string", "Detail line"),
                ("onDismiss", "function", "Shows the close button"),
-               ("onRetry", "function", "Shows the retry button")],
+               ("onRetry", "function", "Shows the retry button"),
+               ("inline", "boolean", "Renders in the normal flow instead of pinned to the viewport")],
      "usage": '<Banner variant="error" title="Failed" message="..." onRetry={refetch} />'},
     {"file": "06-emptystate.png", "name": "EmptyState", "shot": "06-emptystate.png",
      "path": "src/components/EmptyState.jsx",
@@ -96,38 +97,41 @@ COMPONENTS = [
                ("actionLabel", "string", "Label of the call to action"),
                ("onAction", "function", "Called when the action is pressed")],
      "usage": '<EmptyState icon={<Icon/>} title="No hackathons yet" actionLabel="Add" onAction={add} />'},
-    {"file": "07-modal.png", "name": "Modal", "shot": "07-modal.png",
+    {"file": "07-modal-open.png", "name": "Modal", "shot": "07-modal-open.png",
      "path": "src/components/Modal.jsx",
-     "desc": "Overlay dialog for forms. Dismisses on backdrop click and on the close button. The content area scrolls independently of the header, so a long form never pushes the title off screen.",
+     "desc": "Overlay dialog for forms. Dismisses on backdrop click and on the close button. The content area scrolls independently of the header, so a long form never pushes the title off screen. The overlay covers the viewport, so this sample is a viewport shot rather than a crop of the component.",
      "props": [("isOpen", "boolean", "Controls visibility"),
                ("onClose", "function", "Called on backdrop click and the close button"),
                ("title", "string", "Shown in the header"),
                ("size", "sm | md | lg | xl", "Maximum width")],
      "usage": '<Modal isOpen={open} onClose={close} title="Create New Task">...</Modal>'},
     {"file": "08-email-list-row.png", "name": "Email list row", "shot": "08-email-list-row.png",
+     "shot2": "09-email-list-row-with-selection.png", "shot2_name": "Email list row with selection",
      "path": "src/components/InboxPrimitives.jsx",
-     "desc": "One email in the inbox list. The row is a div with role=button and tabIndex 0, and responds to Enter and Space, so the list is fully keyboard reachable. A brand dot marks unread, the platform badge names the source, and a green line shows which hackathon the email matched to.",
+     "desc": "One email in the inbox list. The row is a div with role=button and tabIndex 0, and responds to Enter and Space, so the list is fully keyboard reachable. A brand dot marks unread, the platform badge names the source, and a green line shows which hackathon the email matched to. Passing onToggleCheck adds a bulk-selection checkbox; ticking it stops the click and the keypress from reaching the row, so a message can be queued without opening it.",
      "props": [("email", "object", "The inbox item"),
                ("isSelected", "boolean", "Opens the detail panel"),
                ("panelOpen", "boolean", "Tightens the padding when a panel is open"),
+               ("isChecked", "boolean", "Whether the row is ticked for bulk actions"),
+               ("onToggleCheck", "function", "Adds a checkbox; called with the email when it is ticked"),
                ("onSelect", "function", "Called on click, Enter or Space"),
                ("onToggleProcessed", "function", "Called by the tick button"),
                ("onDelete", "function", "Called by the delete button")],
-     "usage": '<EmailListItem email={e} isSelected={sel} onSelect={pick} onDelete={del} />'},
-    {"file": "09-email-detail-panel.png", "name": "Email detail panel", "shot": "09-email-detail-panel.png",
+     "usage": '<EmailListItem email={e} isSelected={sel} isChecked={sel2} onToggleCheck={pick2} onSelect={pick} onDelete={del} />'},
+    {"file": "10-email-detail-panel.png", "name": "Email detail panel", "shot": "10-email-detail-panel.png",
      "path": "src/components/InboxPrimitives.jsx",
      "desc": "The open email. A circle shows the sender initial, the body renders as plain text rather than injected HTML, so there is no sanitiser to get wrong, and attachments are listed with their names along the bottom.",
      "props": [("email", "object", "The selected email"),
                ("onClose", "function", "Called by the close button")],
      "usage": '<EmailDetail email={selected} onClose={close} />'},
-    {"file": "10-inbox-split-view.png", "name": "Inbox split view", "shot": "10-inbox-split-view.png",
+    {"file": "11-inbox-split-view.png", "name": "Inbox split view", "shot": "11-inbox-split-view.png",
      "path": "src/components/InboxPrimitives.jsx",
      "desc": "The list beside the detail panel. Below the md breakpoint the panel takes the full width and the list is hidden; from md up the list narrows to 380px beside the panel, so both are visible at once.",
      "props": [("children", "ReactNode", "The list"),
                ("selected", "object", "The open email, or null"),
                ("onClose", "function", "Called when the panel is dismissed")],
      "usage": '<InboxSplitView selected={sel} onClose={close}>{list}</InboxSplitView>'},
-    {"file": "11-inbox-skeleton.png", "name": "Inbox skeleton", "shot": "11-inbox-skeleton.png",
+    {"file": "12-inbox-skeleton.png", "name": "Inbox skeleton", "shot": "12-inbox-skeleton.png",
      "path": "src/components/InboxPrimitives.jsx",
      "desc": "Placeholder rows shown while the inbox loads. The shape matches the real row, so the layout does not jump when the data arrives.",
      "props": [("count", "number", "How many placeholder rows")],
@@ -135,22 +139,58 @@ COMPONENTS = [
 ]
 
 
-def mk_table(rows, widths, head_bg=BRAND["600"]):
-    """Table with the handbook's house style."""
-    t = Table(rows, colWidths=widths)
+
+# ── Table helpers ───────────────────────────────────────────────────
+# ReportLab does not wrap plain strings inside table cells: they render on a
+# single line and overflow into the neighbouring column. Every cell is
+# therefore converted to a Paragraph, which does wrap.
+
+CELL = ParagraphStyle("cell", fontName="Helvetica", fontSize=8.5, leading=11.5,
+                      textColor=HexColor(NEUTRAL["600"]))
+CELL_HEAD = ParagraphStyle("cellhead", fontName="Helvetica-Bold", fontSize=8.5,
+                           leading=11.5, textColor=white)
+CELL_MONO = ParagraphStyle("cellmono", fontName="Courier", fontSize=7.5,
+                            leading=10.5, textColor=HexColor(NEUTRAL["600"]))
+CELL_MUTED = ParagraphStyle("cellmuted", fontName="Helvetica", fontSize=8.5,
+                             leading=11.5, textColor=HexColor(NEUTRAL["500"]))
+CELL_CODE = ParagraphStyle("cellcode", fontName="Courier", fontSize=7.5,
+                            leading=10.5, textColor=HexColor(NEUTRAL["600"]))
+
+
+def _cells(row, style):
+    """Convert one table row's strings into Paragraphs."""
+    return [c if isinstance(c, Paragraph) else Paragraph(str(c), style) for c in row]
+
+
+def mk_table(rows, widths, head_bg=BRAND["600"], mono_cols=(), muted_cols=()):
+    """A table whose cells wrap. mono_cols are set in a monospace face."""
+    body = [_cells(rows[0], CELL_HEAD)]
+    for row in rows[1:]:
+        cells = []
+        for i, c in enumerate(row):
+            if isinstance(c, Paragraph):
+                cells.append(c)
+            elif i in mono_cols:
+                cells.append(Paragraph(str(c), CELL_MONO))
+            elif i in muted_cols:
+                cells.append(Paragraph(str(c), CELL_MUTED))
+            else:
+                cells.append(Paragraph(str(c), CELL))
+        body.append(cells)
+    t = Table(body, colWidths=widths, repeatRows=1)
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), HexColor(head_bg)),
         ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("LEADING", (0, 0), (-1, -1), 12),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
+        ("GRID", (0, 0), (-1, -1), 0.4, HexColor(NEUTRAL["200"])),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     return t
+
 
 
 def page_furniture(canv, doc):
@@ -205,24 +245,11 @@ def main():
     story.append(Paragraph("Contents", h1))
     rows = [["Section", "What it covers"]]
     rows.append(["1. Design tokens", "The colour, type, spacing and motion values every component draws from"])
-    rows.append(["2. Component library", "Pixel samples, prop tables and usage for all eleven components"])
+    rows.append(["2. Component library", "Pixel samples, prop tables and usage for all eleven components and twelve sampled states"])
     rows.append(["3. Product requirements", "What the product is, who it is for, and what each module does"])
     rows.append(["4. API reference", "Every endpoint, grouped by module"])
     rows.append(["5. Architecture", "How the pieces fit together, and where the risks are"])
-    t = Table(rows, colWidths=[100, 330])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor(BRAND["600"])),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("LEADING", (0, 0), (-1, -1), 13),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story.append(t)
+    story.append(mk_table(rows, [100, 330]))
     story.append(PageBreak())
 
     # ── 1. Design tokens ───────────────────────────────────────────
@@ -243,19 +270,7 @@ def main():
             "900": "Headings on light backgrounds"}
     for k in ["50", "100", "200", "500", "600", "700", "800", "900"]:
         rows.append([f"brand-{k}", BRAND[k], uses[k]])
-    t = Table(rows, colWidths=[70, 80, 280])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor(BRAND["600"])),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("LEADING", (0, 0), (-1, -1), 12),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
-        ("TEXTCOLOR", (1, 1), (1, -1), HexColor(NEUTRAL["600"])),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
-    story.append(t)
+    story.append(mk_table(rows, [70, 80, 280], muted_cols=(1,)))
     story.append(Spacer(1, 6*mm))
 
     # Swatch strip
@@ -280,17 +295,7 @@ def main():
              "950": "Deepest background (dark)"}
     for k in ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"]:
         rows.append([f"neutral-{k}", NEUTRAL.get(k, "#0F172A" if k == "900" else "#020617"), nuses[k]])
-    t = Table(rows, colWidths=[80, 80, 270])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor(NEUTRAL["700"])),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("LEADING", (0, 0), (-1, -1), 12),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
-    ]))
-    story.append(t)
+    story.append(mk_table(rows, [80, 80, 270], head_bg=NEUTRAL["700"], muted_cols=(1,)))
     story.append(PageBreak())
 
     story.append(Paragraph("1.3 Semantic and priority colours", h2))
@@ -304,17 +309,7 @@ def main():
     for k, (hx, m) in {"low": ("#16A34A", "Low priority"), "medium": ("#2563EB", "Medium priority"),
                         "high": ("#F59E0B", "High priority"), "urgent": ("#DC2626", "Urgent priority")}.items():
         rows.append([f"priority-{k}", hx, m])
-    t = Table(rows, colWidths=[90, 80, 260])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor(NEUTRAL["700"])),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("LEADING", (0, 0), (-1, -1), 12),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
-    ]))
-    story.append(t)
+    story.append(mk_table(rows, [90, 80, 260], head_bg=NEUTRAL["700"], muted_cols=(1,)))
     story.append(Spacer(1, 6*mm))
 
     story.append(Paragraph("1.4 Typography", h2))
@@ -326,17 +321,7 @@ def main():
                            ("xl", "1.25rem / 20px", "Page titles"),
                            ("2xl", "1.5rem / 24px", "Hero headings")]:
         rows.append([tok, size, use])
-    t = Table(rows, colWidths=[60, 110, 260])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor(BRAND["600"])),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("LEADING", (0, 0), (-1, -1), 12),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
-    ]))
-    story.append(t)
+    story.append(mk_table(rows, [60, 110, 260]))
     story.append(Spacer(1, 3*mm))
     story.append(Paragraph(
         "Two families: <b>Inter</b> for interface text, <b>JetBrains Mono</b> for code, "
@@ -349,18 +334,7 @@ def main():
     rows.append(["Radius", "sm 4px, md 6px, lg 8px, xl 12px, full for pills and avatars"])
     rows.append(["Shadow", "xs 2px, sm 3px, md 6px, lg 15px — reserved for raised surfaces"])
     rows.append(["Motion", "fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) for overlays; scaleIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1) for cards and dialogs"])
-    t = Table(rows, colWidths=[80, 350])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor(NEUTRAL["700"])),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("LEADING", (0, 0), (-1, -1), 12),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
-    ]))
-    story.append(t)
+    story.append(mk_table(rows, [80, 350], head_bg=NEUTRAL["700"]))
     story.append(Spacer(1, 6*mm))
 
     story.append(Paragraph("1.6 Dark mode", h2))
@@ -380,9 +354,14 @@ def main():
         "and the implementation can be read side by side.", body))
 
     for c in COMPONENTS:
-        shot_path = os.path.join(SHOTS, c["shot"])
         block = [Paragraph(c["name"], h2), Paragraph(c["desc"], body)]
-        if os.path.exists(shot_path):
+        shots = [(c["shot"], c["name"])]
+        if c.get("shot2"):
+            shots.append((c["shot2"], c.get("shot2_name", c["name"])))
+        for shot_file, shot_label in shots:
+            shot_path = os.path.join(SHOTS, shot_file)
+            if not os.path.exists(shot_path):
+                continue
             img = Image(shot_path)
             ratio = img.imageHeight / img.imageWidth
             max_w = 430
@@ -395,25 +374,15 @@ def main():
             img.hAlign = "LEFT"
             block.append(Spacer(1, 4))
             block.append(img)
-            block.append(Paragraph(f"Sample: {c['name']} &nbsp;·&nbsp; {c['path']}", caption))
+            block.append(Paragraph(
+                f"Sample: {shot_label} &nbsp;·&nbsp; {c['path']}", caption))
         story.append(KeepTogether(block))
 
         # Props table
         rows = [["Prop", "Type", "Meaning"]]
         for p in c["props"]:
             rows.append(list(p))
-        t = Table(rows, colWidths=[95, 175, 160])
-        t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), HexColor(BRAND["600"])),
-            ("TEXTCOLOR", (0, 0), (-1, 0), white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("LEADING", (0, 0), (-1, -1), 11),
-            ("GRID", (0, 0), (-1, -1), 0.5, HexColor(NEUTRAL["200"])),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor(NEUTRAL["50"]), white]),
-            ("FONTNAME", (0, 1), (0, -1), "Courier"),
-        ]))
-        story.append(t)
+        story.append(mk_table(rows, [95, 175, 160], mono_cols=(0,)))
         story.append(Spacer(1, 3*mm))
         story.append(Paragraph(c["usage"], code))
         story.append(Spacer(1, 8*mm))
@@ -582,11 +551,13 @@ def main():
         ["BLOBs share the Durable Object's 10GB ceiling with everything else", "src/index.ts", "Same fix. The R2 migration is a settings change."],
         ["Email body rendered as plain text, so rich email loses its formatting", "src/components/InboxPrimitives.jsx", "Deliberate. Injecting HTML would need a sanitiser; plain text has nothing to sanitise."],
         ["The seed fixtures contain example personal data", "seed/hackathons.json", "Anonymised to placeholder country codes. The real profile is supplied through the API."],
+        ["Mail credentials are stored but nothing reads them - no IMAP client exists, and src/jmap.ts is not wired to any route", "src/settings.ts, src/jmap.ts", "Known gap. The inbox is populated by POST /api/inbox. The settings and the JMAP client are in place; the ingestion route is the next piece of work."],
     ]
     story.append(mk_table(risks, [150, 110, 170]))
 
     story.append(Paragraph("5.4 What comes next", h2))
     for n in ["Authentication and a per-user data model, before any public deployment",
+              "An ingestion route that connects to the configured mail server, so the inbox fills itself",
               "Attachments to R2 with signed URLs, removing the size ceiling",
               "A composed reply path, so the inbox can be worked rather than only read",
               "Calendar synchronisation, so deadlines reach the calendar you already use",

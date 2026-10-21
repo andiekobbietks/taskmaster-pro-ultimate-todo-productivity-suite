@@ -56,9 +56,9 @@ const UNMATCHED_EMAIL = {
   match_method: "ambiguous",
 };
 
-function Story({ title, description, children, className = "" }) {
+function Story({ title, description, children, className = "", capture }) {
   return (
-    <section className="mb-12" data-story={title}>
+    <section className="mb-12" data-story={title} data-capture={capture}>
       <div className="mb-3">
         <h2 className="text-lg font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
           {title}
@@ -205,11 +205,12 @@ function App() {
         {/* Banner */}
         <Story
           title="Banner"
-          description="Failure and status messaging. Dismissible, with an optional retry."
+          description="Failure and status messaging. Dismissible, with an optional retry. Four variants: error, info, success, warning."
         >
           <div className="space-y-4">
             {banner && (
               <Banner
+                inline
                 variant="error"
                 title="Failed to load"
                 message="Could not reach the server. Check your connection and try again."
@@ -218,11 +219,19 @@ function App() {
               />
             )}
             <Banner
+              inline
+              variant="info"
+              title="Sync in progress"
+              message="Fetching the latest hackathon deadlines."
+            />
+            <Banner
+              inline
               variant="success"
               title="Saved"
               message="Your changes were written."
             />
             <Banner
+              inline
               variant="warning"
               title="Rate limited"
               message="Too many requests. Try again in a minute."
@@ -251,7 +260,8 @@ function App() {
         {/* Modal */}
         <Story
           title="Modal"
-          description="Overlay dialog for forms and confirmations."
+          description="Overlay dialog for forms and confirmations. Click the button to open it."
+          capture="skip"
         >
           <Button variant="secondary" onClick={() => setModalOpen(true)}>
             Open modal
@@ -262,6 +272,24 @@ function App() {
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
                 <Button variant="primary" onClick={() => setModalOpen(false)}>Create</Button>
+              </div>
+            </div>
+          </Modal>
+        </Story>
+
+        {/* The modal renders position: fixed, so it can only be sampled as a
+            viewport shot. The trigger story above is the live demo. */}
+        <Story
+          title="Modal open"
+          description="The dialog as it appears on screen — the overlay covers the viewport, so this sample is captured as a viewport shot."
+          capture="viewport"
+        >
+          <Modal isOpen onClose={() => {}} title="Create New Task">
+            <div className="space-y-4">
+              <Input label="Title" placeholder="What needs doing?" value={text} onChange={(e) => setText(e.target.value)} />
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="secondary" onClick={() => {}}>Cancel</Button>
+                <Button variant="primary" onClick={() => {}}>Create</Button>
               </div>
             </div>
           </Modal>
@@ -285,6 +313,34 @@ function App() {
               email={UNMATCHED_EMAIL}
               isSelected={false}
               panelOpen={false}
+              onSelect={() => {}}
+              onToggleProcessed={() => {}}
+              onDelete={() => {}}
+            />
+          </div>
+        </Story>
+
+        <Story
+          title="Email list row with selection"
+          description="Bulk selection. Passing onToggleCheck adds a checkbox; ticking it stops the click from opening the detail panel, so a row can be ticked without reading it."
+        >
+          <div className="-mx-6 -my-2">
+            <EmailListItem
+              email={SAMPLE_EMAIL}
+              isSelected={false}
+              panelOpen={false}
+              isChecked={true}
+              onToggleCheck={() => {}}
+              onSelect={() => {}}
+              onToggleProcessed={() => {}}
+              onDelete={() => {}}
+            />
+            <EmailListItem
+              email={UNMATCHED_EMAIL}
+              isSelected={false}
+              panelOpen={false}
+              isChecked={false}
+              onToggleCheck={() => {}}
               onSelect={() => {}}
               onToggleProcessed={() => {}}
               onDelete={() => {}}

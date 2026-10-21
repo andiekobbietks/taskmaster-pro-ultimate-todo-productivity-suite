@@ -35,13 +35,26 @@ this environment.
 | `npm run storybook:serve` | Every component in isolation on http://127.0.0.1:8821/storybook.html |
 | `npm test` | The API test suite, 36 checks against the real routes |
 
+There are two more checks you can run:
+
+```powershell
+node --experimental-strip-types scripts/test-bugfixes.mjs   # 30 checks on the repaired routes
+python scripts/verify-ui.py                                 # 19 checks in a real browser
+```
+
+`verify-ui.py` needs a server on port 8821 (`npm run storybook:serve`) and
+Playwright (`pip install playwright`). It drives the browser: it opens the
+Add Hackathon form, reads the populated settings, ticks a selection box in
+both lists, and reloads the page with every external request blocked to
+prove the app works offline.
+
 ## The component library
 
 `npm run storybook:serve` then open:
 
 **http://127.0.0.1:8821/storybook.html**
 
-Eleven stories, each one component shown in isolation with every variant and
+Thirteen stories, each one component shown in isolation with every variant and
 state. It imports the real components from `src/components`, so what you see is
 what ships.
 
@@ -53,8 +66,13 @@ python scripts/capture-storybook.py   # regenerate the pixel samples
 python scripts/build-handbook.py       # rebuild the PDF
 ```
 
-Output: `TaskMaster_Pro_Design_System_Handbook.pdf` — 17 pages with the real
-component samples embedded.
+Output: `TaskMaster_Pro_Design_System_Handbook.pdf` — 19 pages with the real
+component samples embedded, in `C:\Users\Admin\Documents`.
+
+The capture script publishes twelve pixel samples into `docs/samples`. It
+clears that folder first, so a renamed or dropped component does not leave a
+stale sample behind, and it skips the components that cover the viewport
+rather than cropping them.
 
 ## Branches
 

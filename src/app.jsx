@@ -137,6 +137,9 @@ function App() {
   const [inboxStats, setInboxStats] = useState({ total: 0, unread: 0, unprocessed: 0, platform: 0 });
   const [eligibility, setEligibility] = useState({});
   const [selectedEmail, setSelectedEmail] = useState(null);
+
+  // Bulk selection in the inbox
+  const [selectedEmails, setSelectedEmails] = useState([]);
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
@@ -225,6 +228,58 @@ function App() {
       fail("Loading settings")(err);
     }
   }, [fail]);
+
+  // --- Inbox bulk selection ---------------------------------------------
+
+  const toggleEmailSelected = (email) => {
+    setSelectedEmails((prev) =>
+      prev.includes(email.id)
+        ? prev.filter((id) => id !== email.id)
+        : [...prev, email.id]
+    );
+  };
+
+  const toggleSelectAllEmails = () => {
+    setSelectedEmails((prev) =>
+      prev.length === inboxItems.length ? [] : inboxItems.map((e) => e.id)
+    );
+  };
+
+  const bulkMarkProcessed = async (processed) => {
+    if (selectedEmails.length === 0) return;
+    const ids = [...selectedEmails];
+    setSelectedEmails([]);
+    try {
+      for (const id of ids) {
+        await api(`./api/inbox/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ processed }),
+        });
+      }
+      await loadInbox();
+      await loadInboxStats();
+    } catch (err) {
+      fail("Updating the selected emails", () => bulkMarkProcessed(processed))(err);
+    }
+  };
+
+  const bulkDeleteEmails = async () => {
+    if (selectedEmails.length === 0) return;
+    const ids = [...selectedEmails];
+    if (!confirm(`Delete ${ids.length} email(s)? This cannot be undone.`)) return;
+    setSelectedEmails([]);
+    try {
+      for (const id of ids) {
+        await api(`./api/inbox/${id}`, { method: "DELETE" });
+      }
+      await loadInbox();
+      await loadInboxStats();
+    } catch (err) {
+      fail("Deleting the selected emails", bulkDeleteEmails)(err);
+    }
+  };
+
 
   const loadHackathons = useCallback(async () => {
     try {
@@ -898,7 +953,7 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setActiveView('today'); setHackathonView(false); setArchiveView(false); setSettingsView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('today'); setArchiveView(false); setSettingsView(false); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         activeView === 'today'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
@@ -947,7 +1002,7 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setActiveView('settings'); setHackathonView(false); setArchiveView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('settings'); setArchiveView(false); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         activeView === 'settings'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
@@ -959,7 +1014,7 @@ function App() {
                     </button>
 
                     <button
-                      onClick={() => { setActiveView('archives'); setHackathonView(false); setActiveTab("all"); setActiveListId("all"); }}
+                      onClick={() => { setActiveView('archives'); setActiveTab("all"); setActiveListId("all"); }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         activeView === 'archives'
                           ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 font-semibold"
@@ -1311,6 +1366,17 @@ function App() {
                     {/* Email settings */}
                     {settingsTab === 'email' && settings && (
                       <div className="space-y-4">
+                        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                          <svg className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <p className="text-xs text-amber-800 dark:text-amber-300">
+                            These credentials are stored, but no route reads them yet. The inbox is
+                            filled by <span className="font-mono">POST /api/inbox</span> — mail
+                            ingestion is not wired up.
+                          </p>
+                        </div>
+
                         <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
                           <h3 className="text-sm font-semibold mb-3">Email inbox</h3>
                           <div className="space-y-3">
@@ -1461,12 +1527,61 @@ function App() {
                           onClose={() => setSelectedEmail(null)}
                         >
                           <div className="flex-1 overflow-y-auto">
+
+                          <div className="flex flex-wrap items-center gap-2 px-4 py-2 md:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/40">
+                            <label className="flex items-center gap-2 text-xs text-neutral-500 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={inboxItems.length > 0 && selectedEmails.length === inboxItems.length}
+                                onChange={toggleSelectAllEmails}
+                                aria-label="Select all emails"
+                                className="rounded border-neutral-300 dark:border-neutral-600 text-brand-600 focus:ring-brand-500/40 cursor-pointer"
+                              />
+                              <span>Select all</span>
+                            </label>
+                          
+                            {selectedEmails.length > 0 && (
+                              <>
+                                <span className="text-xs font-medium text-brand-700 dark:text-brand-300">
+                                  {selectedEmails.length} selected
+                                </span>
+                                <div className="flex-1" />
+                                <button
+                                  onClick={() => bulkMarkProcessed(true)}
+                                  className="h-7 px-2.5 rounded-md text-xs font-medium bg-white dark:bg-neutral-800 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-50 transition-colors"
+                                >
+                                  Mark processed
+                                </button>
+                                <button
+                                  onClick={() => bulkMarkProcessed(false)}
+                                  className="h-7 px-2.5 rounded-md text-xs font-medium bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 transition-colors"
+                                >
+                                  Mark unprocessed
+                                </button>
+                                <button
+                                  onClick={bulkDeleteEmails}
+                                  className="h-7 px-2.5 rounded-md text-xs font-medium bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                                <button
+                                  onClick={() => setSelectedEmails([])}
+                                  className="h-7 px-2.5 rounded-md text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 transition-colors"
+                                >
+                                  Clear
+                                </button>
+                              </>
+                            )}
+                          </div>
+
                             {inboxItems.map((email) => (
                               <EmailListItem
                                 key={email.id}
                                 email={email}
                                 isSelected={selectedEmail?.id === email.id}
                                 panelOpen={selectedEmail !== null}
+                                isChecked={selectedEmails.includes(email.id)}
+                                onToggleCheck={toggleEmailSelected}
                                 onSelect={(e) => {
                                   setSelectedEmail(e);
                                   if (!e.read) markEmailRead(e.id, true);

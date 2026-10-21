@@ -119,6 +119,20 @@ holds a four-step wizard (where, sign in, which, check); its two push
 paths — Microsoft Graph and CalDAV — are marked **(i)** experimental and
 answer HTTP 501 with what is missing rather than pretending to work.
 
+**The app can push to a phone.** The app is a PWA (`public/manifest.webmanifest`,
+`public/sw.js`, generated icons) and the push sender is implemented from the
+spec on WebCrypto — RFC 8292 VAPID signing and RFC 8291 aes128gcm
+encryption — because the `web-push` package needs node's `https` and a
+Worker has none. Verified against **the RFCs' own published examples**:
+RFC 8291's whole encrypted body matches byte for byte (15 checks) and
+RFC 8292's VAPID example verifies (11 checks), so `npm run test:push` is
+the proof. That test caught the subtle one: the content cipher's
+additional data must be **zero-length** (RFC 8188 §2.1) — the header is
+sent but not authenticated. iOS 16.4+ supports Web Push for Home Screen
+web apps, with no Apple Developer Program; the Settings card says so when
+the app is in a Safari tab. The digest still has no time zone, so the push
+feature is marked **(i)** experimental until it does.
+
 **The app is its own MCP server.** `POST /api/mcp` speaks the
 protocol, so any MCP client can connect to the deployed app and work
 with the competitions, the inbox and the capture queue. Fourteen tools

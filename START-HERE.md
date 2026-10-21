@@ -199,6 +199,65 @@ curl http://127.0.0.1:8787/api/calendar.ics
 curl http://127.0.0.1:8787/api/hackathons/simple
 ```
 
+### Push notifications
+
+**The app is installable and can push to a phone.** `public/manifest.webmanifest`
+plus `public/sw.js` make it a PWA; the icons in `public/assets/` are generated
+from the app's own mark by `npm run icons`.
+
+**On iPhone this needs the Home Screen.** Apple supports Web Push for web apps
+added to the Home Screen (iOS 16.4+), with no Apple Developer Program: iOS
+16.4+ supports the Push API, the Notifications API and service workers for
+Home Screen web apps. In a Safari tab there is no push manager, so the
+Settings card says so instead of failing quietly.
+
+**Sending a push is implemented from the spec, not from a library.** The
+`web-push` npm package uses node's `https`, which does not exist in a
+Worker, so `src/push.ts` does it on WebCrypto: RFC 8292 (VAPID signing) and
+RFC 8291 (aes128gcm encryption). That is about 300 lines and keeps the
+dependency tree at four packages.
+
+**The test is the RFC's own example.** RFC 8291 Appendix A publishes every
+value in the derivation chain, and Section 5 publishes the whole encrypted
+body. RFC 8292 section 2.4 publishes a complete VAPID request. Both are
+checked:
+
+```powershell
+npm run test:push              # both: 15 encryption checks, 11 VAPID checks
+npm run test:push:encryption   # RFC 8291
+npm run test:push:vapid        # RFC 8292
+```
+
+The encryption test checks the shared secret, both PRKs, the IKM, the
+content key, the nonce, the 86-octet header, and then the **whole body byte
+for byte** against the RFC's. The VAPID test checks the public key
+encoding, the JWT header and body, and that the RFC's own signature
+verifies against the RFC's public key — which is what proves the signature
+is the raw `r||s` form a push service expects, not DER.
+
+The vector in `scripts/rfc8291-vector.json` is extracted from the RFC text
+by `scripts/extract-rfc-vector.mjs`, so nothing is transcribed by hand.
+
+That test earned its keep twice: it caught that the additional data for the
+content cipher must be **zero-length** (RFC 8188 §2.1) — the header is sent
+in the body but is not authenticated. With the header as the AAD, the body
+looked right and no push service could ever decrypt it.
+
+**Setting it up:**
+
+```powershell
+npm run vapid     # writes .dev.vars (gitignored) and prints the public key
+```
+
+For a deployment, the same three values go in as secrets
+(`npx wrangler secret put VAPID_PUBLIC_KEY`, and the private key and
+subject). Losing the private key means every existing subscription has to
+be re-made: a browser subscription is bound to the public key it was given.
+
+**What is not finished:** the daily digest still has no time zone, so
+`digest_time` is read as UTC, and the reminder content is not settled. The
+Settings card is marked **(i)** until it is.
+
 ### Driving the capture
 
 The capture needs a browser, so it cannot run in the Worker. There is a

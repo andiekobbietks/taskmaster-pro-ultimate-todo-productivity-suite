@@ -17,6 +17,7 @@ import { registerMcpRoutes } from "../src/mcp-sdk.ts";
 import { registerFeedRoutes } from "../src/feed-routes.ts";
 import { registerDevpostRoutes } from "../src/devpost-routes.ts";
 import { registerCalendarRoutes } from "../src/calendar-routes.ts";
+import { registerPushRoutes } from "../src/push-routes.ts";
 import { buildRssFeed, parseFeed, findHackathonMentions } from "../src/feed.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
@@ -37,6 +38,7 @@ registerMcpRoutes(app, sql);
 registerFeedRoutes(app, sql);
 registerDevpostRoutes(app, sql);
 registerCalendarRoutes(app, sql);
+registerPushRoutes(app, sql, undefined);
 
 const call = (method, path, body, isForm, headers) => {
   const init = { method };
@@ -1149,6 +1151,66 @@ console.log("\n=== 18. The calendar ===");
   for (const h of hs) {
     if (h.name === "Calendar Test Hackathon") await call("DELETE", "/api/hackathons/" + h.id);
   }
+}
+
+console.log("\n=== 19. Web push ===");
+{
+  // The harness app has no VAPID keys, so the routes have to say so
+  // rather than pretend.
+  const key = await call("GET", "/api/push/key");
+  const keyBody = await key.json();
+  check("the key route answers when there are no keys", key.status === 503, "HTTP " + key.status);
+  check("it says what is missing",
+        typeof keyBody.message === "string" && keyBody.message.includes("VAPID"),
+        JSON.stringify(keyBody).slice(0, 80));
+
+  const status = await call("GET", "/api/push/status");
+  const statusBody = await status.json();
+  check("the status route answers", status.status === 200, "HTTP " + status.status);
+  check("it reports that no keys are set", statusBody.keys_configured === false, JSON.stringify(statusBody));
+  check("it counts the subscriptions", typeof statusBody.count === "number", statusBody.count);
+
+  // A subscription needs an endpoint and both keys.
+  const noKeys = await call("POST", "/api/push/subscribe", { endpoint: "https://example.com/push" });
+  check("a subscription without keys is refused", noKeys.status === 400, "HTTP " + noKeys.status);
+
+  const notHttps = await call("POST", "/api/push/subscribe", {
+    endpoint: "http://example.com/push",
+    keys: { p256dh: "abc", auth: "def" },
+  });
+  check("a subscription that is not https is refused", notHttps.status === 400, "HTTP " + notHttps.status);
+
+  // A real-looking one is stored.
+  const endpoint = "https://updates.push.services.mozilla.com/wpush/v2/" + "a".repeat(40);
+  const sub = await call("POST", "/api/push/subscribe", {
+    endpoint,
+    keys: { p256dh: "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27ml", auth: "BTBZMqHH6r4Tts7J_aSIgg" },
+  });
+  check("a subscription is accepted", sub.status === 200, "HTTP " + sub.status);
+  const afterSub = await (await call("GET", "/api/push/status")).json();
+  check("the subscription is counted", afterSub.count === 1, JSON.stringify(afterSub));
+
+  // The same one again does not double up.
+  await call("POST", "/api/push/subscribe", {
+    endpoint,
+    keys: { p256dh: "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27ml", auth: "BTBZMqHH6r4Tts7J_aSIgg" },
+  });
+  const afterAgain = await (await call("GET", "/api/push/status")).json();
+  check("the same subscription is not counted twice", afterAgain.count === 1, JSON.stringify(afterAgain));
+
+  // The endpoint is a secret: it must not come back out.
+  check("the endpoint is never returned",
+        !JSON.stringify(afterAgain).includes(endpoint), "the endpoint leaked");
+
+  // With no keys set, a test push cannot be sent, and it says so.
+  const noPush = await call("POST", "/api/push/test");
+  check("a test push without keys is refused", noPush.status === 503, "HTTP " + noPush.status);
+
+  // Unsubscribing removes it.
+  const unsub = await call("POST", "/api/push/unsubscribe", { endpoint });
+  check("a subscription can be removed", unsub.status === 200, "HTTP " + unsub.status);
+  const afterUnsub = await (await call("GET", "/api/push/status")).json();
+  check("it is gone", afterUnsub.count === 0, JSON.stringify(afterUnsub));
 }
 
 console.log("\n" + "=".repeat(60));

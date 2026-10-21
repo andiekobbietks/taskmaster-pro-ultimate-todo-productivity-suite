@@ -10,6 +10,7 @@ import { registerMcpRoutes } from "./mcp-sdk";
 import { registerFeedRoutes } from "./feed-routes";
 import { registerDevpostRoutes } from "./devpost-routes";
 import { registerCalendarRoutes } from "./calendar-routes";
+import { registerPushRoutes } from "./push-routes";
 import { createSchema } from "./schema";
 import { Hono } from "hono";
 
@@ -305,6 +306,7 @@ export class App extends DurableObject {
     registerFeedRoutes(this.app, this.ctx.storage.sql);
     registerDevpostRoutes(this.app, this.ctx.storage.sql);
     registerCalendarRoutes(this.app, this.ctx.storage.sql);
+    registerPushRoutes(this.app, this.ctx.storage.sql, this.env);
 
     // Seed sample data ONLY when explicitly enabled.
     //

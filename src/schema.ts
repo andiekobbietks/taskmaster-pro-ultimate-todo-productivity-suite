@@ -111,6 +111,16 @@ export const SCHEMA: string[] = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
     )`,
+  `CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint TEXT PRIMARY KEY,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT DEFAULT '',
+    created_at INTEGER NOT NULL,
+    last_ok INTEGER DEFAULT NULL,
+    last_error TEXT DEFAULT '',
+    failures INTEGER DEFAULT 0
+    )`,
   `CREATE TABLE IF NOT EXISTS rate_limits (
     ip TEXT PRIMARY KEY,
     count INTEGER DEFAULT 0,

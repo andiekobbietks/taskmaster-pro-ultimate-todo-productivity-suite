@@ -27,6 +27,7 @@ import {
   EmailListItem, EmailDetail, InboxSplitView, EmailListSkeleton,
 } from "./components/InboxPrimitives";
 import { CalendarWizard, ExperimentalBadge } from "./components/CalendarWizard";
+import { PushSettings, registerServiceWorker } from "./components/PushSettings";
 
 /**
  * A dismissible banner that tells the person what failed and offers a retry.
@@ -115,7 +116,12 @@ function App() {
 
   // Hackathon Tracker state
   const [hackathons, setHackathons] = useState([]);
-  const [activeView, setActiveView] = useState('tasks'); // 'tasks', 'today', 'hackathons', 'inbox', 'archives', 'settings'
+  // The manifest's shortcuts open a view: /?view=hackathons, /?view=inbox.
+  const [activeView, setActiveView] = useState(() => {
+    if (typeof window === 'undefined') return 'tasks';
+    const wanted = new URLSearchParams(window.location.search).get('view');
+    return ['tasks', 'today', 'hackathons', 'inbox', 'archives'].includes(wanted) ? wanted : 'tasks';
+  }); // 'tasks', 'today', 'hackathons', 'inbox', 'archives', 'settings'
   const [hackathonProfile, setHackathonProfile] = useState(null);
   const [isHackathonModalOpen, setIsHackathonModalOpen] = useState(false);
   const [editingHackathon, setEditingHackathon] = useState(null);
@@ -189,6 +195,11 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
       document.documentElement.classList.remove("dark");
     }
   }, [darkMode]);
+
+  // The service worker: what receives a push when the tab is closed.
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
 
   // Timer countdown effect
   useEffect(() => {
@@ -1469,9 +1480,16 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                 onChange={(e) => saveSettings({ notifications: { ...settings.notifications, digest_time: e.target.value } })}
                                 className="h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
                               />
+                              <p className="text-xs text-neutral-400 mt-1">
+                                In your own time. The app does not know your time zone
+                                yet, so this is read as UTC until you set one.
+                              </p>
                             </div>
                           </div>
                         </div>
+
+                        {/* Push notifications */}
+                        <PushSettings />
                       </div>
                     )}
 

@@ -27,6 +27,21 @@
        Replaces the Tailwind Play CDN that used to be loaded from
        cdn.tailwindcss.com at runtime. -->
   <link rel="stylesheet" href="/assets/app.css">
+
+  <!-- The app is installable: a manifest, the icons it points at, and the
+       bits iOS needs for a Home Screen web app. iOS ignores the manifest
+       for most things but it does read the apple-touch-icon, and it needs
+       apple-mobile-web-app-capable for the app to open without the
+       browser chrome. -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <meta name="theme-color" content="#5E6AD2">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="TaskMaster">
+  <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body class="bg-[#F8FAFC] dark:bg-[#0A0E1A] text-[#0F172A] dark:text-[#F1F5F9] font-sans antialiased selection:bg-brand-500/20 selection:text-brand-600">
   <div id="root"></div>

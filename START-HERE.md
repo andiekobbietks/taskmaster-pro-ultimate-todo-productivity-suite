@@ -105,6 +105,25 @@ there, with no configuration file of your own:
 python scripts/capture-wacz.py --from-app
 ```
 
+### Driving the capture without running anything
+
+There is an MCP server for the capture, registered in
+`~/.config/opencode/opencode.jsonc` as `taskmaster-capture`. It gives
+five tools:
+
+| Tool | What it does |
+|---|---|
+| `capture_manifest` | What the app wants captured |
+| `add_to_manifest` | Add a page to it |
+| `capture_competition` | Capture one page and hand it to the app |
+| `capture_all` | Queue the manifest and capture all of it |
+| `capture_status` | What the app is holding |
+
+So the capture can be driven by an agent rather than by a script you
+remember to run. It needs the app running on port 8787. The server lives
+in `~/.config/opencode/mcp/taskmaster-capture/`, and it takes
+\`TM_API\` and \`TM_REPO\` from the environment.
+
 That records the page's traffic into a WACZ and posts it to
 `POST /api/archive/wacz`, where the app reads it, extracts the deadline,
 prize and rules, and keeps the raw HTML for the compiler pipeline. The

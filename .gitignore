@@ -22,3 +22,8 @@ public/assets/
 w*.log
 w*.err
 dist/
+
+# The WACZ archives the capture writes. They are the app's input, and they
+# are large; the app holds the competitions that came out of them.
+captures/
+screenshots/

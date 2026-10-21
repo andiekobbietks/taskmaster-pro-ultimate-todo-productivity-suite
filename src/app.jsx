@@ -140,6 +140,17 @@ function App() {
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
+  // Add/Edit Hackathon form
+  const [hackathonForm, setHackathonForm] = useState({
+    name: "", platform: "devpost", url: "", description: "", prize: "",
+    start_date: "", end_date: "", submission_deadline: "", status: "open",
+    notes: "", eligibility_type: "unrestricted", eligibility_countries: "",
+  });
+  const [savingHackathon, setSavingHackathon] = useState(false);
+
+  // Multi-selection for the hackathon list
+  const [selectedHackathons, setSelectedHackathons] = useState([]);
+
   /**
    * Build an error handler for one kind of work.
    *
@@ -205,6 +216,15 @@ function App() {
       fail("Loading your tasks", fetchTodos)(err);
     }
   }, [activeTab, activeListId, priorityFilter, searchQuery, fail]);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const data = await api("./api/settings");
+      setSettings(data);
+    } catch (err) {
+      fail("Loading settings")(err);
+    }
+  }, [fail]);
 
   const loadHackathons = useCallback(async () => {
     try {
@@ -465,7 +485,158 @@ function App() {
     loadInbox();
     loadInboxStats();
     loadEligibility();
-  }, [fetchTodos, fetchLists, fetchStats, loadHackathons, loadInbox, loadInboxStats, loadEligibility]);
+    loadSettings();
+  }, [fetchTodos, fetchLists, fetchStats, loadHackathons, loadInbox, loadInboxStats, loadEligibility, loadSettings]);
+
+  // --- Hackathon CRUD -------------------------------------------------
+
+  const openHackathonModal = (h) => {
+    if (h) {
+      setEditingHackathon(h);
+      setHackathonForm({
+        name: h.name || "",
+        platform: h.platform || "devpost",
+        url: h.url || "",
+        description: h.description || "",
+        prize: h.prize || "",
+        start_date: h.start_date || "",
+        end_date: h.end_date || "",
+        submission_deadline: h.submission_deadline || "",
+        status: h.status || "open",
+        notes: h.notes || "",
+        eligibility_type: (h.eligibility && h.eligibility.eligibility_type) || "unrestricted",
+        eligibility_countries: ((h.eligibility && (h.eligibility.citizenships || h.eligibility.residencies) || []).join(", ")),
+      });
+    } else {
+      setEditingHackathon(null);
+      setHackathonForm({
+        name: "", platform: "devpost", url: "", description: "", prize: "",
+        start_date: "", end_date: "", submission_deadline: "", status: "open",
+        notes: "", eligibility_type: "unrestricted", eligibility_countries: "",
+      });
+    }
+    setIsHackathonModalOpen(true);
+  };
+
+  // Build the eligibility rule from the form fields.
+  const buildEligibility = (form) => {
+    const rule = { eligibility_type: form.eligibility_type };
+    const countries = (form.eligibility_countries || "")
+      .split(",").map((c) => c.trim().toUpperCase()).filter(Boolean);
+    if (form.eligibility_type === "citizenship") {
+      rule.citizenships = countries;
+      rule.regions = ["EU"];
+    } else if (form.eligibility_type === "residency") {
+      rule.residencies = countries;
+      rule.regions = countries.length ? [countries[0]] : ["Global"];
+    } else {
+      rule.regions = ["Global"];
+    }
+    rule.age_min = 13;
+    return rule;
+  };
+
+  const saveHackathon = async (e) => {
+    e.preventDefault();
+    if (!hackathonForm.name.trim()) return;
+    setSavingHackathon(true);
+    const payload = {
+      name: hackathonForm.name.trim(),
+      platform: hackathonForm.platform,
+      url: hackathonForm.url,
+      description: hackathonForm.description,
+      prize: hackathonForm.prize,
+      start_date: hackathonForm.start_date || null,
+      end_date: hackathonForm.end_date || null,
+      submission_deadline: hackathonForm.submission_deadline || null,
+      status: hackathonForm.status,
+      notes: hackathonForm.notes,
+      eligibility: buildEligibility(hackathonForm),
+    };
+    try {
+      if (editingHackathon) {
+        await api(`./api/hackathons/${editingHackathon.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await api("./api/hackathons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+      setIsHackathonModalOpen(false);
+      setEditingHackathon(null);
+      await loadHackathons();
+      await loadEligibility();
+    } catch (err) {
+      fail(editingHackathon ? "Saving the hackathon" : "Creating the hackathon")(
+        () => saveHackathon(e)
+      )(err);
+    } finally {
+      setSavingHackathon(false);
+    }
+  };
+
+  const deleteHackathon = async (h) => {
+    if (!confirm(`Delete "${h.name}"? This cannot be undone.`)) return;
+    try {
+      await api(`./api/hackathons/${h.id}`, { method: "DELETE" });
+      setSelectedHackathons((prev) => prev.filter((id) => id !== h.id));
+      await loadHackathons();
+      await loadEligibility();
+    } catch (err) {
+      fail("Deleting the hackathon", () => deleteHackathon(h))(err);
+    }
+  };
+
+  // --- Multi-selection -------------------------------------------------
+
+  const toggleHackathonSelected = (id) => {
+    setSelectedHackathons((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllHackathons = () => {
+    setSelectedHackathons((prev) =>
+      prev.length === hackathons.length ? [] : hackathons.map((h) => h.id)
+    );
+  };
+
+  const bulkSetStatus = async (status) => {
+    if (selectedHackathons.length === 0) return;
+    try {
+      for (const id of selectedHackathons) {
+        await api(`./api/hackathons/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+      }
+      setSelectedHackathons([]);
+      await loadHackathons();
+    } catch (err) {
+      fail("Updating the selected hackathons", () => bulkSetStatus(status))(err);
+    }
+  };
+
+  const bulkDeleteHackathons = async () => {
+    if (selectedHackathons.length === 0) return;
+    if (!confirm(`Delete ${selectedHackathons.length} hackathon(s)? This cannot be undone.`)) return;
+    try {
+      for (const id of selectedHackathons) {
+        await api(`./api/hackathons/${id}`, { method: "DELETE" });
+      }
+      setSelectedHackathons([]);
+      await loadHackathons();
+      await loadEligibility();
+    } catch (err) {
+      fail("Deleting the selected hackathons", bulkDeleteHackathons)(err);
+    }
+  };
 
   const handleCreateTodo = async (e) => {
     e.preventDefault();
@@ -1189,6 +1360,48 @@ function App() {
                                 className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
                               />
                             </div>
+
+                            {/* JMAP (RFC 8620) — the alternative to IMAP, implemented in
+                                src/jmap.ts. Leave blank to use IMAP only. */}
+                            <div className="pt-2 mt-1 border-t border-neutral-200 dark:border-neutral-800">
+                              <p className="text-xs text-neutral-400 mb-3">
+                                JMAP (RFC 8620) — optional. Leave blank to use IMAP only.
+                              </p>
+                            
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">JMAP server URL</label>
+                                  <input
+                                    type="url"
+                                    value={settings.email?.jmap_server_url || ''}
+                                    onChange={(e) => saveSettings({ email: { ...settings.email, jmap_server_url: e.target.value } })}
+                                    placeholder="https://apidata.fastmail.com"
+                                    className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                  />
+                                </div>
+                            
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">JMAP username</label>
+                                  <input
+                                    type="text"
+                                    value={settings.email?.jmap_username || ''}
+                                    onChange={(e) => saveSettings({ email: { ...settings.email, jmap_username: e.target.value } })}
+                                    placeholder="you@example.com"
+                                    className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                  />
+                                </div>
+                            
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">JMAP password (app password)</label>
+                                  <input
+                                    type="password"
+                                    value={settings.email?.jmap_password || ''}
+                                    onChange={(e) => saveSettings({ email: { ...settings.email, jmap_password: e.target.value } })}
+                                    className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1484,7 +1697,7 @@ function App() {
                           Refresh
                         </button>
                         <button
-                          onClick={() => { setEditingHackathon(null); setIsHackathonModalOpen(true); }}
+                          onClick={() => openHackathonModal(null)}
                           className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5" />
@@ -1492,6 +1705,55 @@ function App() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Bulk actions — shown when something is selected */}
+                    {selectedHackathons.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800">
+                        <span className="text-xs font-medium text-brand-700 dark:text-brand-300">
+                          {selectedHackathons.length} selected
+                        </span>
+                        <div className="flex-1" />
+                        <button
+                          onClick={() => bulkSetStatus("open")}
+                          className="h-7 px-2.5 rounded-md text-xs font-medium bg-white dark:bg-neutral-800 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-50 transition-colors"
+                        >
+                          Mark open
+                        </button>
+                        <button
+                          onClick={() => bulkSetStatus("closed")}
+                          className="h-7 px-2.5 rounded-md text-xs font-medium bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 transition-colors"
+                        >
+                          Mark closed
+                        </button>
+                        <button
+                          onClick={bulkDeleteHackathons}
+                          className="h-7 px-2.5 rounded-md text-xs font-medium bg-white dark:bg-neutral-800 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 transition-colors"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setSelectedHackathons([])}
+                          className="h-7 px-2.5 rounded-md text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Select all. The label wraps the text so clicking the
+                        words toggles the checkbox, not just the box. */}
+                    {hackathons.length > 0 && (
+                      <label className="flex items-center gap-2 text-xs text-neutral-500 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={selectedHackathons.length === hackathons.length && hackathons.length > 0}
+                          onChange={toggleSelectAllHackathons}
+                          aria-label="Select all hackathons"
+                          className="rounded border-neutral-300 dark:border-neutral-600 text-brand-600 focus:ring-brand-500/40 cursor-pointer"
+                        />
+                        <span>Select all</span>
+                      </label>
+                    )}
 
                     {hackathons.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
@@ -1511,6 +1773,13 @@ function App() {
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedHackathons.includes(h.id)}
+                                      onChange={() => toggleHackathonSelected(h.id)}
+                                      aria-label={`Select ${h.name}`}
+                                      className="rounded border-neutral-300 dark:border-neutral-600 text-brand-600 focus:ring-brand-500/40 cursor-pointer"
+                                    />
                                     <h3 className="text-sm font-semibold tracking-tight">{h.name}</h3>
                                     <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
                                       {h.platform}
@@ -1582,8 +1851,27 @@ function App() {
                                 )}
 
                                 <div className="flex items-center gap-1">
+                                  {/* Per-card screenshot upload. The old button sat
+                                      at the view level and used editingHackathon.id,
+                                      so it silently did nothing. */}
+                                  <label
+                                    title="Attach a screenshot to this hackathon"
+                                    className="p-1.5 rounded text-neutral-400 hover:text-brand-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files && e.target.files[0];
+                                        if (file) uploadAttachment(h.id, file);
+                                        e.target.value = "";
+                                      }}
+                                    />
+                                  </label>
                                   <button
-                                    onClick={() => { setEditingHackathon(h); setIsHackathonModalOpen(true); }}
+                                    onClick={() => openHackathonModal(h)}
                                     className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 transition-colors"
                                     title="Edit"
                                   >
@@ -1609,24 +1897,6 @@ function App() {
                       </div>
                     )}
 
-                    {/* Upload attachment button */}
-                    <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                      <label className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-colors cursor-pointer ${uploadingAttachment ? 'bg-neutral-200 text-neutral-400' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}`}>
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                        {uploadingAttachment ? 'Uploading...' : 'Attach Screenshot'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file && editingHackathon) {
-                              uploadAttachment(editingHackathon.id, file);
-                            }
-                          }}
-                        />
-                      </label>
-                    </div>
                   </div>
                 )}
 
@@ -1776,6 +2046,193 @@ function App() {
               </div>
             </main>
           </div>
+
+          {/* Add / Edit Hackathon Modal */}
+          {isHackathonModalOpen && (
+            <div className="fixed inset-0 z-50 bg-neutral-900/40 backdrop-blur-[2px] flex items-center justify-center p-4 animate-fadeIn" onClick={() => setIsHackathonModalOpen(false)}>
+              <div className="w-full max-w-2xl bg-white dark:bg-[#111827] rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-neutral-200 dark:border-neutral-800">
+                  <h3 className="text-base font-semibold">
+                    {editingHackathon ? 'Edit Hackathon' : 'Add Hackathon'}
+                  </h3>
+                  <button onClick={() => setIsHackathonModalOpen(false)} className="p-1.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={saveHackathon} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Name *</label>
+                      <input
+                        type="text"
+                        value={hackathonForm.name}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, name: e.target.value })}
+                        placeholder="Amazon Developer Hackathon"
+                        required
+                        autoFocus
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Platform</label>
+                      <select
+                        value={hackathonForm.platform}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, platform: e.target.value })}
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                      >
+                        {['devpost', 'mlh', 'kaggle', 'lablab', 'ethglobal', 'devfolio', 'unstop', 'other'].map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Status</label>
+                      <select
+                        value={hackathonForm.status}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, status: e.target.value })}
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                      >
+                        <option value="open">Open</option>
+                        <option value="registered">Registered</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Prize</label>
+                      <input
+                        type="text"
+                        value={hackathonForm.prize}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, prize: e.target.value })}
+                        placeholder="$138,000"
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">URL</label>
+                      <input
+                        type="url"
+                        value={hackathonForm.url}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, url: e.target.value })}
+                        placeholder="https://devpost.com/hackathons/..."
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Start date</label>
+                      <input
+                        type="date"
+                        value={hackathonForm.start_date || ''}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, start_date: e.target.value })}
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Submission deadline</label>
+                      <input
+                        type="date"
+                        value={hackathonForm.submission_deadline || ''}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, submission_deadline: e.target.value })}
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">End date</label>
+                      <input
+                        type="date"
+                        value={hackathonForm.end_date || ''}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, end_date: e.target.value })}
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Eligibility</label>
+                      <select
+                        value={hackathonForm.eligibility_type}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, eligibility_type: e.target.value })}
+                        className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                      >
+                        <option value="unrestricted">Open to everyone</option>
+                        <option value="citizenship">By citizenship</option>
+                        <option value="residency">By residence</option>
+                      </select>
+                    </div>
+
+                    {hackathonForm.eligibility_type !== 'unrestricted' && (
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Countries (ISO codes)</label>
+                        <input
+                          type="text"
+                          value={hackathonForm.eligibility_countries}
+                          onChange={(e) => setHackathonForm({ ...hackathonForm, eligibility_countries: e.target.value })}
+                          placeholder="IT, GB, DE, FR"
+                          className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                        />
+                        <p className="text-[11px] text-neutral-400 mt-1">Two-letter codes. Your profile is checked against this list.</p>
+                      </div>
+                    )}
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Description</label>
+                      <textarea
+                        value={hackathonForm.description}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, description: e.target.value })}
+                        placeholder="What is this competition about?"
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Notes</label>
+                      <textarea
+                        value={hackathonForm.notes}
+                        onChange={(e) => setHackathonForm({ ...hackathonForm, notes: e.target.value })}
+                        placeholder="The community Discord, the team, what went wrong last time."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                    {editingHackathon && (
+                      <button
+                        type="button"
+                        onClick={() => deleteHackathon(editingHackathon)}
+                        className="mr-auto h-9 px-3 rounded-md text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsHackathonModalOpen(false)}
+                      className="h-9 px-3 rounded-md text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingHackathon}
+                      className="h-9 px-4 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                    >
+                      {savingHackathon ? 'Saving...' : editingHackathon ? 'Save changes' : 'Add hackathon'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* New Task Modal / Drawer */}
           {isAddingOpen && (

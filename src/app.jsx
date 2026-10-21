@@ -144,6 +144,13 @@ function App() {
   // Mail ingestion, from the Settings screen
   const [mailFetching, setMailFetching] = useState(false);
   const [mailFetchResult, setMailFetchResult] = useState(null);
+  const [yahooTesting, setYahooTesting] = useState(false);
+  const [yahooTestResult, setYahooTestResult] = useState(null);
+
+  // The capture manifest
+  const [captureJobs, setCaptureJobs] = useState([]);
+  const [captureQueuing, setCaptureQueuing] = useState(false);
+  const [captureMessage, setCaptureMessage] = useState(null);
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
@@ -251,6 +258,83 @@ function App() {
       setMailFetching(false);
     }
   };
+
+  // --- The Yahoo application and the capture manifest ---------------------
+
+  // A secret the API has masked must not be written back. Anything that
+  // still holds the mask is left out of the payload, so saving one field
+  // does not wipe the others.
+  const SECRET_MASK = "********";
+  const withoutMasks = (section) => {
+    if (!section) return section;
+    const out = { ...section };
+    for (const key of Object.keys(out)) {
+      if (out[key] === SECRET_MASK) delete out[key];
+    }
+    return out;
+  };
+
+  const testYahooConnection = async () => {
+    setYahooTesting(true);
+    setYahooTestResult(null);
+    try {
+      const data = await api("./api/settings/test-yahoo", { method: "POST" });
+      setYahooTestResult(data);
+    } catch (err) {
+      setYahooTestResult({ ok: false, message: describeError(err) });
+    } finally {
+      setYahooTesting(false);
+    }
+  };
+
+  const loadCaptureJobs = useCallback(async () => {
+    try {
+      const data = await api("./api/capture/jobs");
+      setCaptureJobs(Array.isArray(data) ? data : []);
+    } catch {
+      setCaptureJobs([]);
+    }
+  }, []);
+
+  const queueCaptures = async (all) => {
+    setCaptureQueuing(true);
+    setCaptureMessage(null);
+    try {
+      const data = await api("./api/capture/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(all ? { all: true } : {}),
+      });
+      setCaptureMessage(data.queued + " capture(s) queued.");
+      await loadCaptureJobs();
+    } catch (err) {
+      setCaptureMessage(describeError(err));
+    } finally {
+      setCaptureQueuing(false);
+    }
+  };
+
+  const updateSource = (index, patch) => {
+    const sources = (settings.capture?.sources || []).map((s, i) =>
+      i === index ? { ...s, ...patch } : s);
+    saveSettings({ capture: { ...settings.capture, sources } });
+  };
+
+  const addSource = () => {
+    const sources = [...(settings.capture?.sources || []),
+                     { url: "", name: "", enabled: true, follow: 0 }];
+    saveSettings({ capture: { ...settings.capture, sources } });
+  };
+
+  const removeSource = (index) => {
+    const sources = (settings.capture?.sources || []).filter((_s, i) => i !== index);
+    saveSettings({ capture: { ...settings.capture, sources } });
+  };
+
+  // The capture jobs are only worth loading when the tab is showing.
+  useEffect(() => {
+    if (settingsTab === 'capture') loadCaptureJobs();
+  }, [settingsTab, loadCaptureJobs]);
 
   // --- Inbox bulk selection ---------------------------------------------
 
@@ -1169,7 +1253,7 @@ function App() {
 
                     {/* Settings tabs */}
                     <div className="flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-800 pb-2">
-                      {['storage', 'profile', 'notifications', 'email'].map(tab => (
+                      {['storage', 'profile', 'notifications', 'email', 'capture'].map(tab => (
                         <button
                           key={tab}
                           onClick={() => setSettingsTab(tab)}
@@ -1447,8 +1531,9 @@ function App() {
                               <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP password (app password)</label>
                               <input
                                 type="password"
-                                value={settings.email?.imap_password || ''}
-                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_password: e.target.value } })}
+                                value={settings.email?.imap_password === SECRET_MASK ? '' : (settings.email?.imap_password || '')}
+                                      placeholder={settings.email?.imap_password === SECRET_MASK ? 'Set - type to change' : ''}
+                                onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, imap_password: e.target.value }) })}
                                 className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
                               />
                             </div>
@@ -1487,8 +1572,9 @@ function App() {
                                   <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">JMAP password (app password)</label>
                                   <input
                                     type="password"
-                                    value={settings.email?.jmap_password || ''}
-                                    onChange={(e) => saveSettings({ email: { ...settings.email, jmap_password: e.target.value } })}
+                                    value={settings.email?.jmap_password === SECRET_MASK ? '' : (settings.email?.jmap_password || '')}
+                                      placeholder={settings.email?.jmap_password === SECRET_MASK ? 'Set - type to change' : ''}
+                                    onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, jmap_password: e.target.value }) })}
                                     className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                   />
                                 </div>
@@ -1519,8 +1605,184 @@ function App() {
                                   server above &mdash; IMAP is not supported yet.
                                 </p>
                               </div>
+
+                              {/* The Yahoo Mail API. Register an application at
+                                  developer.yahoo.com with the Mail / Read
+                                  permission, then paste the three values
+                                  here. The app fetches your mail itself
+                                  with these, inside the Worker. */}
+                              <div className="pt-3 mt-1 border-t border-neutral-200 dark:border-neutral-800">
+                                <p className="text-xs text-neutral-500 mb-2">
+                                  Yahoo Mail API &mdash; optional. Takes precedence over JMAP.
+                                </p>
+
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Client ID</label>
+                                    <input
+                                      type="text"
+                                      value={settings.email?.yahoo_client_id || ''}
+                                      onChange={(e) => saveSettings({ email: { ...settings.email, yahoo_client_id: e.target.value } })}
+                                      placeholder="your Yahoo consumer key"
+                                      className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Client secret</label>
+                                    <input
+                                      type="password"
+                                      value={settings.email?.yahoo_client_secret === SECRET_MASK ? '' : (settings.email?.yahoo_client_secret || '')}
+                                      placeholder={settings.email?.yahoo_client_secret === SECRET_MASK ? 'Set - type to change' : ''}
+                                      placeholder="type to set it"
+                                      onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_client_secret: e.target.value }) })}
+                                      className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Refresh token</label>
+                                    <input
+                                      type="password"
+                                      value={settings.email?.yahoo_refresh_token === SECRET_MASK ? '' : (settings.email?.yahoo_refresh_token || '')}
+                                      placeholder={settings.email?.yahoo_refresh_token === SECRET_MASK ? 'Set - type to change' : ''}
+                                      placeholder="type to set it"
+                                      onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_refresh_token: e.target.value }) })}
+                                      className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Mailbox</label>
+                                    <input
+                                      type="text"
+                                      value={settings.email?.yahoo_mailbox_id || '/'}
+                                      onChange={(e) => saveSettings({ email: { ...settings.email, yahoo_mailbox_id: e.target.value } })}
+                                      placeholder="/"
+                                      className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 mt-3">
+                                  <button
+                                    type="button"
+                                    onClick={testYahooConnection}
+                                    disabled={yahooTesting}
+                                    className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-50 transition-colors"
+                                  >
+                                    {yahooTesting ? 'Testing...' : 'Test connection'}
+                                  </button>
+                                  {yahooTestResult && (
+                                    <span className={`text-xs ${yahooTestResult.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                      {yahooTestResult.message}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Capture settings */}
+                    {settingsTab === 'capture' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-1">Capture manifest</h3>
+                          <p className="text-xs text-neutral-500 mb-3">
+                            The pages to capture. A capture records the traffic that made
+                            the page, not a picture of it, and the app reads the deadline,
+                            prize and rules straight out of it.
+                          </p>
+
+                          <div className="space-y-2">
+                            {(settings.capture?.sources || []).map((source, index) => (
+                              <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/50">
+                                <input
+                                  type="checkbox"
+                                  checked={source.enabled !== false}
+                                  onChange={(e) => updateSource(index, { enabled: e.target.checked })}
+                                  aria-label="Capture this page"
+                                  className="rounded border-neutral-300 dark:border-neutral-600 text-brand-600 focus:ring-brand-500/40 cursor-pointer"
+                                />
+                                <input
+                                  type="text"
+                                  value={source.url || ''}
+                                  onChange={(e) => updateSource(index, { url: e.target.value })}
+                                  placeholder="https://devpost.com/hackathons/..."
+                                  className="flex-1 h-8 px-2.5 rounded-md text-xs bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeSource(index)}
+                                  aria-label="Remove this page"
+                                  className="p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                            {(settings.capture?.sources || []).length === 0 && (
+                              <p className="text-xs text-neutral-400 py-2">
+                                Nothing in the manifest yet.
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 mt-3">
+                            <button
+                              type="button"
+                              onClick={addSource}
+                              className="h-8 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                            >
+                              Add a page
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => queueCaptures(true)}
+                              disabled={captureQueuing}
+                              className="h-8 px-3 rounded-md text-xs font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                            >
+                              {captureQueuing ? 'Queuing...' : 'Queue the manifest'}
+                            </button>
+                            {captureMessage && (
+                              <span className="text-xs text-neutral-500">{captureMessage}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* The jobs the app is tracking */}
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold">Captures</h3>
+                            <button
+                              type="button"
+                              onClick={loadCaptureJobs}
+                              className="h-7 px-2.5 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                            >
+                              Refresh
+                            </button>
+                          </div>
+
+                          {captureJobs.length === 0 ? (
+                            <p className="text-xs text-neutral-400">No captures yet.</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {captureJobs.slice(0, 12).map((job) => (
+                                <div key={job.id} className="flex items-center gap-2 text-xs">
+                                  <span className={`w-16 shrink-0 font-mono ${job.status === 'done' ? 'text-green-600 dark:text-green-400' : job.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-neutral-400'}`}>
+                                    {job.status}
+                                  </span>
+                                  <span className="truncate text-neutral-600 dark:text-neutral-300 flex-1">{job.source_url}</span>
+                                  {job.extracted && job.extracted.deadline && (
+                                    <span className="shrink-0 text-neutral-400">{job.extracted.deadline}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

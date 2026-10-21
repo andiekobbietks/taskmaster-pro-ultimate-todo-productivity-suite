@@ -10,8 +10,41 @@
  */
 import { Hono } from "hono";
 import { DEFAULT_PROFILE, readProfile, writeProfile, type UserProfile } from "./profile.ts";
+import { testYahooConnection, type YahooConfig } from "./yahoo.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
+
+/**
+ * One page to capture.
+ *
+ * The manifest is a list of these. The capture runner reads it from the
+ * app, so there is no configuration file to keep in step with the app.
+ */
+export interface CaptureSource {
+  /** The page to capture */
+  url: string;
+  /** A name for it, used in the job list */
+  name?: string;
+  /** Whether it is in the manifest at all */
+  enabled?: boolean;
+  /** How many links on the page to follow and capture as well */
+  follow?: number;
+  /** Capture the whole site, not just the one page */
+  whole_site?: boolean;
+}
+
+/**
+ * The capture manifest and the rules around it.
+ */
+export interface CaptureSettings {
+  sources: CaptureSource[];
+  /** How many captures to run in one batch */
+  batch_size: number;
+  /** Keep the archive after it has been ingested */
+  keep_archive: boolean;
+  /** Where the runner should write the archives */
+  output_dir: string;
+}
 
 export interface Settings {
   storage: {
@@ -33,7 +66,14 @@ export interface Settings {
     jmap_server_url: string;
     jmap_username: string;
     jmap_password: string;
+    // The Yahoo Mail API. The app fetches the mail itself with these,
+    // inside the Worker. See src/yahoo.ts.
+    yahoo_client_id: string;
+    yahoo_client_secret: string;
+    yahoo_refresh_token: string;
+    yahoo_mailbox_id: string;
   };
+  capture: CaptureSettings;
   notifications: {
     daily_digest: boolean;
     digest_time: string;
@@ -63,6 +103,16 @@ const DEFAULT_SETTINGS: Settings = {
     jmap_server_url: "",
     jmap_username: "",
     jmap_password: "",
+    yahoo_client_id: "",
+    yahoo_client_secret: "",
+    yahoo_refresh_token: "",
+    yahoo_mailbox_id: "/",
+  },
+  capture: {
+    sources: [],
+    batch_size: 10,
+    keep_archive: true,
+    output_dir: "captures",
   },
   notifications: {
     daily_digest: true,
@@ -133,7 +183,8 @@ function deobfuscate(value: string): string {
 
 // Fields that should be obfuscated in storage
 const SENSITIVE_FIELDS = new Set([
-  "imap_password", "jmap_password", "azure_sas_token", "s3_secret_key",
+  "imap_password", "jmap_password", "yahoo_client_secret", "yahoo_refresh_token",
+  "azure_sas_token", "s3_secret_key",
 ]);
 
 function obfuscateSettings(settings: any): any {
@@ -165,6 +216,35 @@ function deobfuscateSettings(settings: any): any {
 }
 
 // ── Route registration ───────────────────────────────────────────────
+
+/**
+ * What a set secret looks like from the outside.
+ *
+ * The screen shows this instead of the value, so the API never hands a
+ * secret back. A person who wants to change one types a new value; the
+ * old one stays until they do.
+ */
+export const SECRET_MASK = "********";
+
+/**
+ * Replace the sensitive values with the mask.
+ *
+ * Applied at the API boundary only. readSettings returns the real values,
+ * because the mail and capture routes need them.
+ */
+export function maskSettings(settings: any): any {
+  const copy = JSON.parse(JSON.stringify(settings));
+  for (const section of Object.values(copy)) {
+    if (typeof section === "object" && section !== null) {
+      for (const [key, value] of Object.entries(section)) {
+        if (SENSITIVE_FIELDS.has(key) && typeof value === "string" && value !== "") {
+          (section as any)[key] = SECRET_MASK;
+        }
+      }
+    }
+  }
+  return copy;
+}
 
 /**
  * Read the whole settings object.
@@ -202,7 +282,9 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
   // --- Get all settings -----------------------------------------------
 
   app.get("/api/settings", (c) => {
-    return c.json(readSettings(sql));
+    // A secret is write-only. The screen is told that it is set, not what
+    // it is.
+    return c.json(maskSettings(readSettings(sql)));
   });
 
   // --- Update all settings --------------------------------------------
@@ -305,6 +387,21 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
     // the profile behind and the two would disagree.
     sql.exec("DELETE FROM hackathon_profile WHERE id = 'default'");
     return c.json(DEFAULT_SETTINGS);
+  });
+
+  // --- Test the Yahoo application --------------------------------------
+
+  app.post("/api/settings/test-yahoo", async (c) => {
+    const settings = readSettings(sql);
+    const email = settings.email || {};
+    const config: YahooConfig = {
+      client_id: email.yahoo_client_id || "",
+      client_secret: email.yahoo_client_secret || "",
+      refresh_token: email.yahoo_refresh_token || "",
+      mailbox_id: email.yahoo_mailbox_id || "/",
+    };
+    const result = await testYahooConnection(config);
+    return c.json(result, result.ok ? 200 : 400);
   });
 
   // --- Test storage connection ----------------------------------------

@@ -196,7 +196,22 @@ def run(page, results):
                     page.locator("input[placeholder='https://apidata.fastmail.com']").count() == 1))
     results.append(("the Fetch mail now button is present",
                     page.get_by_role("button", name="Fetch mail now", exact=True).count() == 1))
+    results.append(("the Yahoo client id field is present",
+                    page.get_by_placeholder("your Yahoo consumer key").count() == 1))
+    results.append(("the Yahoo test button is present",
+                    page.get_by_role("button", name="Test connection", exact=True).count() == 1))
     page.screenshot(path=os.path.join(SHOTS, "tm-settings-populated.png"), full_page=True)
+
+    # The capture manifest tab.
+    page.get_by_role("button", name="capture", exact=True).click()
+    time.sleep(1.5)
+    results.append(("the capture tab shows the manifest",
+                    page.get_by_text("Capture manifest").count() > 0))
+    results.append(("the capture tab can queue the manifest",
+                    page.get_by_role("button", name="Queue the manifest", exact=True).count() == 1))
+    results.append(("the capture tab shows the captures",
+                    page.get_by_text("Captures", exact=True).count() > 0))
+    page.screenshot(path=os.path.join(SHOTS, "tm-capture-manifest.png"), full_page=True)
 
     print("--- Inbox ---")
     page.click("text=Inbox")

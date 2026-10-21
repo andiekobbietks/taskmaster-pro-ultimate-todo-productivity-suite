@@ -10,11 +10,17 @@
  */
 import { readSettings } from "./settings.ts";
 import { fetchEmailsSince, type JMAPConfig, type JMAPEmail } from "./jmap.ts";
+import { hasYahooConfig, listMessages, getRawMessage, type YahooConfig } from "./yahoo.ts";
 
 export interface MailFetchResult {
   ok: boolean;
   fetched: number;
+  /** Messages from JMAP, which arrive with their fields already parsed */
   messages: JMAPEmail[];
+  /** Raw sources from the Yahoo Mail API, which arrive as MIME */
+  raws: Array<{ id: string; raw: string }>;
+  /** Which transport was used */
+  source: "yahoo" | "jmap" | "none";
   message: string;
 }
 
@@ -40,12 +46,19 @@ export async function fetchNewMail(sql: any): Promise<MailFetchResult> {
   const settings = readSettings(sql);
   const email = settings.email || {};
 
+  // The Yahoo Mail API comes first when it is set up. It is a plain HTTP
+  // API, so the Worker can call it itself, and it hands back the raw
+  // source of each message.
+  if (hasYahooConfig(email)) {
+    return fetchFromYahoo(email);
+  }
+
   const serverUrl = (email.jmap_server_url || "").trim();
   if (!serverUrl) {
     return {
-      ok: false, fetched: 0, messages: [],
-      message: "No mail server is configured. Add a JMAP server in Settings, " +
-               "or forward mail to POST /api/inbox.",
+      ok: false, fetched: 0, messages: [], raws: [], source: "none",
+      message: "No mail server is configured. Add a Yahoo application in " +
+               "Settings, or forward mail to POST /api/inbox.",
     };
   }
   if (!email.jmap_username || !email.jmap_password) {
@@ -75,8 +88,48 @@ export async function fetchNewMail(sql: any): Promise<MailFetchResult> {
     ok: true,
     fetched: messages.length,
     messages,
+    raws: [],
+    source: "jmap",
     message: messages.length === 0
       ? "Nothing new."
       : `Fetched ${messages.length} message(s).`,
+  };
+}
+
+/**
+ * Fetch over the Yahoo Mail API.
+ *
+ * The messages come back as raw MIME, so the inbox parses them the same
+ * way it parses a message posted from outside.
+ */
+async function fetchFromYahoo(email: any): Promise<MailFetchResult> {
+  const config: YahooConfig = {
+    client_id: email.yahoo_client_id,
+    client_secret: email.yahoo_client_secret,
+    refresh_token: email.yahoo_refresh_token,
+    mailbox_id: email.yahoo_mailbox_id || "/",
+  };
+
+  const listing = await listMessages(config, 25);
+  const raws: Array<{ id: string; raw: string }> = [];
+
+  for (const message of (listing as any).messages || []) {
+    try {
+      const raw = await getRawMessage(config, message.id);
+      raws.push({ id: message.id, raw });
+    } catch {
+      // One message that will not come down is not a reason to stop.
+    }
+  }
+
+  return {
+    ok: true,
+    fetched: raws.length,
+    messages: [],
+    raws,
+    source: "yahoo",
+    message: raws.length === 0
+      ? "Nothing new."
+      : `Fetched ${raws.length} message(s) from Yahoo.`,
   };
 }

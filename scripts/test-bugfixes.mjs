@@ -1,6 +1,7 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
+import { SCHEMA } from "../src/schema.ts";
 import { Hono } from "hono";
 import { makeSql } from "./do-sql.mjs";
 import { registerHackathonRoutes } from "../src/hackathons.ts";
@@ -10,41 +11,11 @@ import { registerAttachmentRoutes } from "../src/attachments.ts";
 import { registerSettingsRoutes } from "../src/settings.ts";
 import { registerCapacityRoutes } from "../src/capacity.ts";
 import { registerArchiveRoutes } from "../src/archive.ts";
+import { registerCaptureRoutes } from "../src/capture.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
 const db = new DatabaseSync(":memory:");
-db.exec(`
-  CREATE TABLE todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
-    description TEXT DEFAULT '', completed INTEGER DEFAULT 0, priority TEXT DEFAULT 'medium',
-    due_date TEXT DEFAULT NULL, list_id TEXT DEFAULT 'inbox', tags TEXT DEFAULT '[]',
-    is_pinned INTEGER DEFAULT 0, estimated_pomodoros INTEGER DEFAULT 1,
-    pomodoro_count INTEGER DEFAULT 0, created_at INTEGER NOT NULL, completed_at INTEGER DEFAULT NULL);
-  CREATE TABLE lists (id TEXT PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL,
-    icon TEXT NOT NULL, sort_order INTEGER DEFAULT 0);
-  CREATE TABLE hackathons (id TEXT PRIMARY KEY, name TEXT NOT NULL,
-    platform TEXT DEFAULT 'manual', url TEXT DEFAULT '', description TEXT DEFAULT '',
-    prize TEXT DEFAULT '', start_date TEXT DEFAULT NULL, end_date TEXT DEFAULT NULL,
-    registration_deadline TEXT DEFAULT NULL, submission_deadline TEXT DEFAULT NULL,
-    eligibility_json TEXT DEFAULT '{}', status TEXT DEFAULT 'open', notes TEXT DEFAULT '',
-    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
-  CREATE TABLE hackathon_profile (id TEXT PRIMARY KEY, profile_json TEXT NOT NULL,
-    updated_at INTEGER NOT NULL);
-  CREATE TABLE attachments (id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL,
-    filename TEXT NOT NULL, mime_type TEXT NOT NULL, data BLOB NOT NULL,
-    size INTEGER NOT NULL, created_at INTEGER NOT NULL);
-  CREATE TABLE inbox (id TEXT PRIMARY KEY, sender TEXT NOT NULL, subject TEXT NOT NULL,
-    received_at INTEGER NOT NULL, body_preview TEXT DEFAULT '', body_html TEXT DEFAULT '',
-    has_attachments INTEGER DEFAULT 0, attachment_names TEXT DEFAULT '[]',
-    is_platform INTEGER DEFAULT 0, platform TEXT DEFAULT NULL, ticket_id TEXT DEFAULT NULL,
-    read INTEGER DEFAULT 0, processed INTEGER DEFAULT 0, created_at INTEGER NOT NULL,
-    match_confidence REAL DEFAULT 0, match_method TEXT DEFAULT 'none');
-  CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
-  CREATE TABLE capacity (day_of_week INTEGER PRIMARY KEY,
-    hours_available REAL NOT NULL DEFAULT 0, notes TEXT DEFAULT '');
-  CREATE TABLE archive_sources (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL,
-    api_key TEXT DEFAULT NULL, enabled INTEGER DEFAULT 1, base_url TEXT DEFAULT '',
-    created_at INTEGER NOT NULL);
-`);
+for (const statement of SCHEMA) db.exec(statement);
 
 const sql = makeSql(db);
 const app = new Hono();
@@ -55,6 +26,7 @@ registerAttachmentRoutes(app, sql);
 registerSettingsRoutes(app, sql);
 registerCapacityRoutes(app, sql);
 registerArchiveRoutes(app, sql);
+registerCaptureRoutes(app, sql);
 
 const call = (method, path, body, isForm, headers) => {
   const init = { method };
@@ -531,6 +503,107 @@ console.log("\n=== 11. Reading a WACZ capture ===");
     new Uint8Array([1, 2, 3, 4, 5]), false, {});
   check("a file that is not a zip is refused", notAZip.status === 400,
         "HTTP " + notAZip.status);
+}
+
+
+console.log("\n=== 12. The capture manifest and the jobs ===");
+{
+  // The manifest is settable through the settings API, and read back.
+  await call("PUT", "/api/settings", {
+    capture: {
+      sources: [
+        { url: "https://devpost.com/hackathons/alpha", name: "Alpha", enabled: true },
+        { url: "https://devpost.com/hackathons/beta", name: "Beta", enabled: false },
+      ],
+      batch_size: 5,
+      keep_archive: true,
+      output_dir: "captures",
+    },
+  });
+
+  const manifest = await (await call("GET", "/api/capture/manifest")).json();
+  check("the manifest holds the sources", manifest.sources.length === 2,
+        manifest.sources.length + " sources");
+  check("the manifest keeps the names",
+        manifest.sources[0].name === "Alpha", manifest.sources[0].name);
+  check("the manifest keeps the batch size", manifest.batch_size === 5,
+        String(manifest.batch_size));
+
+  // Queueing the manifest skips the disabled sources.
+  const queued = await (await call("POST", "/api/capture/jobs", { all: true })).json();
+  check("queueing the manifest creates a job", queued.queued === 1,
+        String(queued.queued));
+  check("the disabled source was skipped",
+        queued.created[0].source_url.includes("alpha"),
+        queued.created[0].source_url);
+
+  const queue = await (await call("GET", "/api/capture/queue")).json();
+  check("the queue holds the job", queue.length === 1, queue.length + " jobs");
+  check("the queue carries the output directory",
+        queue[0].output_dir === "captures", queue[0].output_dir);
+
+  // The same page is not queued twice.
+  const again = await (await call("POST", "/api/capture/jobs", { all: true })).json();
+  check("the same page is not queued twice",
+        again.created[0].already === true, JSON.stringify(again.created[0]));
+
+  // The runner reports back.
+  const jobId = queue[0].id;
+  const result = await (await call("POST", "/api/capture/jobs/" + jobId + "/result", {
+    status: "done", wacz_size: 1234, extracted: { deadline: "November 18, 2026" },
+  })).json();
+  check("the result is accepted", result.ok === true, JSON.stringify(result));
+
+  const job = await (await call("GET", "/api/capture/jobs/" + jobId)).json();
+  check("the job is done", job.status === "done", job.status);
+  check("the job kept the size", job.wacz_size === 1234, String(job.wacz_size));
+  check("the job kept what was extracted",
+        job.extracted && job.extracted.deadline === "November 18, 2026",
+        JSON.stringify(job.extracted));
+
+  // A job that does not exist.
+  const missing = await call("GET", "/api/capture/jobs/nope");
+  check("an unknown job is a 404", missing.status === 404, "HTTP " + missing.status);
+}
+
+console.log("\n=== 13. The Yahoo application ===");
+{
+  // With nothing set up, the test says what is missing rather than failing.
+  await call("PUT", "/api/settings", {
+    email: { yahoo_client_id: "", yahoo_client_secret: "", yahoo_refresh_token: "" },
+  });
+  const r = await call("POST", "/api/settings/test-yahoo");
+  check("testing with no credentials is refused, not a crash",
+        r.status === 400, "HTTP " + r.status);
+  const body = await r.json();
+  check("the refusal says what is needed",
+        /client id/i.test(body.message || ""), (body.message || "").slice(0, 70));
+
+  // With nonsense credentials, the failure is reported, not swallowed.
+  await call("PUT", "/api/settings", {
+    email: {
+      yahoo_client_id: "not-a-real-client-id",
+      yahoo_client_secret: "not-a-real-secret",
+      yahoo_refresh_token: "not-a-real-token",
+    },
+  });
+  const bad = await call("POST", "/api/settings/test-yahoo");
+  check("bad credentials are reported", bad.status === 400, "HTTP " + bad.status);
+  const badBody = await bad.json();
+  check("the failure names the cause",
+        Boolean(badBody.message), (badBody.message || "").slice(0, 80));
+
+  // The settings hold the values, and the secret ones are not handed back
+  // in the clear.
+  const settings = await (await call("GET", "/api/settings")).json();
+  check("the client id is kept", settings.email.yahoo_client_id === "not-a-real-client-id",
+        settings.email.yahoo_client_id);
+  check("the client secret is not handed back in the clear",
+        settings.email.yahoo_client_secret !== "not-a-real-secret",
+        "the secret came back in the clear");
+  check("the refresh token is not handed back in the clear",
+        settings.email.yahoo_refresh_token !== "not-a-real-token",
+        "the token came back in the clear");
 }
 
 console.log("\n" + "=".repeat(60));

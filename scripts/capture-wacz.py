@@ -237,21 +237,38 @@ def pages_from(recorded: list, url: str, title: str) -> list:
     return pages
 
 
-def post_wacz(api_base: str, wacz: bytes, url: str) -> tuple:
+def post_wacz(api_base: str, wacz: bytes, url: str, job_id: str = "") -> tuple:
     """Send the archive to the app."""
+    headers = {
+        "Content-Type": "application/octet-stream",
+        "X-Target-Url": url,
+    }
+    if job_id:
+        # With a job id the app closes the job and creates the competition.
+        headers["X-Job-Id"] = job_id
     try:
         resp = requests.post(
             api_base + "/api/archive/wacz",
             data=wacz,
-            headers={
-                "Content-Type": "application/octet-stream",
-                "X-Target-Url": url,
-            },
+            headers=headers,
             timeout=120,
         )
         return resp.status_code, resp.text
     except Exception as e:
         return 0, str(e)
+
+
+def queued_jobs(api_base: str, limit: int) -> list:
+    """The capture jobs the app is holding, waiting to be done."""
+    try:
+        resp = requests.get(api_base + "/api/capture/queue?limit=%d" % limit,
+                            timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        print("  WARNING: could not read the queue: %s" % e)
+        return []
 
 
 def main():
@@ -263,6 +280,9 @@ def main():
                         help="Path to the capture config")
     parser.add_argument("--output-dir", default="captures",
                         help="Directory to write the archives into")
+    parser.add_argument("--from-app", action="store_true",
+                        help="Take the work from the app's capture queue, so "
+                             "there is no configuration file to keep in step")
     parser.add_argument("--url", default=None,
                         help="Capture one URL instead of a config file")
     parser.add_argument("--name", default="Capture",
@@ -276,7 +296,18 @@ def main():
                         help="Write the archive but do not post it")
     args = parser.parse_args()
 
-    if args.url:
+    if args.from_app:
+        # The app holds the manifest. Ask it what it wants done.
+        queued = queued_jobs(args.api, 50)
+        jobs = [{"ticket_id": None, "url": j["source_url"],
+                 "name": j.get("name") or j["source_url"],
+                 "job_id": j["id"]} for j in queued]
+        if not jobs:
+            print("The app has nothing queued. Add pages to the capture "
+                  "manifest in Settings, then queue them.")
+            sys.exit(0)
+        print("The app asked for %d capture(s)." % len(jobs))
+    elif args.url:
         jobs = [{"ticket_id": None, "url": args.url, "name": args.name}]
     else:
         jobs = load_config(args.config)
@@ -319,7 +350,7 @@ def main():
             if args.dry_run:
                 continue
 
-            code, text = post_wacz(args.api, wacz, url)
+            code, text = post_wacz(args.api, wacz, url, job.get("job_id", ""))
             if code == 200:
                 try:
                     got = json.loads(text)

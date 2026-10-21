@@ -110,10 +110,29 @@ CI captures a page and checks the archive with **warcio**, which is not
 the code that wrote it. If warcio can read the archive, the WARC is well
 formed enough for pywb and the rest of the webrecorder tooling.
 
+**The manifest lives in the app.** Settings has a Capture tab with the
+list of pages to capture. `POST /api/capture/jobs` queues them, and
+`scripts/capture-wacz.py --from-app` takes its work from the app, so
+there is no configuration file to keep in step. A capture that arrives
+closes its job and creates the competition, named from the page's own
+title.
+
 **Still not done:** `scripts/sync-hackathons.mjs:22` has all three sources
 set to `enabled: false` — Devpost, MLH and lablab. That is a separate
 problem from the format, and the answer to it is still "pick one
 platform".
+
+### The mail transport — MOSTLY DONE
+
+The Yahoo Mail API works, and the app fetches the mail itself with it,
+inside the Worker. Register an application at developer.yahoo.com with
+the Mail / Read permission, then put the client id, the client secret
+and the refresh token in Settings → Email. There is a button that checks
+them.
+
+**Still missing: IMAP.** A Gmail user has nothing to point the app at.
+They have to use the Yahoo API, a JMAP provider, or post the raw source
+in from outside. That is the last piece of the transport.
 
 The WACZ format, from the Webrecorder specification 1.1.1:
 

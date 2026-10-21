@@ -38,8 +38,8 @@ this environment.
 There are two more checks you can run:
 
 ```powershell
-node --experimental-strip-types scripts/test-bugfixes.mjs   # 90 route checks
-python scripts/verify-ui.py                                 # 22 checks in a real browser
+node --experimental-strip-types scripts/test-bugfixes.mjs   # 110 route checks
+python scripts/verify-ui.py                                 # 27 checks in a real browser
 ```
 
 `verify-ui.py` needs a server on port 8821 (`npm run storybook:serve`) and
@@ -75,11 +75,34 @@ They clear those folders first, so a renamed or dropped component does not
 leave a stale sample behind, and they skip the components that cover the
 viewport rather than cropping them.
 
+## The Yahoo application
+
+Mail is fetched with the Yahoo Mail API, and the app does it itself,
+inside the Worker.
+
+1. Register an application at `developer.yahoo.com/apps`, with the
+   **Mail / Read** permission.
+2. Put the client id, the client secret and the refresh token into
+   **Settings → Email**.
+3. Press **Test connection**. It lists your mailboxes, or tells you what
+   went wrong.
+
+The secrets are write-only. The API hands back a mask, never the value,
+so the screen shows that a secret is set and sends a new one only when
+you type it.
+
 ## Capturing a competition page as a WACZ
 
 ```powershell
 pip install warcio                                  # to validate the result
 python scripts/capture-wacz.py --url https://devpost.com/hackathons/your-hackathon --name "Your Hackathon"
+```
+
+Or, with the pages listed in **Settings → Capture** and queued from
+there, with no configuration file of your own:
+
+```powershell
+python scripts/capture-wacz.py --from-app
 ```
 
 That records the page's traffic into a WACZ and posts it to

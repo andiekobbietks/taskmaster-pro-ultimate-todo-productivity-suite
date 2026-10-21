@@ -302,6 +302,24 @@ export function registerInboxRoutes(app: Hono, sql: any) {
 
       let inserted = 0;
       let skipped = 0;
+
+      // The Yahoo Mail API hands back raw MIME, which the parser handles.
+      for (const raw of result.raws || []) {
+        const parsed = parseRawMail(raw.raw);
+        if (!parsed.ok) { skipped++; continue; }
+        const stored = insertInboxItem(sql, {
+          sender: parsed.from,
+          subject: parsed.subject,
+          received_at: parsed.dateMs ?? Date.now(),
+          body_text: parsed.textBody,
+          body_html: parsed.htmlBody,
+          has_attachments: parsed.attachmentNames.length > 0,
+          attachment_names: parsed.attachmentNames,
+        }, parsed.messageId ? "inbox-msg-" + parsed.messageId.replace(/[<>]/g, "") : undefined);
+        if (stored.inserted) inserted++;
+        else skipped++;
+      }
+
       for (const m of result.messages) {
         const stored = insertInboxItem(sql, {
           sender: m.from,
@@ -318,6 +336,7 @@ export function registerInboxRoutes(app: Hono, sql: any) {
 
       return c.json({
         ok: true,
+        source: result.source,
         fetched: result.fetched,
         inserted,
         skipped,

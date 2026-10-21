@@ -21,6 +21,61 @@
 import { Hono } from "hono";
 import { readWacz, findResponse, recordText } from "./wacz.ts";
 
+/**
+ * The page's own title, cleaned up.
+ */
+function titleOf(html: string): string {
+  const m = /<title[^>]*>([\s\S]{0,200}?)<\/title>/i.exec(html);
+  if (!m) return "";
+  return m[1]
+    .replace(/\s+/g, " ")
+    .replace(/^[^\w(]+|[^\w)]+$/g, "")
+    .trim()
+    .slice(0, 120);
+}
+
+/**
+ * The last segment of a URL, with the dashes turned back into spaces.
+ */
+function slugOf(url: string): string {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, "");
+    const last = path.split("/").pop() || "";
+    return last.replace(/[-_]+/g, " ").trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Create a competition from what a capture found.
+ *
+ * The name is a guess from the URL, because the capture's own title is
+ * not always in the extracted fields. It is a placeholder that the
+ * person can correct, not a claim.
+ */
+function createHackathonFromCapture(sql: any, data: any): { id: string } {
+  const id = "hack-" + Date.now().toString(36) + "-" +
+    Math.random().toString(36).slice(2, 8);
+  const ts = Date.now();
+  const name = titleOf(data.html || "") || slugOf(data.url || "") || "Untitled competition";
+  const eligibility = {
+    eligibility_type: "unrestricted",
+    regions: ["Global"],
+    age_min: 13,
+  };
+  sql.exec(
+    `INSERT INTO hackathons (id, name, platform, url, description, prize, start_date, end_date, registration_deadline, submission_deadline, eligibility_json, status, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, 'open', ?, ?, ?)`,
+    id, name, data.platform || "devpost",
+    data.url || "", "Captured from " + (data.url || ""),
+    data.extracted?.prize || "", JSON.stringify(eligibility),
+    "Captured from a WACZ archive. " + JSON.stringify(data.extracted || {}),
+    ts, ts
+  ).toArray();
+  return { id };
+}
+
 export interface ArchiveSource {
   id: string;
   name: string;
@@ -191,7 +246,30 @@ export function registerArchiveRoutes(app: Hono, sql: any) {
     const html = recordText(record);
     const extracted = extractHackathonData(html);
 
+    // A capture that was queued as a job closes the job, and the
+    // competition it found is created. That is the whole loop: capture,
+    // post, and the app knows about the competition.
+    const jobId = c.req.header("x-job-id") || "";
+    let hackathonId = "";
+    if (jobId) {
+      const extractedName = (targetUrl || record.url || "").split("/").pop() || "";
+      const created = createHackathonFromCapture(sql, {
+        url: record.url || targetUrl,
+        name: extractedName,
+        extracted,
+        platform: "devpost",
+      });
+      hackathonId = created.id;
+
+      sql.exec(
+        "UPDATE capture_jobs SET status = 'done', wacz_size = ?, extracted_json = ?, error = '', updated_at = ? WHERE id = ?",
+        bytes.length, JSON.stringify(extracted), Date.now(), jobId
+      ).toArray();
+    }
+
     return c.json({
+      job_id: jobId || null,
+      hackathon_id: hackathonId || null,
       ok: true,
       url: record.url || wanted,
       source: "wacz",

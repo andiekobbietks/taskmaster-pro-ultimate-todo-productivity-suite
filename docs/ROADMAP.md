@@ -112,8 +112,9 @@ formed enough for pywb and the rest of the webrecorder tooling.
 
 **The app is its own MCP server.** `POST /api/mcp` speaks the
 protocol, so any MCP client can connect to the deployed app and work
-with the competitions, the inbox and the capture queue. Thirteen tools
-(feed support added three). The transport is the official MCP TypeScript
+with the competitions, the inbox and the capture queue. Fourteen tools
+(three from feed support, `import_devpost` from the Devpost listing API
+found 2026-10-21). The transport is the official MCP TypeScript
 SDK (1.32.1) on its WebStandard Streamable HTTP; the tool definitions
 live in `src/mcp-tools.ts` and are shared with `src/mcp.ts`, the
 hand-rolled lean transport kept as a fallback with a one-line import
@@ -138,7 +139,10 @@ findings changed the answer:
   `feed.rss` returns the homepage as HTML, and MLH has no feed at all.
   The feeds that work are tech-news feeds — TechCabal and Gadget for
   EMEA, AIM and YourStory for India — and they find hackathons
-  *mentioned in articles*, which is noisy and will miss most.
+  *mentioned in articles*, which is noisy and will miss most. Corrected
+  2026-10-21: Devpost has no feed but its SPA's JSON API is open — the
+  app now ingests all 59 open hackathons in two requests (`src/devpost.ts`,
+  `POST /api/devpost/import`).
 - **Devpost serves a Cloudflare bot challenge to a headless browser.**
   Both the listing and a single competition page came back as the
   challenge, not the page. The capture machinery is fine — it recorded

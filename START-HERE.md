@@ -133,10 +133,12 @@ nothing to install and no sidecar.
 }
 ```
 
-Thirteen tools: `list_competitions`, `get_competition`, `list_inbox`,
-`search_inbox`, `capture_manifest`, `add_to_manifest`, `capture_all`,
-`capture_status`, `fetch_mail`, `feed_competitions`, `read_feed`,
-`known_feeds`, `get_settings`. The secrets come back masked.
+Thirteen tools and one importer: `list_competitions`, `get_competition`,
+`list_inbox`, `search_inbox`, `capture_manifest`, `add_to_manifest`,
+`capture_all`, `capture_status`, `fetch_mail`, `feed_competitions`,
+`read_feed`, `known_feeds`, `import_devpost` (pulls every open Devpost
+hackathon straight into competitions), `get_settings`. The secrets come
+back masked.
 
 Quick check that it is alive, without configuring anything — the MCP
 Inspector is the official playground, and it connects straight to the

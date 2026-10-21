@@ -15,6 +15,7 @@ import { registerArchiveRoutes } from "../src/archive.ts";
 import { registerCaptureRoutes } from "../src/capture.ts";
 import { registerMcpRoutes } from "../src/mcp-sdk.ts";
 import { registerFeedRoutes } from "../src/feed-routes.ts";
+import { registerDevpostRoutes } from "../src/devpost-routes.ts";
 import { buildRssFeed, parseFeed, findHackathonMentions } from "../src/feed.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
@@ -33,6 +34,7 @@ registerArchiveRoutes(app, sql);
 registerCaptureRoutes(app, sql);
 registerMcpRoutes(app, sql);
 registerFeedRoutes(app, sql);
+registerDevpostRoutes(app, sql);
 
 const call = (method, path, body, isForm, headers) => {
   const init = { method };
@@ -952,6 +954,104 @@ console.log("\n=== 16. Feeds, in both directions ===");
   for (const h of hs) {
     if (h.name === "Feed Test Competition") await call("DELETE", "/api/hackathons/" + h.id);
   }
+}
+
+console.log("\n=== 17. Devpost, as a data source ===");
+{
+  // Canned payload shaped like the real endpoint's answer, so the suite
+  // never touches the internet.
+  const canned = {
+    hackathons: [
+      { id: 30992, title: "Build, Ship, Shape: Amazon Developer Hackathon",
+        url: "https://amazonappdev2026.devpost.com/", open_state: "open",
+        prize_amount: "$<span data-currency-value>138,000</span>",
+        themes: [{ name: "Machine Learning/AI" }, { name: "Productivity" }],
+        registrations_count: 60896, invite_only: false, winners_announced: false,
+        organization_name: "Amazon", submission_period_dates: "Aug 31 - Oct 23, 2026" },
+      { id: 31302, title: "PayPal AI Hackathon",
+        url: "https://paypalaihackathon.devpost.com/", open_state: "open",
+        prize_amount: "$<span data-currency-value>50,000</span>",
+        themes: [{ name: "Machine Learning/AI" }],
+        registrations_count: 18004, invite_only: false, winners_announced: false,
+        organization_name: "PayPal", submission_period_dates: "Oct 01 - Nov 12, 2026" },
+    ],
+  };
+  // parseSubmissionPeriod, on its own: the honest parser.
+  const { parseSubmissionPeriod } = await import("../src/devpost.ts");
+  check("period 'Aug 31 - Oct 23, 2026' parses",
+        JSON.stringify(parseSubmissionPeriod("Aug 31 - Oct 23, 2026"))
+        === '{"start":"2026-08-31","end":"2026-10-23"}',
+        JSON.stringify(parseSubmissionPeriod("Aug 31 - Oct 23, 2026")));
+  check("a yearless first date borrows the year",
+        JSON.stringify(parseSubmissionPeriod("Oct 01 - Nov 12, 2026"))
+        === '{"start":"2026-10-01","end":"2026-11-12"}',
+        JSON.stringify(parseSubmissionPeriod("Oct 01 - Nov 12, 2026")));
+  check("dateless text parses to nulls, never a wrong date",
+        JSON.stringify(parseSubmissionPeriod("sometime soon"))
+        === '{"start":null,"end":null}',
+        JSON.stringify(parseSubmissionPeriod("sometime soon")));
+  check("a same-month range 'Oct 05 - 27, 2026' borrows the month",
+        JSON.stringify(parseSubmissionPeriod("Oct 05 - 27, 2026"))
+        === '{"start":"2026-10-05","end":"2026-10-27"}',
+        JSON.stringify(parseSubmissionPeriod("Oct 05 - 27, 2026")));
+  check("a range that spans two years parses both sides",
+        JSON.stringify(parseSubmissionPeriod("Jul 16, 2026 - Jan 15, 2027"))
+        === '{"start":"2026-07-16","end":"2027-01-15"}',
+        JSON.stringify(parseSubmissionPeriod("Jul 16, 2026 - Jan 15, 2027")));
+
+  const realFetch = globalThis.fetch;
+  let asked = 0;
+  globalThis.fetch = async (url) => {
+    asked++;
+    return { ok: true, json: async () => canned };
+  };
+  let r;
+  try {
+    r = await call("POST", "/api/devpost/import", { pages: 1 });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+
+  const body = await r.json();
+  check("the import route answers 200", r.status === 200, "HTTP " + r.status);
+  check("it imported two competitions", body.imported === 2, JSON.stringify(body));
+  check("the endpoint was actually called", asked >= 1, asked + " calls");
+
+  const hs = (await (await call("GET", "/api/hackathons")).json())
+    .filter((h) => h.platform === "devpost");
+  const amazon = hs.find((h) => h.url === "https://amazonappdev2026.devpost.com/");
+  check("the Amazon competition exists", !!amazon, JSON.stringify(hs.map(h => h.url)));
+  check("the prize is plain text, no span markup",
+        amazon?.prize === "$138,000", amazon?.prize || "(none)");
+  check("the submission period parsed into dates",
+        amazon?.start_date === "2026-08-31" && amazon?.end_date === "2026-10-23",
+        (amazon?.start_date || "?") + " .. " + (amazon?.end_date || "?"));
+  check("the id is stable, from the platform id",
+        amazon?.id === "hack-devpost-30992", amazon?.id || "(none)");
+
+  // A second import must update, not duplicate.
+  let r2;
+  const realFetch2 = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({ ok: true, json: async () => canned });
+    r2 = await call("POST", "/api/devpost/import", { pages: 1 });
+  } finally {
+    globalThis.fetch = realFetch2;
+  }
+  const body2 = await r2.json();
+  const count = (await (await call("GET", "/api/hackathons")).json())
+    .filter((h) => String(h.id).startsWith("hack-devpost-")).length;
+  check("a re-import updates its own rows",
+        body2.updated === 2 && body2.imported === 0, JSON.stringify(body2));
+  check("no duplicates were created", count === 2, count + " devpost rows");
+  check("import_devpost is advertised as a tool",
+        (await rpcListToolNames()).includes("import_devpost"));
+}
+
+// The MCP tools/list helper, for the check above.
+async function rpcListToolNames() {
+  const r = await call("POST", "/api/mcp", { jsonrpc: "2.0", id: 99, method: "tools/list" });
+  return (await r.json()).result.tools.map((t) => t.name);
 }
 
 console.log("\n" + "=".repeat(60));

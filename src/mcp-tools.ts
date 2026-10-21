@@ -17,6 +17,7 @@ import { readProfile } from "./profile.ts";
 import { evaluateEligibility, type EligibilityRules } from "./hackathons.ts";
 import { fetchNewMail } from "./mail.ts";
 import { buildRssFeed, readFeed } from "./feed.ts";
+import { ingestDevpost } from "./devpost.ts";
 
 export interface McpTool {
   name: string;
@@ -317,11 +318,30 @@ export const MCP_TOOLS: McpTool[] = [
         { url: "https://hnrss.org/frontpage", region: "Global" },
       ],
       dead: [
-        "devpost.com/feed.rss - returns the homepage as HTML",
+        "devpost.com/feed.rss - returns the homepage as HTML (but see " +
+          "import_devpost: their SPA's JSON API is open)",
         "pipes.yahoo.com - does not resolve; Yahoo Pipes is gone",
         "query.yahooapis.com - does not resolve; YQL is gone",
       ],
     }, null, 2)
+  ),
+
+  tool(
+    "import_devpost",
+    "Pull every open hackathon straight from Devpost's listing API into " +
+      "the competitions table. Devpost has no feed and no documented API, " +
+      "but the JSON their own page calls answers to anyone. Idempotent: " +
+      "re-importing updates rows instead of duplicating them.",
+    {
+      pages: z.number().optional()
+        .describe("How many pages to pull. 40 per page; default 2 covers all open."),
+    },
+    async (args, sql) => {
+      const requested = Number(args?.pages) || 2;
+      const pages = Math.max(1, Math.min(requested, 8));
+      const result = await ingestDevpost(sql, { pages });
+      return JSON.stringify(result, null, 2);
+    }
   ),
 
   tool(

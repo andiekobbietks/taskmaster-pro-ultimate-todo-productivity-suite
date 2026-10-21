@@ -29,6 +29,24 @@ platforms have none at all.
 Devpost has no public feed. MLH has no public feed. There is no
 documented way to subscribe to either one's listings.
 
+**Corrected 2026-10-21: Devpost has an undocumented JSON API, and it is
+open.** The feed table above stands — there is still no RSS — but the
+same endpoint their own front end calls answers a plain GET with no key
+and no challenge:
+
+    GET https://devpost.com/api/hackathons?status[]=open&per_page=40&page=1
+
+Measured that day: 59 open hackathons (total catalogue 14,132), 9 rows
+default or 40 with `per_page=40`, fields include title, url, prize
+(markup-wrapped), submission_period_dates, registrations_count,
+invite_only, organization_name. The app ingests it:
+`src/devpost.ts`, route `POST /api/devpost/import` (2 pages cover the
+whole open set; a re-import updates its own stable
+`hack-devpost-<id>` rows instead of duplicating). Caveat: this is an
+internal endpoint Devpost does not document and can change or close
+without notice — the ingest treats every field defensively and reports
+`endpoint_ok: false` on any shape change.
+
 ### Regional and aggregator candidates
 
 | Feed | Result |

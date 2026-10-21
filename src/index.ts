@@ -6,7 +6,7 @@ import { registerSettingsRoutes } from "./settings";
 import { registerCapacityRoutes } from "./capacity";
 import { registerInboxRoutes } from "./inbox";
 import { registerCaptureRoutes } from "./capture";
-import { registerMcpRoutes } from "./mcp";
+import { registerMcpRoutes } from "./mcp-sdk";
 import { registerFeedRoutes } from "./feed-routes";
 import { createSchema } from "./schema";
 import { Hono } from "hono";

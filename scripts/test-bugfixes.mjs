@@ -13,7 +13,7 @@ import { registerSettingsRoutes } from "../src/settings.ts";
 import { registerCapacityRoutes } from "../src/capacity.ts";
 import { registerArchiveRoutes } from "../src/archive.ts";
 import { registerCaptureRoutes } from "../src/capture.ts";
-import { registerMcpRoutes } from "../src/mcp.ts";
+import { registerMcpRoutes } from "../src/mcp-sdk.ts";
 import { registerFeedRoutes } from "../src/feed-routes.ts";
 import { buildRssFeed, parseFeed, findHackathonMentions } from "../src/feed.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
@@ -44,6 +44,11 @@ const call = (method, path, body, isForm, headers) => {
   } else if (body !== undefined) {
     init.body = JSON.stringify(body);
     init.headers = { "Content-Type": "application/json" };
+    // The MCP transport is spec-strict (2025-06-18): a POST without this
+    // Accept header is answered HTTP 406. The lean server did not care.
+    if (path.startsWith("/api/mcp")) {
+      init.headers["Accept"] = "application/json, text/event-stream";
+    }
   }
   return app.request(path, init);
 };

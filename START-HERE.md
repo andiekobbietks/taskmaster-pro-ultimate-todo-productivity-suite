@@ -148,13 +148,22 @@ npx @modelcontextprotocol/inspector --cli http://127.0.0.1:8787/api/mcp --method
 npx @modelcontextprotocol/inspector   # the web UI; put in the same URL
 ```
 
-The protocol is implemented in `src/mcp.ts` rather than pulled in, so the
-app's dependency tree stays lean. The tool definitions are shared with
-`src/mcp-sdk.ts`, which is the same endpoint on the official SDK's full
-transport (sessions, SSE); switching is a one-line import change in
-`src/index.ts`. Measured against the lean server on 2026-10-21, the SDK
-transport costs +291 KB minified (+78 KB gzipped), which is why the lean
-one ships and the SDK one is opt-in.
+The official MCP TypeScript SDK (**1.32.1**) is the transport: real
+Streamable HTTP, sessions, SSE, spec-strict protocol handling — the same
+plumbing every blog post about "we implement MCP" ends up describing. The
+tool definitions live in `src/mcp-tools.ts`; `src/mcp.ts` is a hand-rolled
+lean transport kept as the fallback (flip one import in `src/index.ts`).
+
+The SDK is bigger, and the numbers are measured, not vibes — wrangler's
+own bundling, 2026-10-21: worker bundle 1601 KiB raw / **285 KiB
+gzipped** with the SDK against 953 KiB / 165 KiB hand-rolled (+120 KiB
+compressed). Both fit deploy limits; the price is honesty in the README,
+not a broken build.
+
+One warning for custom clients: the SDK transport is spec-strict. A POST
+without `Accept: application/json, text/event-stream` is answered
+**HTTP 406** — the lean server accepted anything, and the test suite
+caught the difference when it was switched over.
 
 ### Driving the capture
 

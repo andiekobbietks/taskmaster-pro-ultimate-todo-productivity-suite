@@ -13,6 +13,7 @@
  * - No external dependencies in this module
  */
 import { Hono } from "hono";
+import { fetchNewMail, JMAP_ID_PREFIX } from "./mail.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -186,6 +187,60 @@ function findTicket(
   return { ticketId: null, confidence: 0, method: "none" };
 }
 
+/**
+ * Store one message in the inbox.
+ *
+ * `stableId` is for sources that give each message a permanent id, such as
+ * JMAP. The row id is then the same every time, so fetching the same
+ * message twice is skipped rather than duplicated.
+ */
+export function insertInboxItem(
+  sql: any,
+  data: any,
+  stableId?: string
+): { inserted: boolean; id: string } {
+  const {
+    sender = "",
+    subject = "",
+    received_at = Date.now(),
+    body_text = "",
+    body_html = "",
+    has_attachments = false,
+    attachment_names = [],
+    is_platform = false,
+  } = data;
+
+  if (!sender || !subject) return { inserted: false, id: "" };
+
+  const id = stableId || `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // A stable id that is already here means this message has been seen.
+  const existing = sql.exec("SELECT id FROM inbox WHERE id = ?", id).toArray();
+  if (existing.length > 0) return { inserted: false, id };
+
+  const platform = detectPlatform(sender);
+  const ts = now();
+
+  // Match to an existing hackathon ticket by content first, so two
+  // competitions on the same platform stay distinguishable.
+  const match = findTicket(sql, platform, subject, body_text.slice(0, 500));
+  const ticketId = match.ticketId;
+
+  sql.exec(
+    `INSERT INTO inbox (id, sender, subject, received_at, body_preview, body_html, has_attachments, attachment_names, is_platform, platform, ticket_id, read, processed, created_at, match_confidence, match_method)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)`,
+    id, sender, subject, received_at,
+    body_text.slice(0, 500), body_html,
+    has_attachments ? 1 : 0,
+    JSON.stringify(attachment_names),
+    is_platform || platform !== null ? 1 : 0,
+    platform, ticketId, ts,
+    Math.round(match.confidence * 100) / 100, match.method
+  ).toArray();
+
+  return { inserted: true, id };
+}
+
 // ── Route registration ───────────────────────────────────────────────
 
 export function registerInboxRoutes(app: Hono, sql: any) {
@@ -193,45 +248,56 @@ export function registerInboxRoutes(app: Hono, sql: any) {
 
   app.post("/api/inbox", async (c) => {
     const data = await c.req.json();
-    const {
-      sender = "",
-      subject = "",
-      received_at = Date.now(),
-      body_text = "",
-      body_html = "",
-      has_attachments = false,
-      attachment_names = [],
-      is_platform = false,
-    } = data;
-
-    if (!sender || !subject) {
+    if (!data.sender || !data.subject) {
       return c.json({ error: "Sender and subject are required" }, 400);
     }
-
-    const platform = detectPlatform(sender);
-    const id = `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const ts = now();
-
-    // Match to an existing hackathon ticket by content first, so two
-    // competitions on the same platform stay distinguishable.
-    const match = findTicket(sql, platform, subject, body_text.slice(0, 500));
-    const ticketId = match.ticketId;
-
-    sql.exec(
-      `INSERT INTO inbox (id, sender, subject, received_at, body_preview, body_html, has_attachments, attachment_names, is_platform, platform, ticket_id, read, processed, created_at, match_confidence, match_method)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)`,
-      id, sender, subject, received_at,
-      body_text.slice(0, 500), body_html,
-      has_attachments ? 1 : 0,
-      JSON.stringify(attachment_names),
-      is_platform || platform !== null ? 1 : 0,
-      platform, ticketId, ts,
-      Math.round(match.confidence * 100) / 100, match.method
-    ).toArray();
-
-    const row = sql.exec("SELECT * FROM inbox WHERE id = ?", id).toArray();
-    if (row.length === 0) return c.json({ error: "Failed to create inbox item" }, 500);
+    const result = insertInboxItem(sql, data);
+    if (!result.inserted) {
+      return c.json({ error: "Failed to create inbox item" }, 500);
+    }
+    const row = sql.exec("SELECT * FROM inbox WHERE id = ?", result.id).toArray();
     return c.json(rowToInboxItem(row[0]), 201);
+  });
+
+  // --- Fetch mail from the configured server ----------------------------
+  //
+  // The manual counterpart of the cron trigger. Works in local dev, where
+  // a cron never fires, and lets the Settings screen offer a button.
+  app.post("/api/inbox/fetch", async (c) => {
+    try {
+      const result = await fetchNewMail(sql);
+      if (!result.ok) {
+        return c.json({ ok: false, fetched: 0, inserted: 0, message: result.message }, 400);
+      }
+
+      let inserted = 0;
+      let skipped = 0;
+      for (const m of result.messages) {
+        const stored = insertInboxItem(sql, {
+          sender: m.from,
+          subject: m.subject,
+          received_at: m.receivedAt ? Date.parse(m.receivedAt) : Date.now(),
+          body_text: m.textBody,
+          body_html: m.htmlBody,
+          has_attachments: m.attachments.length > 0,
+          attachment_names: m.attachments.map((a) => a.name),
+        }, JMAP_ID_PREFIX + m.id);
+        if (stored.inserted) inserted++;
+        else skipped++;
+      }
+
+      return c.json({
+        ok: true,
+        fetched: result.fetched,
+        inserted,
+        skipped,
+        message: inserted === 0
+          ? `Fetched ${result.fetched}, nothing new.`
+          : `Fetched ${result.fetched}, added ${inserted}.`,
+      });
+    } catch (err: any) {
+      return c.json({ ok: false, error: err?.message || "Mail fetch failed" }, 502);
+    }
   });
 
   // --- List inbox items ----------------------------------------------

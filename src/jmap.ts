@@ -112,7 +112,51 @@ export async function searchHackathonEmails(config: JMAPConfig): Promise<JMAPEma
     }, "1"],
   ], config.password);
 
-  const emails = results.methodResponses?.[1]?.[1]?.list || [];
+  return mapJMAPEmails(results);
+}
+
+/**
+ * Pull every message received after a timestamp.
+ *
+ * Unlike searchHackathonEmails this does not filter by text: ingestion
+ * wants everything, and the inbox decides what is interesting by matching
+ * the content against the competitions being tracked.
+ *
+ * @param config - JMAP server configuration (URL, credentials, account ID)
+ * @param sinceIso - ISO timestamp to fetch after, or null for the newest page
+ * @param limit - How many messages to fetch at most
+ */
+export async function fetchEmailsSince(
+  config: JMAPConfig,
+  sinceIso: string | null,
+  limit = 50
+): Promise<JMAPEmail[]> {
+  const session = await discoverJMAPSession(config.server_url);
+  const accountId = config.account_id || session.primaryAccounts?.["urn:ietf:params:jmap:mail"];
+
+  const filter: Record<string, unknown> = {};
+  if (sinceIso) filter.after = sinceIso;
+
+  const results = await jmapCall(config.server_url, accountId, [
+    ["Email/query", {
+      filter,
+      sort: [{ property: "receivedAt", isAscending: false }],
+      limit,
+    }, "0"],
+    ["Email/get", {
+      "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
+      properties: ["from", "subject", "receivedAt", "textBody", "htmlBody", "attachments"],
+    }, "1"],
+  ], config.password);
+
+  return mapJMAPEmails(results);
+}
+
+/**
+ * Turn a JMAP Email/get response into plain objects.
+ */
+function mapJMAPEmails(results: any): JMAPEmail[] {
+  const emails = results?.methodResponses?.[1]?.[1]?.list || [];
   return emails.map((e: any) => ({
     id: e.id,
     from: e.from?.[0]?.email || "",

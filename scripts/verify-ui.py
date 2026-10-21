@@ -180,6 +180,8 @@ def run(page, results):
                     "imap.mail.yahoo.com" in email_values))
     results.append(("the JMAP fields are present",
                     page.locator("input[placeholder='https://apidata.fastmail.com']").count() == 1))
+    results.append(("the Fetch mail now button is present",
+                    page.get_by_role("button", name="Fetch mail now", exact=True).count() == 1))
     page.screenshot(path=os.path.join(SHOTS, "tm-settings-populated.png"), full_page=True)
 
     print("--- Inbox ---")

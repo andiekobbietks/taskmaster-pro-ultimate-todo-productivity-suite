@@ -517,6 +517,26 @@ const worker = {
 
     return env.ASSETS.fetch(request);
   },
+
+  /**
+   * Hourly cron trigger.
+   *
+   * It calls the same route the Settings button calls, so there is one
+   * code path for pulling mail. A cron never fires in local dev, which is
+   * why POST /api/inbox/fetch exists as well.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const id = env.APP.idFromName("taskmaster");
+    try {
+      await env.APP.get(id).fetch(
+        new Request("https://internal/api/inbox/fetch", { method: "POST" })
+      );
+    } catch (err) {
+      // A failed poll must not take the Worker down. The next hour tries
+      // again, and the Settings screen shows the error from the route.
+      console.error("scheduled mail fetch failed:", err);
+    }
+  },
 };
 
 export default worker;

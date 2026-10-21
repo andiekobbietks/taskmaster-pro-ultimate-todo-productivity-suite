@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
 import { makeSql } from "./do-sql.mjs";
 import { registerHackathonRoutes } from "../src/hackathons.ts";
-import { registerInboxRoutes } from "../src/inbox.ts";
+import { registerInboxRoutes, insertInboxItem } from "../src/inbox.ts";
 import { registerAttachmentRoutes } from "../src/attachments.ts";
 import { registerSettingsRoutes } from "../src/settings.ts";
 import { registerCapacityRoutes } from "../src/capacity.ts";
@@ -315,6 +315,84 @@ console.log("\n=== 8. The digest uses the real eligibility engine ===");
   check("the eligibility route agrees too",
         eligGerman && eligGerman.eligible === false,
         eligGerman ? String(eligGerman.eligible) : "missing");
+}
+
+
+console.log("\n=== 9. Mail ingestion ===");
+{
+  // 9a. With no server configured the route must say so, not crash.
+  await call("PUT", "/api/settings", {
+    email: { jmap_server_url: "", jmap_username: "", jmap_password: "" },
+  });
+  const noServer = await call("POST", "/api/inbox/fetch");
+  check("fetching with no server configured is refused, not a crash",
+        noServer.status === 400, "HTTP " + noServer.status);
+  const noServerBody = await noServer.json();
+  check("the refusal explains what to do",
+        /configured/i.test(noServerBody.message || ""),
+        (noServerBody.message || "").slice(0, 70));
+
+  // 9b. With a server configured but unreachable, the error is reported.
+  await call("PUT", "/api/settings", {
+    email: {
+      jmap_server_url: "http://127.0.0.1:1",
+      jmap_username: "someone@example.com",
+      jmap_password: "not-a-real-password",
+    },
+  });
+  const unreachable = await call("POST", "/api/inbox/fetch");
+  check("an unreachable server is reported, not swallowed",
+        unreachable.status === 502, "HTTP " + unreachable.status);
+  const unreachableBody = await unreachable.json();
+  check("the failure names the cause",
+        !!unreachableBody.error, (unreachableBody.error || "").slice(0, 60));
+
+  // 9c. The insert deduplicates on a stable id.
+  const message = {
+    sender: "notifications@devpost.com",
+    subject: "Deduplication check",
+    body_text: "The same message, twice.",
+  };
+  const first = insertInboxItem(sql, message, "inbox-jmap-stable-test-1");
+  check("the first insert is stored", first.inserted === true);
+  const second = insertInboxItem(sql, message, "inbox-jmap-stable-test-1");
+  check("the same stable id is not stored twice", second.inserted === false);
+
+  const listed = await (await call("GET", "/api/inbox")).json();
+  const copies = listed.filter((e) => e.subject === "Deduplication check");
+  check("the inbox holds exactly one copy", copies.length === 1,
+        copies.length + " copies");
+
+  // 9d. Without a stable id each insert is its own row.
+  const a = insertInboxItem(sql, message);
+  const b = insertInboxItem(sql, message);
+  check("without a stable id two inserts make two rows",
+        a.inserted && b.inserted && a.id !== b.id, a.id + " / " + b.id);
+
+  // 9e. The stored message is matched against the competitions.
+  await call("POST", "/api/hackathons", {
+    name: "Deduplication Check Competition",
+    platform: "devpost",
+    eligibility: { eligibility_type: "unrestricted", regions: ["Global"], age_min: 13 },
+  });
+  const matched = insertInboxItem(sql, {
+    sender: "notifications@devpost.com",
+    subject: "Deduplication Check Competition is open",
+    body_text: "Deduplication Check Competition",
+  });
+  check("a message matching a competition name is linked to it",
+        matched.inserted === true);
+  const after = await (await call("GET", "/api/inbox")).json();
+  const linked = after.find((e) => e.subject === "Deduplication Check Competition is open");
+  check("the link points at the competition",
+        linked && !!linked.ticket_id, linked ? String(linked.ticket_id) : "missing");
+
+  // Clean up the rows this test created.
+  for (const e of after) {
+    if (e.subject && e.subject.startsWith("Deduplication Check")) {
+      await call("DELETE", "/api/inbox/" + e.id);
+    }
+  }
 }
 
 console.log("\n" + "=".repeat(60));

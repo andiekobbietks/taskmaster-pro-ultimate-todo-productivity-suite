@@ -140,6 +140,10 @@ function App() {
 
   // Bulk selection in the inbox
   const [selectedEmails, setSelectedEmails] = useState([]);
+
+  // Mail ingestion, from the Settings screen
+  const [mailFetching, setMailFetching] = useState(false);
+  const [mailFetchResult, setMailFetchResult] = useState(null);
   const [previewAttachment, setPreviewAttachment] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
@@ -228,6 +232,25 @@ function App() {
       fail("Loading settings")(err);
     }
   }, [fail]);
+
+  // --- Mail ingestion ----------------------------------------------------
+
+  const fetchMailNow = async () => {
+    setMailFetching(true);
+    setMailFetchResult(null);
+    try {
+      const data = await api("./api/inbox/fetch", { method: "POST" });
+      setMailFetchResult(data);
+      if (data && data.inserted > 0) {
+        await loadInbox();
+        await loadInboxStats();
+      }
+    } catch (err) {
+      setMailFetchResult({ ok: false, error: describeError(err) });
+    } finally {
+      setMailFetching(false);
+    }
+  };
 
   // --- Inbox bulk selection ---------------------------------------------
 
@@ -1466,6 +1489,32 @@ function App() {
                                     className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                   />
                                 </div>
+                              </div>
+
+                              {/* Pull mail now. The hourly cron does this in
+                                  production; a cron never fires in local
+                                  dev, so the button is how the inbox fills
+                                  on a laptop. */}
+                              <div className="pt-3 mt-1 border-t border-neutral-200 dark:border-neutral-800">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={fetchMailNow}
+                                    disabled={mailFetching}
+                                    className="h-8 px-3 rounded-md text-xs font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                                  >
+                                    {mailFetching ? 'Fetching...' : 'Fetch mail now'}
+                                  </button>
+                                  {mailFetchResult && (
+                                    <span className={`text-xs ${mailFetchResult.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                      {mailFetchResult.message || mailFetchResult.error}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-neutral-400 mt-1.5">
+                                  In production this runs hourly on its own. It needs a JMAP
+                                  server above &mdash; IMAP is not supported yet.
+                                </p>
                               </div>
                             </div>
                           </div>

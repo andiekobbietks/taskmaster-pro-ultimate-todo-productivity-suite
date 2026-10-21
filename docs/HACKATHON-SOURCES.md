@@ -68,10 +68,31 @@ No competition data, in either capture. The listing is a React app, so
 the competitions come from an API call that never happens because the
 challenge is served instead.
 
-That is the reason "find them all" is not solved by pointing the capture
-at the listing page. It is not the format's problem — it is Cloudflare's
-bot management, and it applies to anything that is not a real browser
-with a real profile.
+### The usual fixes, tried
+
+| Attempt | Result |
+|---|---|
+| Bundled Chromium, headless | 2,356-byte challenge page |
+| Bundled Chromium, headed | Same |
+| Real Chrome (`channel="chrome"`), headless | Same |
+| Real Chrome, headed | Same |
+| Bundled Chromium, **persistent profile**, headless | Same |
+| Bundled Chromium, persistent profile, headed | Same |
+| Real Chrome, persistent profile, headless | Same |
+| Real Chrome, persistent profile, headed | Same |
+
+A persistent profile is the standard answer to a bot challenge — the
+clearance cookie survives, so the second visit is clean. It did not help
+here, because a **fresh** profile has no clearance cookie to reuse. The
+first visit needs a human to pass the challenge, and a human passing it
+in a headed browser does not obviously leave a cookie the automated
+profile can use.
+
+That is the honest position: **the capture cannot get Devpost's content
+unattended.** It is not the format's problem — it is Cloudflare's bot
+management, and it applies to anything that is not a real browser with a
+real profile that has already been through it.
+
 
 ## What that leaves
 

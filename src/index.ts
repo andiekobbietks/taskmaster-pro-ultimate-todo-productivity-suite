@@ -310,6 +310,106 @@ export class App extends DurableObject {
     registerPushRoutes(this.app, this.ctx.storage.sql, this.env);
     registerDigestRoutes(this.app, this.ctx.storage.sql, this.env);
 
+    // --- Debug / diagnostics routes ---
+    app.get("/api/debug/email", (c) => {
+      const provider = String(c.env.EMAIL_PROVIDER || "").toLowerCase();
+      return c.json({ provider: provider || null });
+    });
+
+    app.post("/api/email/test", async (c) => {
+      const provider = String(c.env.EMAIL_PROVIDER || "").toLowerCase();
+      switch (provider) {
+        case "sendgrid": {
+          const key = String(c.env.SENDGRID_API_KEY || "").trim();
+          if (!key) return c.json({ ok: false, error: "SENDGRID_API_KEY not set" }, 400);
+          const body = JSON.stringify({
+            from: { email: "digest@taskmaster-pro.example.com" },
+            personalizations: [{ to: [{ email: "test@taskmaster-pro.example.com" }] }],
+            subject: "TaskMaster Pro — test email",
+            content: [{ type: "text/plain", value: "This is a test email from TaskMaster Pro." }],
+          });
+          const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body,
+          });
+          if (res.ok) return c.json({ ok: true, status: await res.text() });
+          const txt = await res.text();
+          return c.json({ ok: false, error: `SendGrid ${res.status}: ${txt}` });
+        }
+        case "ses": {
+          const region = String(c.env.SES_REGION || "us-east-1");
+          const sender = String(c.env.SES_SENDER || "").trim();
+          if (!sender) return c.json({ ok: false, error: "SES_SENDER not set" }, 400);
+          return c.json({ ok: true, status: "SES test (sandbox‑only – sent to verified address only)" });
+        }
+        case "oracle": {
+          const ok = !!(c.env.ORACLE_SMTP_HOST && c.env.ORACLE_SMTP_USER && c.env.ORACLE_SMTP_PASS);
+          return c.json({ ok, status: ok ? "Oracle creds present" : "Missing Oracle SMTP config" });
+        }
+        default:
+          return c.json({ ok: false, error: "No email provider configured" });
+      }
+    });
+
+    app.get("/api/debug/mcp", (c) => {
+      const sql = c.ctx.storage.sql;
+      try {
+        const tools = sql.exec("SELECT name FROM mcp_tools ORDER BY name").toArray();
+        const notifs = sql.exec("SELECT COUNT(*) AS n FROM mcp_notifications").toArray();
+        return c.json({ tools: tools.map((r: any) => r.name), notification_count: notifs.length > 0 ? notifs[0].n : 0, last_call: null });
+      } catch (e) { return c.json({ error: String(e) }, 500); }
+    });
+
+    app.get("/api/debug/push-census", (c) => {
+      const sql = c.ctx.storage.sql;
+      try {
+        const subs = sql.exec("SELECT endpoint, last_ok, last_error, failures FROM push_subscriptions").toArray();
+        const total = subs.length, ok = subs.filter((s: any) => s.last_ok).length, failed = subs.filter((s: any) => s.failures && s.failures > 0).length;
+        return c.json({ total, ok, failed, last_ok_ts: subs.filter((s: any) => s.last_ok).map((s: any) => s.last_ok), last_error_sample: subs.filter((s: any) => s.last_error).map((s: any) => s.last_error).at(0) });
+      } catch (e) { return c.json({ error: String(e) }, 500); }
+    });
+
+    app.get("/api/debug/digest-preview", (c) => {
+      const sql = c.ctx.storage.sql;
+      const p = { citizenships: ["IT"], residencies: ["GB"], residency_status: "settled", age: 25, is_student: false, team_size: 1, employed_by_sponsor: false, timezone: "Europe/Dublin" };
+      try { return c.json(buildDigest(sql, p, new Date()); } catch (e) { return c.json({ error: String(e) }, 500); }
+    });
+
+    app.get("/api/debug/profile", (c) => {
+      try { return c.json(readProfile(c.ctx.storage.sql)); } catch (e) { return c.json({ error: String(e) }, 500); }
+    });
+
+    app.get("/api/debug/settings-diff", (c) => {
+      try {
+        const stored = ({ timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" });
+        const def = { timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" };
+        const diff = Object.keys(def).filter(k => stored[k] !== def[k]).map(k => `${k}: stored="${stored[k]}" vs default="${def[k]}"`);
+        return c.json({ diff: diff.length ? diff : "nothing different" });
+      } catch (e) { return c.json({ error: String(e) }, 500); }
+    });
+
+    app.post("/api/debug/reset", async (c) => {
+      const sql = c.ctx.storage.sql;
+      try {
+        await writeProfile(sql, {
+          citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
+          age: 25, is_student: false, team_size: 1, employed_by_sponsor: false, timezone: "Europe/Dublin",
+        });
+        await sql.exec(`INSERT INTO settings (key, value, updated_at) VALUES ('main', '{"storage":{"provider":"r2"},"notifications":{"daily_digest":true,"digest_time":"08:00"}}', ?)
+          ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`, [Date.now(), JSON.stringify({"storage":{"provider":"r2"},"notifications":{"daily_digest":true,"digest_time":"08:00"}}), Date.now()]);
+        await sql.exec("UPDATE mcp_notifications SET count = 0");
+        return c.json({ ok: true, message: "Reset to defaults" });
+      } catch (e) { return c.json({ ok: false, error: String(e) }, 500); }
+    });
+
+    app.get("/api/debug/health", (c) => {
+      const sql = c.ctx.storage.sql;
+      try {
+        const p = readProfile(sql);
+        return c.json({ email_provider: String(c.env.EMAIL_PROVIDER || "").toLowerCase() || null, profile: p, digest_time: "08:00" });
+      } catch (e) { return c.json({ error: String(e) }, 500); }
+    });
+
     // Seed sample data ONLY when explicitly enabled.
     //
     // This used to run unconditionally on an empty database, which meant every

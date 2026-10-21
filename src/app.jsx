@@ -1269,7 +1269,7 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
 
                     {/* Settings tabs */}
                     <div className="flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-800 pb-2">
-                      {['storage', 'profile', 'notifications', 'email', 'capture', 'calendar'].map(tab => (
+                      {['storage', 'profile', 'notifications', 'email', 'capture', 'calendar', 'developer'].map(tab => (
                         <button
                           key={tab}
                           onClick={() => setSettingsTab(tab)}
@@ -1737,6 +1737,165 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                               </div>
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Developer settings */}
+                    {settingsTab === 'developer' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-3">Developer</h3>
+
+                          <p className="text-xs text-neutral-500">
+                            Email provider: <span id="email-provider">loading…</span>
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/debug/email")
+                                .then(r => r.json())
+                                .then(d => { document.getElementById('email-provider').textContent = d.provider || 'none'; });
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors"
+                          >
+                            Check config
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/email/test", {method: "POST"})
+                                .then(r => r.json())
+                                .then(d => alert(d.ok ? 'Test email sent: ' + (d.status||'') : 'Error: ' + (d.error||'') ));
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+                          >
+                            Test email
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/debug/mcp")
+                                .then(r => r.json())
+                                .then(d => {
+                                  const ul = document.createElement('ul');
+                                  d.tools.forEach(t => {
+                                    const li = document.createElement('li');
+                                    li.textContent = t;
+                                    document.getElementById('mcp-status').appendChild(li);
+                                  });
+                                  document.getElementById('mcp-notif').textContent =
+                                    d.notification_count ? `${d.notification_count} pending` : 'none';
+                                });
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                          >
+                            MCP status
+                          </button>
+                          <div id="mcp-status" className="mt-2 text-xs text-neutral-500"></div>
+                          <div id="mcp-notif" className="mt-1 text-xs indigo-600"></div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/debug/push-census")
+                                .then(r => r.json())
+                                .then(d => {
+                                  const div = document.getElementById('push-census');
+                                  div.innerHTML = `
+                                    <p>Subscribed devices: ${d.total}</p>
+                                    <p>Last OK: ${d.ok} device(s)</p>
+                                    <p>Failed (last error): ${d.failed} device(s)</p>
+                                    ${d.last_error_sample ? `<p>Last error: ${d.last_error_sample}</p>` : ''}
+                                  `;
+                                });
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                          >
+                            Push census
+                          </button>
+                          <div id="push-census" className="mt-2 text-sm"></div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/debug/digest-preview")
+                                .then(r => r.json())
+                                .then(d => {
+                                  const box = document.getElementById('debug-digest');
+                                  box.value = JSON.stringify(d, null, 2);
+                                });
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                          >
+                            Digest preview
+                          </button>
+                          <textarea id="debug-digest" className="w-full h-40 rounded-md border border-neutral-300 dark:border-neutral-600 text-sm font-mono p-2 m-2 resize-y" readonly></textarea>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/debug/profile")
+                                .then(r => r.json())
+                                .then(d => {
+                                  const box = document.getElementById('debug-profile');
+                                  box.value = JSON.stringify(d, null, 2);
+                                });
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors"
+                          >
+                            Profile snapshot
+                          </button>
+                          <textarea id="debug-profile" className="w-full h-20 rounded-md border border-neutral-300 dark:border-neutral-600 text-sm font-mono p-2 m-2 resize-y" readonly></textarea>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/debug/settings-diff")
+                                .then(r => r.json())
+                                .then(d => {
+                                  const box = document.getElementById('debug-diff');
+                                  box.value = d.diff.join("\n");
+                                });
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+                          >
+                            Settings diff
+                          </button>
+                          <textarea id="debug-diff" className="w-full h-20 rounded-md border border-neutral-300 dark:border-neutral-600 text-sm font-mono p-2 m-2 resize-y" readonly></textarea>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm("This will wipe your profile, settings and MCP counters back to the seeded defaults. Are you sure?")) {
+                                fetch("/api/debug/reset", {method: "POST"})
+                                  .then(r => r.json())
+                                  .then(d => alert(d.ok ? "Defaults restored" : "Error: " + (d.error||'') ));
+                              }
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+                          >
+                            Reset defaults
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fetch("/api/debug/health")
+                                .then(r => r.json())
+                                .then(d => {
+                                  const box = document.getElementById('debug-health');
+                                  box.value = JSON.stringify(d, null, 2);
+                                });
+                            }}
+                            className="h-8 px-3 rounded-md text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                          >
+                            Health check
+                          </button>
+                          <textarea id="debug-health" className="w-full h-30 rounded-md border border-neutral-300 dark:border-neutral-600 text-sm font-mono p-2 m-2 resize-y" readonly></textarea>
                         </div>
                       </div>
                     )}

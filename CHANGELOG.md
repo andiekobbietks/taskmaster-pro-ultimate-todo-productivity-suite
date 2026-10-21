@@ -134,6 +134,91 @@ changelog is the single source of truth for what a release contains.
 - **`.gitattributes`** added so line endings stay LF and binary files are never
   touched.
 
+## [1.3.1] - 2026-10-21
+
+### Fixed
+
+- **The eligibility profile had two definitions and two defaults.**
+  `src/hackathons.ts` had an empty profile; `src/settings.ts` had one with
+  values in it. With nothing stored, the Settings screen showed a profile
+  while the eligibility engine evaluated an empty one — so every verdict
+  was computed against someone who did not exist. `src/profile.ts` now holds
+  the type, the default, and a merge that fills in any field a stored
+  profile is missing. Both modules read from it.
+- **`POST /api/settings/reset` cleared only the settings blob**, not the
+  canonical `hackathon_profile` table, so after a reset the screen and the
+  engine disagreed again. It clears both now.
+
+### Changed
+
+- `scripts/verify-ui.py` seeds its own inbox messages and removes them
+  afterwards, and waits on `domcontentloaded` rather than `networkidle`,
+  which never settles against the wrangler dev server.
+
+## [1.3.0] - 2026-10-21
+
+### Added
+
+- **A real Add/Edit Hackathon form.** The button set `isHackathonModalOpen`
+  but no modal was ever rendered, so it did nothing. The form covers
+  platform, status, prize, URL, dates, notes and eligibility rules, and is
+  wired to `POST` and `PATCH /api/hackathons` with a delete action.
+- **Multi-selection, in both lists.** Per-card checkboxes, select all, and
+  bulk actions: mark open, mark closed and delete for hackathons; mark
+  processed, mark unprocessed and delete for inbox messages. Ticking an
+  inbox row stops the click and the keypress from reaching the row, so a
+  message can be queued without opening it.
+- **JMAP settings fields.** `src/jmap.ts` needs a server URL, a username and
+  a password, and there was nowhere to configure them. `jmap_password` is
+  obfuscated at rest like the IMAP password.
+- **`scripts/verify-ui.py`** — 18 browser checks covering the Add Hackathon
+  form, the populated settings screen, per-card screenshot upload, bulk
+  selection in both lists, and the app rendering with no network at all.
+- **`scripts/test-bugfixes.mjs`** — 34 route-level checks, including
+  regression tests for the settings merge and the settings reset.
+
+### Fixed
+
+- **Settings rendered empty, for three separate reasons.**
+  `GET /api/settings` threw on `row.value` where it meant `rows[0].value`.
+  There was no `loadSettings`, so the state stayed null and every tab is
+  gated on `settings &&`. And `PUT /api/settings` did
+  `{...DEFAULT_SETTINGS, ...data}`, so editing one field reset every other
+  section back to its defaults.
+- **Attach Screenshot did nothing.** The button sat at the view level and
+  used `editingHackathon.id`, which is null unless an Edit dialog had been
+  opened. It now lives on each card and uploads to that card's id.
+- **`setHackathonView` was called by three navigation buttons but never
+  declared** — the flag was removed when `activeView` took over — so
+  clicking Today, Settings or Archives threw at runtime.
+- **`DELETE /api/hackathons/:id` had no return statement**, so the client
+  received no response body.
+- **The handbook's table cells were plain strings.** ReportLab draws those
+  on one line, so long cells overflowed into the next column and overlapped
+  it — the known-risks table was three columns of text on top of each other.
+  Every cell is now a `Paragraph`, through one `mk_table` helper, with the
+  header row repeating across page breaks.
+- **The handbook's Modal sample showed a button, not a modal**, and the
+  Banner sample showed one variant, because fixed banners all land on the
+  same spot. `Banner` gained an `inline` mode, and the modal now has its own
+  sample.
+
+### Changed
+
+- **The app no longer needs a network.** Google Fonts blocked the first
+  paint, so with no connection the interface never appeared. The stylesheet
+  now loads non-blocking and Tailwind carries system font fallbacks, so the
+  app renders in the system stack immediately and swaps to Inter if the
+  webfont ever arrives.
+- The storybook has 13 stories, including the inbox selection state and the
+  open modal. The capture script clears `docs/samples` first so a renamed
+  component cannot leave a stale sample behind, and hides fixed overlays
+  belonging to other stories.
+- The handbook is 19 pages and includes a new known risk: the mail
+  credentials in Settings are stored but nothing reads them. There is no
+  IMAP client, and `src/jmap.ts` is not wired to any route — the inbox is
+  filled by `POST /api/inbox`.
+
 ## [Unreleased]
 
 ### Added

@@ -61,18 +61,19 @@ what ships.
 ## Rebuilding the design system handbook
 
 ```powershell
-npm run storybook:build          # rebuild the component library bundle
-python scripts/capture-storybook.py   # regenerate the pixel samples
-python scripts/build-handbook.py       # rebuild the PDF
+npm run storybook:build               # rebuild the component library bundle
+python scripts/capture-storybook.py   # regenerate the component pixel samples
+python scripts/capture-views.py       # regenerate the screen pixel samples
+python scripts/build-handbook.py      # rebuild the PDF
 ```
 
-Output: `TaskMaster_Pro_Design_System_Handbook.pdf` — 19 pages with the real
-component samples embedded, in `C:\Users\Admin\Documents`.
+Output: `TaskMaster_Pro_Design_System_Handbook.pdf` — 22 pages with the real
+component and screen samples embedded, in `C:\Users\Admin\Documents`.
 
-The capture script publishes twelve pixel samples into `docs/samples`. It
-clears that folder first, so a renamed or dropped component does not leave a
-stale sample behind, and it skips the components that cover the viewport
-rather than cropping them.
+The capture scripts publish into `docs/samples` and `docs/samples/views`.
+They clear those folders first, so a renamed or dropped component does not
+leave a stale sample behind, and they skip the components that cover the
+viewport rather than cropping them.
 
 ## Where the work goes next
 

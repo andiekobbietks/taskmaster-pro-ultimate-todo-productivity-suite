@@ -266,10 +266,11 @@ def main():
     story.append(HRFlowable(width="100%", thickness=1, color=HexColor(BRAND["200"])))
     story.append(Spacer(1, 6*mm))
     story.append(Paragraph(
-        "Every component in this handbook is a real pixel sample of the shipped code, "
-        "captured at two times resolution. Nothing here is a mock-up: the images are "
-        "rendered from <b>src/components</b> and <b>src/lib</b>, so a change to a "
-        "component changes this document.", body))
+        "Every component and every screen in this handbook is a real pixel sample of "
+        "the shipped code, captured at two times resolution. Nothing here is a mock-up: "
+        "the components are rendered from <b>src/components</b> and <b>src/lib</b>, and "
+        "the screens are captured from the running application. A change to the code "
+        "changes this document.", body))
     story.append(PageBreak())
 
     # ── Contents ───────────────────────────────────────────────────
@@ -607,7 +608,7 @@ def main():
         ["src/app.jsx", "The whole front end — one file, compiled by esbuild"],
         ["src/components/", "Reusable interface components"],
         ["src/lib/", "Shared helpers: the API client, and email formatting"],
-        ["scripts/", "Email search, screenshot pipeline, sync, and the API test suite"],
+        ["scripts/", "Email search, screenshot pipeline, sync, the test suites, and the capture scripts that build this document"],
         ["docs/", "Generated inventories, SBOM, readiness gates and this handbook's source"],
     ]
     story.append(mk_table(layout, [140, 290]))
@@ -642,8 +643,8 @@ def main():
     story.append(Spacer(1, 4*mm))
     story.append(Paragraph(
         "This handbook is generated from the repository. The samples are real pixels of "
-        "the shipped components, and the inventories it cites are the same ones CI "
-        "checks for drift. If the code changes, the handbook changes with it.", small))
+        "the shipped components and screens, and the inventories it cites are the same "
+        "ones CI checks for drift. If the code changes, the handbook changes with it.", small))
 
 
     doc.build(story, onFirstPage=page_furniture, onLaterPages=page_furniture)

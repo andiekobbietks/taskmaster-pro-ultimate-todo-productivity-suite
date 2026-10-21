@@ -14,6 +14,8 @@ import { registerCapacityRoutes } from "../src/capacity.ts";
 import { registerArchiveRoutes } from "../src/archive.ts";
 import { registerCaptureRoutes } from "../src/capture.ts";
 import { registerMcpRoutes } from "../src/mcp.ts";
+import { registerFeedRoutes } from "../src/feed-routes.ts";
+import { buildRssFeed, parseFeed, findHackathonMentions } from "../src/feed.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
 const db = new DatabaseSync(":memory:");
@@ -30,6 +32,7 @@ registerCapacityRoutes(app, sql);
 registerArchiveRoutes(app, sql);
 registerCaptureRoutes(app, sql);
 registerMcpRoutes(app, sql);
+registerFeedRoutes(app, sql);
 
 const call = (method, path, body, isForm, headers) => {
   const init = { method };
@@ -852,6 +855,97 @@ console.log("\n=== 15. The app as an MCP server ===");
   const hs = await (await call("GET", "/api/hackathons")).json();
   for (const h of hs) {
     if (h.name === "MCP Test Competition") await call("DELETE", "/api/hackathons/" + h.id);
+  }
+}
+
+
+console.log("\n=== 16. Feeds, in both directions ===");
+{
+  // --- Writing ---------------------------------------------------------
+  await call("POST", "/api/hackathons", {
+    name: "Feed Test Competition", platform: "devpost", prize: "$25,000",
+    url: "https://devpost.com/hackathons/feed-test",
+    submission_deadline: "2026-12-01",
+    eligibility: { eligibility_type: "unrestricted", regions: ["Global"], age_min: 13 },
+  });
+
+  const feedResp = await call("GET", "/api/feed.xml");
+  const xml = await feedResp.text();
+  check("the feed is served", feedResp.status === 200, "HTTP " + feedResp.status);
+  check("it is XML", xml.includes("<rss version=\"2.0\">"), xml.slice(0, 40));
+  check("it has the competition", xml.includes("Feed Test Competition"));
+  check("it carries the deadline", xml.includes("2026-12-01"));
+  check("it carries the prize", xml.includes("$25,000"));
+  check("it carries the verdict", xml.includes("eligible"));
+  check("it has a guid", /<guid[^>]*>hack-/.test(xml));
+
+  // The XML has to be well formed, or a reader will reject it.
+  let wellFormed = true;
+  try {
+    // A rough check: every opened tag is closed.
+    const opened = (xml.match(/<item>/g) || []).length;
+    const closed = (xml.match(/<\/item>/g) || []).length;
+    wellFormed = opened === closed && opened > 0;
+  } catch {
+    wellFormed = false;
+  }
+  check("the items balance", wellFormed);
+
+  // --- Reading ---------------------------------------------------------
+  const rss = `<?xml version="1.0"?><rss version="2.0"><channel>
+    <title>Regional Tech</title>
+    <link>https://example.com</link>
+    <item><title>Amazon Developer Hackathon is open</title>
+      <link>https://example.com/amazon</link>
+      <description>Registration closes soon, prize money to be won.</description>
+      <pubDate>Wed, 21 Oct 2026 08:32:12 GMT</pubDate></item>
+    <item><title>Some other news</title><link>https://example.com/other</link>
+      <description>Unrelated, about a shopping sale.</description></item>
+  </channel></rss>`;
+
+  const parsed = parseFeed(rss);
+  check("the RSS title is read", parsed.title === "Regional Tech", parsed.title);
+  check("the RSS has two items", parsed.items.length === 2, parsed.items.length + " items");
+  check("the item title is read",
+        parsed.items[0].title === "Amazon Developer Hackathon is open",
+        parsed.items[0].title);
+  check("the item link is read",
+        parsed.items[0].link === "https://example.com/amazon", parsed.items[0].link);
+  check("the description is stripped of tags",
+        !parsed.items[0].description.includes("<"), parsed.items[0].description.slice(0, 40));
+
+  const atom = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <title>Atom Feed</title>
+    <entry><title>An entry about a hackathon</title>
+      <link href="https://example.com/atom-entry"/>
+      <summary>Something for a hackathon</summary>
+      <updated>2026-10-21T08:32:12Z</updated></entry>
+  </feed>`;
+  const parsedAtom = parseFeed(atom);
+  check("the Atom format is detected", parsedAtom.format === "atom", parsedAtom.format);
+  check("the Atom entry is read", parsedAtom.items.length === 1, parsedAtom.items.length + "");
+  check("the Atom link is read",
+        parsedAtom.items[0].link === "https://example.com/atom-entry",
+        parsedAtom.items[0].link);
+
+  const mentions = findHackathonMentions(parsed);
+  check("the hackathon item is found", mentions.length === 1, mentions.length + " matches");
+  check("the other item is not",
+        !mentions.some((m) => m.title === "Some other news"));
+  check("an unrelated word does not match",
+        findHackathonMentions(parseFeed(rss.replace(/hackathon/gi, "shopping")))
+          .length === 0);
+
+  // The route needs a url, and it has to be http.
+  const noUrl = await call("POST", "/api/feed/fetch", {});
+  check("a missing url is refused", noUrl.status === 400, "HTTP " + noUrl.status);
+  const badScheme = await call("POST", "/api/feed/fetch", { url: "file:///etc/passwd" });
+  check("a non-http url is refused", badScheme.status === 400, "HTTP " + badScheme.status);
+
+  // Clean up.
+  const hs = await (await call("GET", "/api/hackathons")).json();
+  for (const h of hs) {
+    if (h.name === "Feed Test Competition") await call("DELETE", "/api/hackathons/" + h.id);
   }
 }
 

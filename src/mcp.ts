@@ -22,6 +22,7 @@ import { readSettings } from "./settings.ts";
 import { readProfile } from "./profile.ts";
 import { evaluateEligibility, type EligibilityRules } from "./hackathons.ts";
 import { fetchNewMail } from "./mail.ts";
+import { buildRssFeed, readFeed } from "./feed.ts";
 
 const PROTOCOL_VERSION = "2025-06-18";
 const SERVER_INFO = { name: "taskmaster-pro", version: "1.3.1" };
@@ -242,6 +243,88 @@ const TOOLS: Tool[] = [
       const result = await fetchNewMail(sql);
       return JSON.stringify(result, null, 2);
     },
+  },
+  {
+    name: "feed_competitions",
+    description:
+      "The competitions being tracked, as an RSS 2.0 document. This is the " +
+      "app's own feed: anything can subscribe to it.",
+    inputSchema: { type: "object", properties: {} },
+    run: async (_args, sql) => {
+      const rows = sql.exec(
+        "SELECT * FROM hackathons WHERE status = 'open' ORDER BY created_at DESC LIMIT 100"
+      ).toArray();
+      const profile = readProfile(sql);
+      const items = rows.map((r: any) => {
+        const verdict = evaluateEligibility(
+          (safeJson(r.eligibility_json) || {}) as EligibilityRules, profile);
+        const deadline = r.submission_deadline || r.end_date;
+        return {
+          title: r.name,
+          link: r.url || "",
+          description: [
+            r.platform,
+            deadline ? "closes " + deadline : "",
+            r.prize ? "prize " + r.prize : "",
+            verdict.eligible ? verdict.qualification_path
+              : "not eligible: " + verdict.reasons.join("; "),
+          ].filter(Boolean).join(" · "),
+          pubDate: new Date(Number(r.created_at) || Date.now()).toUTCString(),
+          guid: r.id,
+        };
+      });
+      return buildRssFeed(
+        "TaskMaster Pro — competitions being tracked",
+        "The hackathons and competitions tracked in this TaskMaster Pro instance.",
+        "", items);
+    },
+  },
+  {
+    name: "read_feed",
+    description:
+      "Read an RSS or Atom feed and pull the items that mention a hackathon. " +
+      "There is no feed that lists hackathons, but the regional tech-news " +
+      "feeds mention them.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The feed to read" },
+        keywords: {
+          type: "array", items: { type: "string" },
+          description: "Words that mark an item as being about a hackathon",
+        },
+      },
+      required: ["url"],
+    },
+    run: async (args) => {
+      const url = String(args.url || "");
+      if (!/^https?:\/\//i.test(url)) {
+        return JSON.stringify({ ok: false, message: "The feed url must be http or https" });
+      }
+      return JSON.stringify(await readFeed(url, args.keywords), null, 2);
+    },
+  },
+  {
+    name: "known_feeds",
+    description:
+      "The feeds that are known to work for finding hackathons, by region, and " +
+      "the ones that are dead.",
+    inputSchema: { type: "object", properties: {} },
+    run: async () => JSON.stringify({
+      feeds: [
+        { url: "https://techcabal.com/feed/", region: "Africa" },
+        { url: "https://www.gadget.co.za/feed/", region: "South Africa" },
+        { url: "https://analyticsindiamag.com/feed", region: "India" },
+        { url: "https://yourstory.com/feed", region: "India" },
+        { url: "https://ec.europa.eu/commission/presscorner/api/rss?language=en", region: "EU" },
+        { url: "https://hnrss.org/frontpage", region: "Global" },
+      ],
+      dead: [
+        "devpost.com/feed.rss - returns the homepage as HTML",
+        "pipes.yahoo.com - does not resolve; Yahoo Pipes is gone",
+        "query.yahooapis.com - does not resolve; YQL is gone",
+      ],
+    }, null, 2),
   },
   {
     name: "get_settings",

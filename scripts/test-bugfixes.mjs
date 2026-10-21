@@ -10,6 +10,7 @@ import { registerAttachmentRoutes } from "../src/attachments.ts";
 import { registerSettingsRoutes } from "../src/settings.ts";
 import { registerCapacityRoutes } from "../src/capacity.ts";
 import { registerArchiveRoutes } from "../src/archive.ts";
+import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
 const db = new DatabaseSync(":memory:");
 db.exec(`
@@ -55,10 +56,14 @@ registerSettingsRoutes(app, sql);
 registerCapacityRoutes(app, sql);
 registerArchiveRoutes(app, sql);
 
-const call = (method, path, body, isForm) => {
+const call = (method, path, body, isForm, headers) => {
   const init = { method };
   if (isForm) init.body = body;
-  else if (body !== undefined) {
+  else if (body instanceof Uint8Array) {
+    // Raw bytes, for a file upload.
+    init.body = body;
+    init.headers = headers || {};
+  } else if (body !== undefined) {
     init.body = JSON.stringify(body);
     init.headers = { "Content-Type": "application/json" };
   }
@@ -470,6 +475,62 @@ console.log("\n=== 10. The raw MIME parser, against a real message ===");
   const inbox = await (await call("GET", "/api/inbox")).json();
   const copies = inbox.filter((e) => e.subject === mail.subject);
   check("the inbox holds one copy", copies.length === 1, copies.length + " copies");
+}
+
+
+console.log("\n=== 11. Reading a WACZ capture ===");
+{
+  const bytes = new Uint8Array(readFileSync(
+    new URL("./fixtures/sample-capture.wacz", import.meta.url)));
+
+  const archive = await readWacz(bytes);
+  check("the zip is read", archive.records.length > 0 || archive.pages.length > 0);
+  check("the page list is read", archive.pages.length === 1,
+        archive.pages.length + " pages");
+  check("the page URL is read",
+        archive.pages[0].url === "https://devpost.com/hackathons/amazon-hackathon",
+        archive.pages[0].url);
+  check("the datapackage is read",
+        archive.datapackage && archive.datapackage.profile === "wacz",
+        archive.datapackage ? archive.datapackage.profile : "missing");
+
+  check("the WARC records are parsed", archive.records.length === 1,
+        archive.records.length + " records");
+  const record = archive.records[0];
+  check("the record is a response", record.type === "response", record.type);
+  check("the record's URL is read",
+        record.url === "https://devpost.com/hackathons/amazon-hackathon", record.url);
+  check("the HTTP status is read", record.status === 200, String(record.status));
+  check("the body is read", recordText(record).includes("Amazon Developer Hackathon"));
+
+  // The lookup has to survive a URL that differs in the query string.
+  const found = findResponse(archive.records,
+    "https://devpost.com/hackathons/amazon-hackathon?utm=1");
+  check("the response is found despite a different query", found !== null);
+
+  // And the route has to accept the file.
+  const r = await call("POST", "/api/archive/wacz", bytes, false,
+    { "x-target-url": "https://devpost.com/hackathons/amazon-hackathon" });
+  check("the route accepts a raw WACZ", r.status === 200, "HTTP " + r.status);
+  const body = await r.json();
+  check("the route reports the source", body.source === "wacz", body.source);
+  check("the route counts the pages", body.pages_captured === 1,
+        String(body.pages_captured));
+  check("the route extracts the deadline",
+        /November 18, 2026/.test(JSON.stringify(body.extracted || {})),
+        JSON.stringify(body.extracted || {}).slice(0, 120));
+  check("the route extracts the prize",
+        /\$138,000/.test(JSON.stringify(body.extracted || {})),
+        JSON.stringify(body.extracted || {}).slice(0, 120));
+  check("the route returns the raw HTML for the compiler",
+        typeof body.html === "string" && body.html.includes("<!doctype html>"),
+        String(body.html).slice(0, 50));
+
+  // Something that is not a zip has to be refused, not crash.
+  const notAZip = await call("POST", "/api/archive/wacz",
+    new Uint8Array([1, 2, 3, 4, 5]), false, {});
+  check("a file that is not a zip is refused", notAZip.status === 400,
+        "HTTP " + notAZip.status);
 }
 
 console.log("\n" + "=".repeat(60));

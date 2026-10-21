@@ -19,6 +19,7 @@
  */
 
 import { Hono } from "hono";
+import { readWacz, findResponse, recordText } from "./wacz.ts";
 
 export interface ArchiveSource {
   id: string;
@@ -135,6 +136,74 @@ function extractHackathonData(html: string): ArchivedPage["extracted"] {
  * @param sql - SQLite storage interface from Durable Object
  */
 export function registerArchiveRoutes(app: Hono, sql: any) {
+  // --- Ingest a WACZ archive ---------------------------------------------
+  //
+  // A WACZ is a zip of the raw HTTP transactions for a capture. It is
+  // posted here, read, and the same extraction runs over the captured
+  // HTML as the Wayback route uses. The difference is that the WACZ holds
+  // the network traffic, not just the rendered page.
+  app.post("/api/archive/wacz", async (c) => {
+    let bytes: Uint8Array | null = null;
+    let targetUrl = "";
+
+    const contentType = c.req.header("content-type") || "";
+
+    if (contentType.includes("multipart/form-data")) {
+      const form = await c.req.formData();
+      const file = form.get("file");
+      targetUrl = String(form.get("url") || "");
+      if (file instanceof File) {
+        bytes = new Uint8Array(await file.arrayBuffer());
+      }
+    } else {
+      // The raw file, with the URL in a header.
+      targetUrl = c.req.header("x-target-url") || "";
+      bytes = new Uint8Array(await c.req.arrayBuffer());
+    }
+
+    if (!bytes || bytes.length === 0) {
+      return c.json({ error: "No WACZ file was sent" }, 400);
+    }
+
+    let archive;
+    try {
+      archive = await readWacz(bytes);
+    } catch (err: any) {
+      return c.json({ error: "Could not read the WACZ: " + (err?.message || "unknown") }, 400);
+    }
+
+    if (archive.pages.length === 0 && archive.records.length === 0) {
+      return c.json({ error: "The WACZ has no pages and no records in it" }, 400);
+    }
+
+    // Work out which page was wanted. The URL in the request wins; if it
+    // was not given, the first page in the capture is the one.
+    const wanted = targetUrl || archive.pages[0]?.url || "";
+    const record = wanted ? findResponse(archive.records, wanted) : archive.records[0];
+
+    if (!record) {
+      return c.json({
+        error: "No response for " + wanted + " in the WACZ",
+        captured: archive.pages.map((p) => p.url).slice(0, 20),
+      }, 404);
+    }
+
+    const html = recordText(record);
+    const extracted = extractHackathonData(html);
+
+    return c.json({
+      ok: true,
+      url: record.url || wanted,
+      source: "wacz",
+      pages_captured: archive.pages.length,
+      records: archive.records.length,
+      extracted,
+      // The raw HTML, so the caller can compile it rather than only read
+      // the fields.
+      html: html.slice(0, 2_000_000),
+    });
+  });
+
   // --- List archive sources -------------------------------------------
 
   app.get("/api/archive/sources", (c) => {

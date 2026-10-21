@@ -87,13 +87,45 @@ Broken chain, or no safety net. In critical-path order.
 The journey works but is manual, or the product is incomplete for the
 person it is for.
 
-### S1 — Make bulk capture real
+### S1 — Make bulk capture real — PART DONE
 
-`scripts/sync-hackathons.mjs:22` has all three sources set to
-`enabled: false` — Devpost, MLH and lablab. The PRD's premise is that the
-information is scattered across a dozen platforms; today capture is one
-competition at a time, by hand. Pick one platform, make it work, then the
-rest. `scripts/screenshot_pipeline.py` exists and is also standalone.
+The capture side is done: `src/wacz.ts` reads a WACZ archive and
+`POST /api/archive/wacz` ingests one, extracting the same fields the
+Wayback route does and returning the raw HTML so the compiler can work
+from it. Eighteen checks run against a real WACZ in
+`scripts/fixtures/sample-capture.wacz`.
+
+**The capture side is not done.** Nothing yet produces a WACZ. The
+screenshot pipeline records a picture; a WACZ needs the network traffic.
+Two ways, neither of them needs the Wayback Machine:
+
+| Way | What it needs | Note |
+|---|---|---|
+| **Record the network with Playwright** | `warcio` from PyPI, one small package | The screenshot pipeline already drives Playwright. Listen to the response events, write a WARC, zip it as a WACZ. |
+| **`@harvard-lil/scoop`** | One npm package | A service worker injected into the page that records the traffic itself. |
+
+The WACZ format, from the Webrecorder specification 1.1.1:
+
+```
+datapackage.json          the collection description
+datapackage-digest.json   its hash
+archive/data.warc.gz      every raw HTTP transaction, gzipped
+pages/pages.jsonl         one line per captured page
+indexes/index.cdx.gz      a CDX index, for random access
+```
+
+**On the Wayback Machine's own archiving.** Save Page Now can be
+triggered, and its form has a "Email me a WACZ file with the results"
+option. Two reasons not to build on it: it is rate limited per IP — the
+response carries `X-RL`, the number of captures left, and it answers 429
+once that runs out — and the WACZ arrives **by email**, so it lands in
+the inbox rather than in a file the pipeline can point at. Keep the
+Wayback route for pages that are already archived; do not automate
+archiving.
+
+`scripts/sync-hackathons.mjs:22` still has all three sources set to
+`enabled: false` — Devpost, MLH and lablab. That is a separate problem
+from the format, and the answer to it is still "pick one platform".
 
 ### S2 — Schedule the digest, and let it read the todos
 

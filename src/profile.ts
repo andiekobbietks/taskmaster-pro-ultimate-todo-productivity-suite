@@ -49,3 +49,37 @@ export function withProfileDefaults(profile: Partial<UserProfile> | null | undef
     ...(profile || {}),
   };
 }
+
+/**
+ * Read the stored profile from its canonical table.
+ *
+ * The table is `hackathon_profile`. A profile written by an older version,
+ * or edited one field at a time, may be missing keys, so the result is
+ * merged against the default rather than trusted as-is.
+ */
+export function readProfile(sql: any): UserProfile {
+  try {
+    const rows = sql
+      .exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'")
+      .toArray();
+    if (rows.length > 0 && rows[0].profile_json) {
+      return withProfileDefaults(JSON.parse(rows[0].profile_json));
+    }
+  } catch {
+    // fall through to the defaults
+  }
+  return { ...DEFAULT_PROFILE };
+}
+
+/**
+ * Write the profile to its canonical table.
+ */
+export function writeProfile(sql: any, profile: UserProfile): void {
+  const json = JSON.stringify(profile);
+  const ts = Date.now();
+  sql.exec(
+    `INSERT INTO hackathon_profile (id, profile_json, updated_at) VALUES ('default', ?, ?)
+     ON CONFLICT(id) DO UPDATE SET profile_json = ?, updated_at = ?`,
+    json, ts, json, ts
+  ).toArray();
+}

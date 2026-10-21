@@ -16,6 +16,7 @@ Exit code 0 means every check passed.
 import json
 import os
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -26,7 +27,28 @@ except ImportError:
     sys.exit(2)
 
 BASE = os.environ.get("TM_BASE", "http://127.0.0.1:8821")
-SHOTS = os.environ.get("TM_SHOTS", r"C:\Users\Admin\Documents")
+
+
+def shots_dir():
+    """Where to write the screenshots.
+
+    Defaults to the Documents folder on Windows, where the rest of the
+    project's output lives. On a CI runner there is no such folder, so it
+    falls back to a temporary directory — deliberately not docs/, because
+    CI fails when anything under docs/ drifts from what is committed.
+    """
+    chosen = os.environ.get("TM_SHOTS")
+    if chosen:
+        path = chosen
+    elif os.path.isdir(r"C:\Users\Admin\Documents"):
+        path = r"C:\Users\Admin\Documents"
+    else:
+        path = os.path.join(tempfile.gettempdir(), "tm-screenshots")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+SHOTS = shots_dir()
 
 passed = 0
 failed = []
@@ -47,18 +69,49 @@ def api(method, path, body=None):
 
 
 def seed_emails():
-    """Put two emails in the inbox so the list has something to select."""
-    ids = []
-    for subject in ["Verification check: deadline extended",
-                    "Verification check: account please confirm"]:
-        r = api("POST", "/api/inbox", {
-            "sender": "notifications@devpost.com",
-            "subject": subject,
-            "body_text": "This message was created by scripts/verify-ui.py.",
-        })
-        if r and r.get("id"):
-            ids.append(r["id"])
-    return ids
+    """Make sure the inbox has something to select.
+
+    Returns (ids_for_the_checks, ids_to_delete).
+
+    Against the live Worker the inbox starts empty, so two messages are
+    posted and those two are deleted afterwards. Against the mock API it
+    already carries a fixed set of four and ignores writes, so nothing is
+    posted and the existing ones are used and left alone.
+
+    Only what this function creates is ever deleted. If the inbox already
+    had messages, they are used for the checks and kept.
+
+    The ids are read back from the list rather than taken from the POST
+    response, because the two servers return different shapes there.
+    """
+    listing = api("GET", "/api/inbox")
+    existing = listing if isinstance(listing, list) else []
+
+    subjects = ["Verification check: deadline extended",
+                "Verification check: account please confirm"]
+    created = []
+
+    if not existing:
+        for subject in subjects:
+            api("POST", "/api/inbox", {
+                "sender": "notifications@devpost.com",
+                "subject": subject,
+                "body_text": "This message was created by scripts/verify-ui.py.",
+            })
+        listing = api("GET", "/api/inbox")
+        existing = listing if isinstance(listing, list) else []
+        created = [e["id"] for e in existing
+                   if isinstance(e, dict) and e.get("subject") in subjects
+                   and e.get("id")]
+
+    usable = [e["id"] for e in existing
+              if isinstance(e, dict) and e.get("id")
+              and (not subjects or e.get("subject") in subjects)]
+    if not usable:
+        usable = [e["id"] for e in existing
+                  if isinstance(e, dict) and e.get("id")]
+
+    return usable, created
 
 
 def delete_emails(ids):
@@ -147,8 +200,9 @@ def run(page, results):
 
 
 def main():
-    seeded = seed_emails()
-    print("seeded %d email(s) for the inbox checks" % len(seeded))
+    usable, created = seed_emails()
+    print("inbox: %d message(s) available, %d created by this run"
+          % (len(usable), len(created)))
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -183,7 +237,7 @@ def main():
 
         browser.close()
 
-    delete_emails(seeded)
+    delete_emails(created)
 
     print()
     for name, ok in results:

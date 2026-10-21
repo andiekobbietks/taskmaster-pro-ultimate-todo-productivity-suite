@@ -10,7 +10,7 @@
  * Regional groupings: EU, EEA, Schengen, UK, US, Global
  */
 import { Hono } from "hono";
-import { DEFAULT_PROFILE, withProfileDefaults, type UserProfile } from "./profile.ts";
+import { DEFAULT_PROFILE, readProfile, writeProfile, withProfileDefaults, type UserProfile } from "./profile.ts";
 
 // ── Regional groupings ──────────────────────────────────────────────
 
@@ -306,12 +306,7 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
       team_size: data.team_size ?? 1,
       employed_by_sponsor: data.employed_by_sponsor ?? false,
     };
-    const json = JSON.stringify(profile);
-    sql.exec(
-      `INSERT INTO hackathon_profile (id, profile_json, updated_at) VALUES ('default', ?, ?)
-       ON CONFLICT(id) DO UPDATE SET profile_json = ?, updated_at = ?`,
-      json, now(), json, now()
-    ).toArray();
+    writeProfile(sql, profile);
     return c.json(profile);
   });
   // Get single
@@ -373,10 +368,5 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
 }
 
 function getUserProfile(sql: any): UserProfile {
-  try {
-    const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
-    const row = rows.length > 0 ? rows[0] : null;
-    if (row?.profile_json) return withProfileDefaults(parseJson(row.profile_json, DEFAULT_PROFILE));
-  } catch {}
-  return { ...DEFAULT_PROFILE };
+  return readProfile(sql);
 }

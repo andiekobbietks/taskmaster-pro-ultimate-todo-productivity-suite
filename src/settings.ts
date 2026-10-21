@@ -9,7 +9,7 @@
  * - Archive sources are managed via the archive module, but surfaced here too.
  */
 import { Hono } from "hono";
-import { DEFAULT_PROFILE, type UserProfile } from "./profile.ts";
+import { DEFAULT_PROFILE, readProfile, writeProfile, type UserProfile } from "./profile.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -180,41 +180,6 @@ function deobfuscateSettings(settings: any): any {
  * @param app - Hono application instance
  * @param sql - SQLite storage interface from Durable Object
  */
-
-/**
- * Write the eligibility profile to its canonical home.
- *
- * The profile lives in the `hackathon_profile` table because that is what
- * the eligibility engine reads (src/hackathons.ts). The settings blob
- * keeps a copy so the Settings screen can render it, but the table is
- * authoritative. Writing either place updates both, so the two can never
- * drift apart.
- */
-function writeProfile(sql: any, profile: any) {
-  const json = JSON.stringify(profile);
-  sql.exec(
-    `INSERT INTO hackathon_profile (id, profile_json, updated_at) VALUES ('default', ?, ?)
-     ON CONFLICT(id) DO UPDATE SET profile_json = ?, updated_at = ?`,
-    json, now(), json, now()
-  ).toArray();
-}
-
-/**
- * Read the eligibility profile from its canonical home.
- */
-function readProfile(sql: any): any {
-  const rows = sql
-    .exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'")
-    .toArray();
-  if (rows.length > 0 && rows[0].profile_json) {
-    try {
-      return JSON.parse(rows[0].profile_json);
-    } catch {
-      // fall through to the defaults
-    }
-  }
-  return { ...DEFAULT_PROFILE };
-}
 
 export function registerSettingsRoutes(app: Hono, sql: any) {
   // --- Get all settings -----------------------------------------------

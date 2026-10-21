@@ -10,6 +10,7 @@
  */
 import { Hono } from "hono";
 import { DEFAULT_PROFILE, readProfile, writeProfile, type UserProfile } from "./profile.ts";
+import { isValidTimeZone } from "./timezone.ts";
 import { testYahooConnection, type YahooConfig } from "./yahoo.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -307,6 +308,12 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
     // table would drop the fields it did not mention.
     if (data.profile) {
       const mergedProfile = mergeSettings(readProfile(sql), data.profile);
+      // A time zone the runtime does not know would break the digest and
+      // the "today" filter, so an unknown one is refused rather than
+      // stored.
+      if (!isValidTimeZone(mergedProfile.timezone)) {
+        mergedProfile.timezone = readProfile(sql).timezone || DEFAULT_PROFILE.timezone;
+      }
       writeProfile(sql, mergedProfile);
       settings.profile = mergedProfile;
     }

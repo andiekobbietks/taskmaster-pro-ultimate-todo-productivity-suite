@@ -199,6 +199,47 @@ curl http://127.0.0.1:8787/api/calendar.ics
 curl http://127.0.0.1:8787/api/hackathons/simple
 ```
 
+### The reader's time zone
+
+**The profile carries an IANA zone** (`Europe/Dublin`), and everything
+that needs a clock uses it: the digest's time, the "today" filter, the
+days left on a deadline, and the eligibility engine's idea of now. Set
+it in **Settings → Profile**, or press **"Use this device"** and the
+browser's own zone is taken.
+
+```powershell
+npm run test:timezone     # 42 checks, including every daylight-saving edge
+```
+
+**The arithmetic is in `src/timezone.ts`**, on `Intl` — the Workers
+runtime ships the full zone database, so there is no table to maintain
+and no library to install. The parts that are easy to get wrong, and are
+therefore tested:
+
+- **Finding "08:00 local"** is not adding eight hours to UTC. It is
+  finding the instant whose *local* time is 08:00, which moves with
+  daylight saving.
+- **A local time that does not exist** (the hour that vanishes on a
+  spring-forward morning) still resolves to a real instant.
+- **A local time that happens twice** (the hour that repeats on a
+  fall-back evening) resolves to the *first* one, like every calendar.
+- **Counting days** is a calendar difference, not hours divided by 24.
+  A deadline that closes tonight is 0 days left, in Auckland and in
+  Los Angeles alike.
+
+**Two bugs this fixed, which affected every reader outside UTC:**
+
+1. The "Today" filter compared the reader's tasks against **UTC's**
+   date, so in the evening in California the Today tab showed
+   yesterday.
+2. The days-left on a deadline compared a **UTC midnight** against a
+   local clock, so a deadline closing tonight read as tomorrow's.
+
+**What is still UTC:** the competition deadlines themselves. Devpost
+publishes a date, and that date is the organiser's — "closes on the
+23rd" means the 23rd where they are. That is the right reading for a
+deadline, and it is not a bug.
+
 ### Push notifications
 
 **The app is installable and can push to a phone.** `public/manifest.webmanifest`

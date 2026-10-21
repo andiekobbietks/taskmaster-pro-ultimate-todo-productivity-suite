@@ -22,6 +22,7 @@ import {
   Flame, MoreHorizontal, ArrowRight, X, Menu, Settings, Check, HelpCircle
 } from "lucide-react";
 import { api, describeError } from "./lib/api.js";
+import { todayLocal, daysUntilLocal, browserTimeZone, describeBrowserZone } from "./lib/time.js";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import {
   EmailListItem, EmailDetail, InboxSplitView, EmailListSkeleton,
@@ -231,7 +232,9 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
 
       // Client-side date filters if needed
       let filtered = Array.isArray(data) ? data : [];
-      const todayStr = new Date().toISOString().split('T')[0];
+      // The reader's today, not UTC's. In the evening in California, or
+      // before breakfast in Tokyo, UTC's date is a different day.
+      const todayStr = todayLocal();
       if (activeTab === "today") {
         filtered = filtered.filter(t => t.due_date === todayStr);
       }
@@ -1425,6 +1428,38 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                 className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
                               />
                             </div>
+                            <div>
+                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Time zone</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  list="timezone-list"
+                                  value={settings.profile?.timezone || ''}
+                                  placeholder="Europe/Dublin"
+                                  onChange={(e) => saveSettings({ profile: { ...settings.profile, timezone: e.target.value } })}
+                                  className="flex-1 h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => saveSettings({ profile: { ...settings.profile, timezone: browserTimeZone() } })}
+                                  className="h-9 px-3 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                                >
+                                  Use this device
+                                </button>
+                              </div>
+                              <datalist id="timezone-list">
+                                {['Europe/Dublin','Europe/London','Europe/Berlin','Europe/Lisbon','Europe/Moscow','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Sao_Paulo','America/Toronto','Africa/Lagos','Africa/Nairobi','Africa/Cairo','Africa/Johannesburg','Asia/Kolkata','Asia/Dubai','Asia/Singapore','Asia/Shanghai','Asia/Tokyo','Asia/Seoul','Australia/Sydney','Pacific/Auckland','UTC'].map(z => (
+                                  <option key={z} value={z} />
+                                ))}
+                              </datalist>
+                              <p className="text-xs text-neutral-400 mt-1">
+                                {settings.profile?.timezone
+                                  ? describeBrowserZone() === settings.profile.timezone
+                                    ? `This device is on ${settings.profile.timezone}.`
+                                    : `Saved: ${settings.profile.timezone}. This device is on ${browserTimeZone() || 'an unknown zone'}.`
+                                  : 'Your own zone, so the digest arrives in your morning and "today" means your today.'}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2288,7 +2323,10 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                       <div className="grid gap-3">
                         {hackathons.map(h => {
                           const deadline = h.submission_deadline || h.end_date;
-                          const daysLeft = deadline ? Math.ceil((new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                          // Whole local days, not hours divided by 24:
+                          // a deadline that closes tonight is 0 days
+                          // left, whatever the reader's zone.
+                          const daysLeft = daysUntilLocal(deadline);
                           return (
                             <div key={h.id} className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all">
                               <div className="flex items-start justify-between gap-3">

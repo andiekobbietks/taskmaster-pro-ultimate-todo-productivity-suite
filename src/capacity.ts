@@ -11,6 +11,7 @@
 import { Hono } from "hono";
 import { evaluateEligibility, type EligibilityRules } from "./hackathons.ts";
 import { readProfile, type UserProfile } from "./profile.ts";
+import { daysUntilInZone } from "./timezone.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -62,11 +63,14 @@ function parseJson<T>(s: string | null, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 }
 
-function daysUntil(dateStr: string | null): number {
+function daysUntil(dateStr: string | null, timeZone: string): number {
   if (!dateStr) return 999;
-  const target = new Date(dateStr).getTime();
-  const today = new Date().setHours(0, 0, 0, 0);
-  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+  // Counted in the reader's own zone: a deadline that closes tonight is
+  // 0 days left, wherever the reader is. The old version compared a
+  // UTC midnight against a local midnight, which was a day out for
+  // anyone west of Greenwich.
+  const left = daysUntilInZone(timeZone, dateStr);
+  return left === null ? 999 : left;
 }
 
 // Estimate hours needed based on hackathon type
@@ -194,7 +198,7 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
     // Evaluate eligibility and calculate scores
     const scored = hackathons.map((h: any) => {
       const deadline = h.submission_deadline || h.end_date;
-      const daysLeft = daysUntil(deadline);
+      const daysLeft = daysUntil(deadline, profile.timezone);
       // The same engine the eligibility route uses, so the plan and the
       // badge on the competition card can never disagree.
       const rules = parseJson(h.eligibility_json, {}) as EligibilityRules;
@@ -322,7 +326,7 @@ export function registerCapacityRoutes(app: Hono, sql: any) {
     const profile: UserProfile = readProfile(sql);
     const scored = rows.map((r: any) => {
       const deadline = r.submission_deadline || r.end_date;
-      const daysLeft = daysUntil(deadline);
+      const daysLeft = daysUntil(deadline, profile.timezone);
       const estHours = estimateHours(r.platform, r.name);
       const prizeNorm = normalizePrize(r.prize);
       const urgency = daysLeft <= 0 ? 1.0 : Math.min(1.0, 1.0 / daysLeft);

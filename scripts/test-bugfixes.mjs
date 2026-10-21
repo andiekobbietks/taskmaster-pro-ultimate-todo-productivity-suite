@@ -18,6 +18,7 @@ import { registerFeedRoutes } from "../src/feed-routes.ts";
 import { registerDevpostRoutes } from "../src/devpost-routes.ts";
 import { registerCalendarRoutes } from "../src/calendar-routes.ts";
 import { registerPushRoutes } from "../src/push-routes.ts";
+import { registerDigestRoutes } from "../src/digest-routes.ts";
 import { buildRssFeed, parseFeed, findHackathonMentions } from "../src/feed.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
@@ -39,6 +40,7 @@ registerFeedRoutes(app, sql);
 registerDevpostRoutes(app, sql);
 registerCalendarRoutes(app, sql);
 registerPushRoutes(app, sql, undefined);
+registerDigestRoutes(app, sql, undefined);
 
 const call = (method, path, body, isForm, headers) => {
   const init = { method };
@@ -1211,6 +1213,63 @@ console.log("\n=== 19. Web push ===");
   check("a subscription can be removed", unsub.status === 200, "HTTP " + unsub.status);
   const afterUnsub = await (await call("GET", "/api/push/status")).json();
   check("it is gone", afterUnsub.count === 0, JSON.stringify(afterUnsub));
+}
+
+console.log("\n=== 20. The reader's time zone ===");
+{
+  // The profile carries the zone, so the digest and the "today" filter
+  // know where the reader is.
+  const saved = await call("PUT", "/api/hackathons/profile", {
+    citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
+    age: 25, is_student: false, team_size: 1, employed_by_sponsor: false,
+    timezone: "Asia/Kolkata",
+  });
+  const savedBody = await saved.json();
+  check("a profile with a time zone is accepted", saved.status === 200, "HTTP " + saved.status);
+  check("the zone is kept", savedBody.timezone === "Asia/Kolkata", savedBody.timezone);
+
+  const read = await (await call("GET", "/api/hackathons/profile")).json();
+  check("the zone survives a round trip", read.timezone === "Asia/Kolkata", read.timezone);
+
+  // A zone the runtime does not know is refused, not stored.
+  const bad = await call("PUT", "/api/hackathons/profile", {
+    citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
+    age: 25, is_student: false, team_size: 1, employed_by_sponsor: false,
+    timezone: "Mars/Olympus_Mons",
+  });
+  const badBody = await bad.json();
+  check("an unknown zone is refused", badBody.timezone !== "Mars/Olympus_Mons", badBody.timezone);
+  check("and the stored one is kept", badBody.timezone === "Asia/Kolkata", badBody.timezone);
+
+  // The reader's clock, in their own zone.
+  const time = await (await call("GET", "/api/time")).json();
+  check("the time route answers", typeof time.local_time === "string", JSON.stringify(time));
+  check("it names the zone", time.timezone === "Asia/Kolkata", time.timezone);
+  check("it says the zone is valid", time.zone_is_valid === true, JSON.stringify(time));
+  check("it gives the offset in minutes", time.offset_minutes === 330, time.offset_minutes);
+  check("it gives the local date", /^\d{4}-\d{2}-\d{2}$/.test(time.local_date), time.local_date);
+  check("it gives the local time", /^\d{2}:\d{2}$/.test(time.local_time), time.local_time);
+
+  // The digest preview, in the reader's zone.
+  const preview = await (await call("GET", "/api/digest/preview")).json();
+  check("the digest preview answers", typeof preview.title === "string", JSON.stringify(preview).slice(0, 90));
+  check("it names the reader's date", preview.date === time.local_date, preview.date + " vs " + time.local_date);
+  check("it has a body", typeof preview.body === "string" && preview.body.length > 0, preview.body);
+  check("it lists what is closing", Array.isArray(preview.closing), JSON.stringify(preview.closing).slice(0, 60));
+
+  // The send is honest when there is nothing to send it to.
+  const send = await call("POST", "/api/digest/send");
+  const sendBody = await send.json();
+  check("the send route answers", send.status === 200, "HTTP " + send.status);
+  check("it did not pretend to send", sendBody.sent === false, JSON.stringify(sendBody).slice(0, 90));
+  check("it says why", typeof sendBody.why === "string" && sendBody.why.length > 0, sendBody.why);
+
+  // Put the profile back the way it was.
+  await call("PUT", "/api/hackathons/profile", {
+    citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
+    age: 25, is_student: false, team_size: 1, employed_by_sponsor: false,
+    timezone: "Europe/Dublin",
+  });
 }
 
 console.log("\n" + "=".repeat(60));

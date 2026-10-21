@@ -119,6 +119,18 @@ holds a four-step wizard (where, sign in, which, check); its two push
 paths — Microsoft Graph and CalDAV — are marked **(i)** experimental and
 answer HTTP 501 with what is missing rather than pretending to work.
 
+**The app knows the reader's time zone.** The profile carries an IANA
+zone, and the digest, the "today" filter and the days-left count all
+use it. `src/timezone.ts` does the arithmetic on `Intl` (the Workers
+runtime ships the full zone database, so no table and no library), and
+`npm run test:timezone` checks 42 cases including every daylight-saving
+edge: finding "08:00 local" across a DST change, a local time that does
+not exist, one that happens twice, and counting days as a calendar
+difference rather than hours divided by 24. Two real bugs went with it:
+the "Today" filter compared against UTC's date (wrong in the evening in
+California), and the days-left compared a UTC midnight against a local
+clock (a deadline closing tonight read as tomorrow's).
+
 **The app can push to a phone.** The app is a PWA (`public/manifest.webmanifest`,
 `public/sw.js`, generated icons) and the push sender is implemented from the
 spec on WebCrypto — RFC 8292 VAPID signing and RFC 8291 aes128gcm

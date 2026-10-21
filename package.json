@@ -17,6 +17,7 @@
     "test:push": "node --experimental-strip-types scripts/test-push.mjs && node --experimental-strip-types scripts/test-vapid.mjs",
     "test:push:encryption": "node --experimental-strip-types scripts/test-push.mjs",
     "test:push:vapid": "node --experimental-strip-types scripts/test-vapid.mjs",
+    "test:timezone": "node --experimental-strip-types scripts/test-timezone.mjs",
     "icons": "python scripts/make-icons.py",
     "vapid": "node scripts/make-vapid-keys.mjs",
     "test:ui": "python scripts/verify-ui.py",

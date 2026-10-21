@@ -11,6 +11,7 @@
  */
 import { Hono } from "hono";
 import { DEFAULT_PROFILE, readProfile, writeProfile, withProfileDefaults, type UserProfile } from "./profile.ts";
+import { isValidTimeZone } from "./timezone.ts";
 
 // ── Regional groupings ──────────────────────────────────────────────
 
@@ -311,6 +312,12 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
   app.get("/api/hackathons/profile", (c) => c.json(getUserProfile(sql)));
   app.put("/api/hackathons/profile", async (c) => {
     const data = await c.req.json();
+    // The time zone is kept only if it is one this runtime knows. A
+    // browser can send anything, and a bad zone would break the digest
+    // and the "today" filter rather than fail loudly. An unknown zone
+    // leaves the stored one alone.
+    const zone = String(data.timezone || "");
+    const stored = readProfile(sql);
     const profile: UserProfile = {
       citizenships: data.citizenships || ["IT"],
       residencies: data.residencies || ["GB"],
@@ -319,6 +326,7 @@ export function registerHackathonRoutes(app: Hono, sql: any) {
       is_student: data.is_student ?? false,
       team_size: data.team_size ?? 1,
       employed_by_sponsor: data.employed_by_sponsor ?? false,
+      timezone: isValidTimeZone(zone) ? zone : stored.timezone || DEFAULT_PROFILE.timezone,
     };
     writeProfile(sql, profile);
     return c.json(profile);

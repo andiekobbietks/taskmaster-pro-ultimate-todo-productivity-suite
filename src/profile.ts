@@ -18,6 +18,16 @@ export interface UserProfile {
   is_student: boolean;
   team_size: number;
   employed_by_sponsor: boolean;
+  /**
+   * The reader's own time zone, as an IANA name ("Europe/Dublin").
+   *
+   * The app stores dates rather than instants, so most things do not
+   * need a zone. Two things do: the digest, which has to arrive at
+   * 08:00 in the reader's morning, and the "today" filter, which has to
+   * mean the reader's today. A zone with daylight saving is handled in
+   * src/timezone.ts.
+   */
+  timezone: string;
 }
 
 /**
@@ -34,6 +44,7 @@ export const DEFAULT_PROFILE: UserProfile = {
   is_student: false,
   team_size: 1,
   employed_by_sponsor: false,
+  timezone: "Europe/Dublin",
 };
 
 /**

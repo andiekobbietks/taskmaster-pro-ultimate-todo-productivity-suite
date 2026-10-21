@@ -11,6 +11,7 @@ import { registerFeedRoutes } from "./feed-routes";
 import { registerDevpostRoutes } from "./devpost-routes";
 import { registerCalendarRoutes } from "./calendar-routes";
 import { registerPushRoutes } from "./push-routes";
+import { registerDigestRoutes } from "./digest-routes";
 import { createSchema } from "./schema";
 import { Hono } from "hono";
 
@@ -307,6 +308,7 @@ export class App extends DurableObject {
     registerDevpostRoutes(this.app, this.ctx.storage.sql);
     registerCalendarRoutes(this.app, this.ctx.storage.sql);
     registerPushRoutes(this.app, this.ctx.storage.sql, this.env);
+    registerDigestRoutes(this.app, this.ctx.storage.sql, this.env);
 
     // Seed sample data ONLY when explicitly enabled.
     //
@@ -427,6 +429,21 @@ const worker = {
       // A failed poll must not take the Worker down. The next hour tries
       // again, and the Settings screen shows the error from the route.
       console.error("scheduled mail fetch failed:", err);
+    }
+
+    // The daily digest, in the reader's own time zone. The cron ticks
+    // every hour in UTC, and the digest decides for itself whether the
+    // reader's digest time has arrived — so the same tick works for
+    // every zone, and daylight saving is handled in src/timezone.ts.
+    try {
+      const result = await env.APP.get(id).fetch(
+        new Request("https://internal/api/digest/send", { method: "POST" })
+      );
+      if (result.status >= 400) {
+        console.error("scheduled digest failed:", result.status);
+      }
+    } catch (err) {
+      console.error("scheduled digest failed:", err);
     }
   },
 };

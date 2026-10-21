@@ -272,7 +272,7 @@ Every sample is captured at one width.
 |---|---|---|---|
 | 1 | No authentication on any `/api/*` route | Critical | **open** |
 | 2 | No audit trail | High | **open** |
-| 3 | The capture runner does not validate the URL it is given | High | fixed 2026-10-21 |
+| 3 | The capture runner does not validate the URL it is given | High | partly fixed 2026-10-21 |
 | 4 | Secrets are XOR-obfuscated, not encrypted | Medium | open |
 | 5 | The Durable Object is a single thread | Medium | open |
 | 6 | Captured pages and mail are untrusted input to an agent | Medium | open, inherent |

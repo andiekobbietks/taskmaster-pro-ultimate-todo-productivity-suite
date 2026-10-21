@@ -226,6 +226,14 @@ before it is stored.
 Findings 3 and the size caps in section 3 were **fixed on 2026-10-21**, during
 this assessment. Findings 1, 2, 4, 5, 6 and 7 are open.
 
+**Finding 3 is only half fixed.** The upload size and the decompressed
+size are now capped, so a large or expanding archive cannot stall the
+Durable Object. But `scripts/capture-wacz.py` still does not check the
+scheme of the URL it is given, and it still does not refuse a private
+address range. Pointed at `http://192.168.1.1/` it would drive the
+browser to the router's admin page and write what it saw to disk. That
+check is a dozen lines and it is the next thing to do.
+
 ## 5. About Vault and Supabase
 
 Neither is implemented, and neither is the right answer for this app.

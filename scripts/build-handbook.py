@@ -14,6 +14,7 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas as pdfcanvas
 
 SHOTS = r"C:\Users\Admin\AppData\Local\Temp\opencode\storybook-shots"
+VIEWS_DIR = r"C:\Users\Admin\Documents\taskmaster-pro\docs\samples\views"
 OUT = r"C:\Users\Admin\Documents\TaskMaster_Pro_Design_System_Handbook.pdf"
 DOCS = r"C:\Users\Admin\AppData\Local\Temp\opencode\tp"
 
@@ -162,6 +163,36 @@ def _cells(row, style):
     return [c if isinstance(c, Paragraph) else Paragraph(str(c), style) for c in row]
 
 
+# The screens, captured from the running app rather than the component
+# library. A view is a composition, so a component sample cannot stand in
+# for it.
+VIEWS = [
+    {"file": "today.png", "name": "Today",
+     "desc": "The answer to 'what should I do today'. A one-line summary of the hours "
+             "you have against the work due this week, the competitions worth your "
+             "time, the deadlines that collide, and the week's capacity as a grid. "
+             "Everything else in the app is reachable from here.",
+     "shows": "Summary, focus today, conflicts, upcoming this week, weekly capacity"},
+    {"file": "hackathons.png", "name": "Hackathons",
+     "desc": "Every competition being tracked. The deadline counts down, the prize is "
+             "shown, and the eligibility verdict sits on the card - so a competition "
+             "you cannot enter is visible as such rather than as a prize you will "
+             "never win. Each card can take a screenshot and can be selected in bulk.",
+     "shows": "Deadline, prize, eligibility verdict, per-card actions, bulk selection"},
+    {"file": "inbox.png", "name": "Inbox",
+     "desc": "The mail that arrives from the competitions, matched to the competition "
+             "it belongs to. A row is a button with keyboard support, so the list is "
+             "reachable without a mouse, and a message can be queued for later with "
+             "the selection checkbox without opening it.",
+     "shows": "Split view, per-row actions, bulk selection, linked competition"},
+    {"file": "settings.png", "name": "Settings",
+     "desc": "Profile, notifications, mail configuration and the storage backend, in "
+             "four tabs. The profile here is the same one the eligibility engine "
+             "reads, so changing your citizenship changes the verdicts.",
+     "shows": "Storage, profile, notifications and email tabs"},
+]
+
+
 def mk_table(rows, widths, head_bg=BRAND["600"], mono_cols=(), muted_cols=()):
     """A table whose cells wrap. mono_cols are set in a monospace face."""
     body = [_cells(rows[0], CELL_HEAD)]
@@ -246,9 +277,10 @@ def main():
     rows = [["Section", "What it covers"]]
     rows.append(["1. Design tokens", "The colour, type, spacing and motion values every component draws from"])
     rows.append(["2. Component library", "Pixel samples, prop tables and usage for all eleven components and twelve sampled states"])
-    rows.append(["3. Product requirements", "What the product is, who it is for, and what each module does"])
-    rows.append(["4. API reference", "Every endpoint, grouped by module"])
-    rows.append(["5. Architecture", "How the pieces fit together, and where the risks are"])
+    rows.append(["3. The views", "The four screens, captured from the running app"])
+    rows.append(["4. Product requirements", "What the product is, who it is for, and what each module does"])
+    rows.append(["5. API reference", "Every endpoint, grouped by module"])
+    rows.append(["6. Architecture", "How the pieces fit together, and where the risks are"])
     story.append(mk_table(rows, [100, 330]))
     story.append(PageBreak())
 
@@ -388,8 +420,45 @@ def main():
         story.append(Spacer(1, 8*mm))
 
     # ── 3. PRD ─────────────────────────────────────────────────────
-    story.append(Paragraph("3. Product requirements (PRD)", h1))
-    story.append(Paragraph("3.1 What the product is", h2))
+    # ── 3. The views ─────────────────────────────────────────────────
+    story.append(Paragraph("3. The views", h1))
+    story.append(Paragraph(
+        "The screens, in the order a person meets them. These are real pixels of the "
+        "running application, captured at two times resolution by "
+        "<b>scripts/capture-views.py</b> &mdash; not mock-ups, and not the components "
+        "assembled by hand. A view is a composition, so a component sample cannot "
+        "stand in for one.", body))
+    story.append(Spacer(1, 3*mm))
+
+    for v in VIEWS:
+        shot_path = os.path.join(VIEWS_DIR, v["file"])
+        block = [Paragraph("3.%d %s" % (VIEWS.index(v) + 1, v["name"]), h2),
+                 Paragraph(v["desc"], body)]
+        if os.path.exists(shot_path):
+            img = Image(shot_path)
+            ratio = img.imageHeight / img.imageWidth
+            max_w = 430
+            img.drawWidth = max_w
+            img.drawHeight = max_w * ratio
+            if img.drawHeight > 300:
+                scale = 300 / img.drawHeight
+                img.drawWidth *= scale
+                img.drawHeight *= scale
+            img.hAlign = "LEFT"
+            block.append(Spacer(1, 4))
+            block.append(img)
+            block.append(Paragraph(
+                "Sample: %s &nbsp;·&nbsp; shows: %s" % (v["name"], v["shows"]), caption))
+        else:
+            block.append(Paragraph(
+                "<i>Sample not captured. Run scripts/capture-views.py.</i>", caption))
+        story.append(KeepTogether(block))
+
+    story.append(PageBreak())
+
+    # ── 4. Product requirements ───────────────────────────────────────
+    story.append(Paragraph("4. Product requirements (PRD)", h1))
+    story.append(Paragraph("4.1 What the product is", h2))
     story.append(Paragraph(
         "TaskMaster Pro is a self-hosted productivity and hackathon tracking platform. "
         "It runs entirely on Cloudflare Workers with a Durable Object holding the "
@@ -401,14 +470,14 @@ def main():
         "is scattered across a dozen platforms, and the time to act on it is measured in "
         "hours a week, not hours a day.", body))
 
-    story.append(Paragraph("3.2 Who it is for", h2))
+    story.append(Paragraph("4.2 Who it is for", h2))
     story.append(Paragraph(
         "A developer or technical professional who competes in several hackathons a "
         "month while holding a full-time job and other responsibilities. They need to "
         "know which competitions they are actually eligible for, when each one closes, "
         "and what to do next given the hours they genuinely have.", body))
 
-    story.append(Paragraph("3.3 The modules", h2))
+    story.append(Paragraph("4.3 The modules", h2))
     modules = [
         ("Todo management", "Tasks with priorities, tags, lists, due dates, pinning, search and a pomodoro counter.", "A working todo app, because the rest of the product is useless without a place to put the outcome."),
         ("Hackathon tracker", "Competitions with deadlines, prizes, platform and status, each with a rule set.", "The core entity. Everything else supports it."),
@@ -425,7 +494,7 @@ def main():
         rows.append(list(m))
     story.append(mk_table(rows, [95, 165, 170]))
 
-    story.append(Paragraph("3.4 The eligibility engine", h2))
+    story.append(Paragraph("4.4 The eligibility engine", h2))
     story.append(Paragraph(
         "Eligibility is the feature that distinguishes this from a calendar. Rules are "
         "stored as JSON on each competition, so adding a competition with new rules "
@@ -449,7 +518,7 @@ def main():
         '<Badge variant="success">eligible via UK residency (GB, settled)</Badge>\n'
         '<Badge variant="danger">Students only</Badge>', code))
 
-    story.append(Paragraph("3.5 Data protection", h2))
+    story.append(Paragraph("4.5 Data protection", h2))
     story.append(Paragraph(
         "The inbox stores extracted metadata, not raw email. Email bodies are rendered "
         "as plain text and never injected into the page, so there is no HTML sanitiser "
@@ -460,7 +529,7 @@ def main():
     story.append(PageBreak())
 
     # ── 4. API reference ────────────────────────────────────────────
-    story.append(Paragraph("4. API reference", h1))
+    story.append(Paragraph("5. API reference", h1))
     story.append(Paragraph(
         "Every route is served by the Durable Object and answers JSON. Literal paths "
         "are registered ahead of their parameter siblings, so a route such as "
@@ -513,8 +582,8 @@ def main():
     story.append(PageBreak())
 
     # ── 5. Architecture ─────────────────────────────────────────────
-    story.append(Paragraph("5. Architecture", h1))
-    story.append(Paragraph("5.1 Shape", h2))
+    story.append(Paragraph("6. Architecture", h1))
+    story.append(Paragraph("6.1 Shape", h2))
     story.append(Paragraph(
         "A single Cloudflare Worker serves the compiled single-page app and exposes "
         "the API. All state lives in one Durable Object with an embedded SQLite "
@@ -522,7 +591,7 @@ def main():
         "sit in the same database as BLOB data. There is no R2 binding yet, so moving "
         "them out is work rather than a setting.", body))
 
-    story.append(Paragraph("5.2 Layout", h2))
+    story.append(Paragraph("6.2 Layout", h2))
     layout = [["Path", "Role"]]
     layout += [
         ["src/index.ts", "Worker entry. Durable Object, Hono router, security middleware, schema"],
@@ -543,7 +612,7 @@ def main():
     ]
     story.append(mk_table(layout, [140, 290]))
 
-    story.append(Paragraph("5.3 Known risks", h2))
+    story.append(Paragraph("6.3 Known risks", h2))
     story.append(Paragraph(
         "Stated plainly, because a design document that only lists strengths is a "
         "marketing document.", body))
@@ -560,7 +629,7 @@ def main():
     ]
     story.append(mk_table(risks, [150, 110, 170]))
 
-    story.append(Paragraph("5.4 What comes next", h2))
+    story.append(Paragraph("6.4 What comes next", h2))
     for n in ["Authentication and a per-user data model, before any public deployment",
               "An ingestion route that connects to the configured mail server, so the inbox fills itself",
               "Attachments to R2 with signed URLs, removing the size ceiling",

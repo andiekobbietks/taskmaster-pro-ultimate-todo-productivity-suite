@@ -13,9 +13,11 @@ Run it against a live server:
 
 Exit code 0 means every check passed.
 """
+import json
 import os
 import sys
 import time
+import urllib.request
 
 try:
     from playwright.sync_api import sync_playwright
@@ -28,6 +30,41 @@ SHOTS = os.environ.get("TM_SHOTS", r"C:\Users\Admin\Documents")
 
 passed = 0
 failed = []
+
+
+def api(method, path, body=None):
+    """Call the app's own API. Returns the parsed body, or None."""
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(BASE + path, data=data, method=method)
+    if data:
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode() or "{}")
+    except Exception as e:
+        print("  api %s %s failed: %s" % (method, path, e))
+        return None
+
+
+def seed_emails():
+    """Put two emails in the inbox so the list has something to select."""
+    ids = []
+    for subject in ["Verification check: deadline extended",
+                    "Verification check: account please confirm"]:
+        r = api("POST", "/api/inbox", {
+            "sender": "notifications@devpost.com",
+            "subject": subject,
+            "body_text": "This message was created by scripts/verify-ui.py.",
+        })
+        if r and r.get("id"):
+            ids.append(r["id"])
+    return ids
+
+
+def delete_emails(ids):
+    for i in ids:
+        api("DELETE", "/api/inbox/" + i)
+
 
 
 def check(name, ok, detail=""):
@@ -110,13 +147,16 @@ def run(page, results):
 
 
 def main():
+    seeded = seed_emails()
+    print("seeded %d email(s) for the inbox checks" % len(seeded))
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1600, "height": 1100})
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
-        page.goto(BASE + "/", wait_until="networkidle", timeout=20000)
-        time.sleep(2)
+        page.goto(BASE + "/", wait_until="domcontentloaded", timeout=30000)
+        time.sleep(3)
 
         results = []
         run(page, results)
@@ -142,6 +182,8 @@ def main():
         page.screenshot(path=os.path.join(SHOTS, "tm-offline.png"), full_page=True)
 
         browser.close()
+
+    delete_emails(seeded)
 
     print()
     for name, ok in results:

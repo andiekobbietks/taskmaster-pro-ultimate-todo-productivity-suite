@@ -10,6 +10,7 @@
  * Regional groupings: EU, EEA, Schengen, UK, US, Global
  */
 import { Hono } from "hono";
+import { DEFAULT_PROFILE, withProfileDefaults, type UserProfile } from "./profile.ts";
 
 // ── Regional groupings ──────────────────────────────────────────────
 
@@ -34,15 +35,9 @@ const REGIONS: Record<string, string[]> = {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export interface UserProfile {
-  citizenships: string[];      // ISO 3166-1 alpha-2
-  residencies: string[];       // ISO 3166-1 alpha-2
-  residency_status: string;     // "settled", "pre-settled", "visa", "citizen", "none"
-  age: number;
-  is_student: boolean;
-  team_size: number;
-  employed_by_sponsor: boolean;
-}
+// The profile type and its default live in src/profile.ts, so the
+// eligibility engine and the Settings screen cannot disagree about them.
+export type { UserProfile } from "./profile.ts";
 
 export interface EligibilityRules {
   eligibility_type: string;     // "citizenship" | "residency" | "any" | "unrestricted"
@@ -252,15 +247,8 @@ function rowToHackathon(r: any): Hackathon {
 
 // ── Default user profile (Andie's actual profile) ────────────────────
 
-const DEFAULT_PROFILE: UserProfile = {
-  citizenships: [],               // Set via PUT /api/hackathons/profile
-  residencies: [],
-  residency_status: "none",
-  age: 0,
-  is_student: false,
-  team_size: 1,
-  employed_by_sponsor: false,
-};
+// The default profile comes from src/profile.ts, so it is the same one
+// the Settings screen shows.
 
 // ── Route registration ───────────────────────────────────────────────
 
@@ -388,7 +376,7 @@ function getUserProfile(sql: any): UserProfile {
   try {
     const rows = sql.exec("SELECT profile_json FROM hackathon_profile WHERE id = 'default'").toArray();
     const row = rows.length > 0 ? rows[0] : null;
-    if (row?.profile_json) return parseJson(row.profile_json, DEFAULT_PROFILE);
+    if (row?.profile_json) return withProfileDefaults(parseJson(row.profile_json, DEFAULT_PROFILE));
   } catch {}
   return { ...DEFAULT_PROFILE };
 }

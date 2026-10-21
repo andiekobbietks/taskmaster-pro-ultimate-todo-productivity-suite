@@ -531,6 +531,7 @@ def main():
         ["src/archive.ts", "Wayback Machine adapter and metadata extraction"],
         ["src/capacity.ts", "Weekly hours template, prioritisation, conflict detection"],
         ["src/settings.ts", "Configurable settings, with sensitive values obfuscated at rest"],
+        ["src/profile.ts", "The eligibility profile: one type, one default, read by both the engine and the Settings screen"],
         ["src/jmap.ts", "JMAP client for JMAP-compatible mail servers"],
         ["src/app.jsx", "The whole front end — one file, compiled by esbuild"],
         ["src/components/", "Reusable interface components"],

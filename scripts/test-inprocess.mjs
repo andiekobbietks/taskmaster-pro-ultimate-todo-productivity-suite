@@ -11,6 +11,7 @@ import { registerAttachmentRoutes } from "../src/attachments.ts";
 import { registerSettingsRoutes } from "../src/settings.ts";
 import { registerCapacityRoutes } from "../src/capacity.ts";
 import { registerArchiveRoutes } from "../src/archive.ts";
+import { SCHEMA } from "../src/schema.ts";
 
 const db = new DatabaseSync(":memory:");
 

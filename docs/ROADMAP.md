@@ -112,10 +112,12 @@ formed enough for pywb and the rest of the webrecorder tooling.
 
 **The app is its own MCP server.** `POST /api/mcp` speaks the
 protocol, so any MCP client can connect to the deployed app and work
-with the competitions, the inbox and the capture queue. Ten tools. The
-protocol is implemented in `src/mcp.ts` rather than pulled in, because
-the official SDK bundles to 385 KB and drags express, jose and ajv in
-with it.
+with the competitions, the inbox and the capture queue. Thirteen tools
+(feed support added three). The tool definitions live in
+`src/mcp-tools.ts`; `src/mcp.ts` implements the protocol by hand — the
+official SDK's transport costs +291 KB minified against it (measured
+2026-10-21) — and `src/mcp-sdk.ts` is the same endpoint on the SDK,
+opt-in with a one-line import change in `src/index.ts`.
 
 **The manifest lives in the app.** Settings has a Capture tab with the
 list of pages to capture. `POST /api/capture/jobs` queues them, and

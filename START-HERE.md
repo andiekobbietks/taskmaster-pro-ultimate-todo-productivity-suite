@@ -133,15 +133,28 @@ nothing to install and no sidecar.
 }
 ```
 
-Ten tools: `list_competitions`, `get_competition`, `list_inbox`,
+Thirteen tools: `list_competitions`, `get_competition`, `list_inbox`,
 `search_inbox`, `capture_manifest`, `add_to_manifest`, `capture_all`,
-`capture_status`, `fetch_mail`, `get_settings`. The secrets come back
-masked.
+`capture_status`, `fetch_mail`, `feed_competitions`, `read_feed`,
+`known_feeds`, `get_settings`. The secrets come back masked.
 
-The protocol is implemented in `src/mcp.ts` rather than pulled in, because
-the official SDK drags express, hono/node-server, jose and ajv behind it
-and bundles to 385 KB. A stateless JSON-RPC server over one HTTP POST is
-a few hundred lines, and the app's dependency tree stays at four packages.
+Quick check that it is alive, without configuring anything — the MCP
+Inspector is the official playground, and it connects straight to the
+endpoint:
+
+```powershell
+npx @modelcontextprotocol/inspector --cli http://127.0.0.1:8787/api/mcp --method tools/list
+npx @modelcontextprotocol/inspector --cli http://127.0.0.1:8787/api/mcp --method tools/call --tool-name known_feeds
+npx @modelcontextprotocol/inspector   # the web UI; put in the same URL
+```
+
+The protocol is implemented in `src/mcp.ts` rather than pulled in, so the
+app's dependency tree stays lean. The tool definitions are shared with
+`src/mcp-sdk.ts`, which is the same endpoint on the official SDK's full
+transport (sessions, SSE); switching is a one-line import change in
+`src/index.ts`. Measured against the lean server on 2026-10-21, the SDK
+transport costs +291 KB minified (+78 KB gzipped), which is why the lean
+one ships and the SDK one is opt-in.
 
 ### Driving the capture
 

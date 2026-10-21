@@ -6,6 +6,7 @@ import { registerSettingsRoutes } from "./settings";
 import { registerCapacityRoutes } from "./capacity";
 import { registerInboxRoutes } from "./inbox";
 import { registerCaptureRoutes } from "./capture";
+import { registerMcpRoutes } from "./mcp";
 import { createSchema } from "./schema";
 import { Hono } from "hono";
 
@@ -297,6 +298,7 @@ export class App extends DurableObject {
     registerCapacityRoutes(this.app, this.ctx.storage.sql);
     registerInboxRoutes(this.app, this.ctx.storage.sql);
     registerCaptureRoutes(this.app, this.ctx.storage.sql);
+    registerMcpRoutes(this.app, this.ctx.storage.sql);
 
     // Seed sample data ONLY when explicitly enabled.
     //

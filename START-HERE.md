@@ -38,7 +38,7 @@ this environment.
 There are two more checks you can run:
 
 ```powershell
-node --experimental-strip-types scripts/test-bugfixes.mjs   # 110 route checks
+node --experimental-strip-types scripts/test-bugfixes.mjs   # 144 route checks
 python scripts/verify-ui.py                                 # 27 checks in a real browser
 ```
 
@@ -116,24 +116,40 @@ To check an archive without the app:
 python scripts/validate-wacz.py captures/Your-Hackathon.wacz
 ```
 
-### Driving the capture without running anything
+### The app as an MCP server
 
-There is an MCP server for the capture, registered in
-`~/.config/opencode/opencode.jsonc` as `taskmaster-capture`. It gives
-five tools:
+**The app speaks MCP itself**, at `POST /api/mcp`. Any MCP client can
+connect to it — Claude Desktop, Cursor, VS Code, an agent, a script — and
+work with the competitions, the inbox and the capture queue. There is
+nothing to install and no sidecar.
 
-| Tool | What it does |
-|---|---|
-| `capture_manifest` | What the app wants captured |
-| `add_to_manifest` | Add a page to it |
-| `capture_competition` | Capture one page and hand it to the app |
-| `capture_all` | Queue the manifest and capture all of it |
-| `capture_status` | What the app is holding |
+```jsonc
+// in ~/.config/opencode/opencode.jsonc
+"taskmaster": {
+  "type": "remote",
+  "url": "http://127.0.0.1:8787/api/mcp",
+  "enabled": true,
+  "timeout": 60000
+}
+```
 
-So the capture can be driven by an agent rather than by a script you
-remember to run. It needs the app running on port 8787. The server lives
-in `~/.config/opencode/mcp/taskmaster-capture/`, and it takes `TM_API`
-and `TM_REPO` from the environment.
+Ten tools: `list_competitions`, `get_competition`, `list_inbox`,
+`search_inbox`, `capture_manifest`, `add_to_manifest`, `capture_all`,
+`capture_status`, `fetch_mail`, `get_settings`. The secrets come back
+masked.
+
+The protocol is implemented in `src/mcp.ts` rather than pulled in, because
+the official SDK drags express, hono/node-server, jose and ajv behind it
+and bundles to 385 KB. A stateless JSON-RPC server over one HTTP POST is
+a few hundred lines, and the app's dependency tree stays at four packages.
+
+### Driving the capture
+
+The capture needs a browser, so it cannot run in the Worker. There is a
+second, small MCP server for that, registered as `taskmaster-capture`,
+which lives in `~/.config/opencode/mcp/taskmaster-capture/`. It runs the
+capture and posts the archive back to the app. It takes `TM_API` and
+`TM_REPO` from the environment.
 
 ## Where the work goes next
 

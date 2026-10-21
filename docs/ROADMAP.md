@@ -110,6 +110,13 @@ CI captures a page and checks the archive with **warcio**, which is not
 the code that wrote it. If warcio can read the archive, the WARC is well
 formed enough for pywb and the rest of the webrecorder tooling.
 
+**The app is its own MCP server.** `POST /api/mcp` speaks the
+protocol, so any MCP client can connect to the deployed app and work
+with the competitions, the inbox and the capture queue. Ten tools. The
+protocol is implemented in `src/mcp.ts` rather than pulled in, because
+the official SDK bundles to 385 KB and drags express, jose and ajv in
+with it.
+
 **The manifest lives in the app.** Settings has a Capture tab with the
 list of pages to capture. `POST /api/capture/jobs` queues them, and
 `scripts/capture-wacz.py --from-app` takes its work from the app, so

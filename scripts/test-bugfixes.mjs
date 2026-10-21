@@ -13,6 +13,7 @@ import { registerSettingsRoutes } from "../src/settings.ts";
 import { registerCapacityRoutes } from "../src/capacity.ts";
 import { registerArchiveRoutes } from "../src/archive.ts";
 import { registerCaptureRoutes } from "../src/capture.ts";
+import { registerMcpRoutes } from "../src/mcp.ts";
 import { readWacz, findResponse, recordText } from "../src/wacz.ts";
 
 const db = new DatabaseSync(":memory:");
@@ -28,6 +29,7 @@ registerSettingsRoutes(app, sql);
 registerCapacityRoutes(app, sql);
 registerArchiveRoutes(app, sql);
 registerCaptureRoutes(app, sql);
+registerMcpRoutes(app, sql);
 
 const call = (method, path, body, isForm, headers) => {
   const init = { method };
@@ -739,6 +741,118 @@ console.log("\n=== 14. The archive extraction on real page shapes ===");
   check("a rule is not read out of the JavaScript",
         !/deleteRule|Rules\.length/.test(cBody.extracted?.eligibility || ""),
         (cBody.extracted?.eligibility || "(nothing)").slice(0, 70));
+}
+
+
+console.log("\n=== 15. The app as an MCP server ===");
+{
+  // The protocol is JSON-RPC 2.0 over one HTTP POST.
+  const rpc = async (method, params, id) => {
+    const body = { jsonrpc: "2.0", method };
+    if (params !== undefined) body.params = params;
+    if (id !== undefined) body.id = id;
+    const r = await call("POST", "/api/mcp", body);
+    const text = await r.text();
+    return { status: r.status, body: text ? JSON.parse(text) : null };
+  };
+
+  const init = await rpc("initialize", {
+    protocolVersion: "2025-06-18", capabilities: {},
+    clientInfo: { name: "test", version: "1" },
+  }, 1);
+  check("initialize answers", init.status === 200, "HTTP " + init.status);
+  check("it names the protocol version",
+        init.body?.result?.protocolVersion === "2025-06-18",
+        init.body?.result?.protocolVersion || "(none)");
+  check("it names the server",
+        init.body?.result?.serverInfo?.name === "taskmaster-pro",
+        JSON.stringify(init.body?.result?.serverInfo || {}));
+  check("it advertises the tools capability",
+        !!init.body?.result?.capabilities?.tools);
+
+  const list = await rpc("tools/list", {}, 2);
+  const tools = list.body?.result?.tools || [];
+  check("the tool list is served", tools.length >= 8, tools.length + " tools");
+  const names = tools.map((t) => t.name);
+  for (const expected of ["list_competitions", "list_inbox", "search_inbox",
+                           "capture_manifest", "add_to_manifest", "capture_all",
+                           "capture_status", "fetch_mail", "get_settings"]) {
+    check("there is a " + expected + " tool", names.includes(expected));
+  }
+  check("every tool has a schema",
+        tools.every((t) => t.inputSchema && t.inputSchema.type === "object"));
+
+  // Calling a tool.
+  await call("POST", "/api/hackathons", {
+    name: "MCP Test Competition", platform: "devpost", prize: "$1,000",
+    eligibility: { eligibility_type: "unrestricted", regions: ["Global"], age_min: 13 },
+  });
+
+  const call1 = await rpc("tools/call",
+    { name: "list_competitions", arguments: { limit: 5 } }, 3);
+  const text = call1.body?.result?.content?.[0]?.text || "";
+  check("list_competitions answers", call1.status === 200, "HTTP " + call1.status);
+  check("it finds the competition", text.includes("MCP Test Competition"),
+        text.slice(0, 80));
+  check("it carries the eligibility verdict", text.includes("eligible"),
+        text.slice(0, 120));
+
+  // The manifest, and adding to it.
+  const before = await rpc("tools/call", { name: "capture_manifest", arguments: {} }, 4);
+  const beforeText = before.body?.result?.content?.[0]?.text || "";
+  const beforeCount = JSON.parse(beforeText).sources.length;
+
+  const added = await rpc("tools/call", {
+    name: "add_to_manifest",
+    arguments: { url: "https://devpost.com/hackathons/mcp-test" },
+  }, 5);
+  check("add_to_manifest answers", added.status === 200, "HTTP " + added.status);
+
+  const after = await rpc("tools/call", { name: "capture_manifest", arguments: {} }, 6);
+  const afterText = after.body?.result?.content?.[0]?.text || "";
+  const afterSources = JSON.parse(afterText).sources;
+  check("the manifest grew", afterSources.length === beforeCount + 1,
+        beforeCount + " -> " + afterSources.length);
+  check("the page is in it",
+        afterSources.some((s) => s.url === "https://devpost.com/hackathons/mcp-test"));
+
+  // Queueing the manifest.
+  const queued = await rpc("tools/call", { name: "capture_all", arguments: {} }, 7);
+  const queuedText = queued.body?.result?.content?.[0]?.text || "";
+  const queuedJson = JSON.parse(queuedText);
+  check("capture_all queues the manifest", queuedJson.queued >= 1,
+        String(queuedJson.queued));
+
+  const status = await rpc("tools/call", { name: "capture_status", arguments: {} }, 8);
+  const statusText = status.body?.result?.content?.[0]?.text || "";
+  check("capture_status reports the job",
+        statusText.includes("mcp-test"), statusText.slice(0, 100));
+
+  // A notification gets no reply.
+  const note = await call("POST", "/api/mcp", {
+    jsonrpc: "2.0", method: "notifications/initialized",
+  });
+  check("a notification gets no body", note.status === 202, "HTTP " + note.status);
+
+  // An unknown tool is an error, not a crash.
+  const unknown = await rpc("tools/call", { name: "no_such_tool", arguments: {} }, 9);
+  check("an unknown tool is an error",
+        unknown.body?.result?.isError === true, JSON.stringify(unknown.body).slice(0, 80));
+
+  // A batch.
+  const batchBody = [
+    { jsonrpc: "2.0", id: 20, method: "ping" },
+    { jsonrpc: "2.0", id: 21, method: "tools/list" },
+  ];
+  const batch = await call("POST", "/api/mcp", batchBody);
+  const replies = JSON.parse(await batch.text());
+  check("a batch gets one reply per message", replies.length === 2, replies.length + " replies");
+
+  // Clean up.
+  const hs = await (await call("GET", "/api/hackathons")).json();
+  for (const h of hs) {
+    if (h.name === "MCP Test Competition") await call("DELETE", "/api/hackathons/" + h.id);
+  }
 }
 
 console.log("\n" + "=".repeat(60));

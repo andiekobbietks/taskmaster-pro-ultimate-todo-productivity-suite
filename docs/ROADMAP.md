@@ -117,10 +117,27 @@ there is no configuration file to keep in step. A capture that arrives
 closes its job and creates the competition, named from the page's own
 title.
 
-**Still not done:** `scripts/sync-hackathons.mjs:22` has all three sources
-set to `enabled: false` — Devpost, MLH and lablab. That is a separate
-problem from the format, and the answer to it is still "pick one
-platform".
+**Still not done: finding them.** `scripts/sync-hackathons.mjs:22`
+has all three sources set to `enabled: false` — Devpost, MLH and lablab.
+`docs/HACKATHON-SOURCES.md` has what the research found, and two of the
+findings changed the answer:
+
+- **There is no RSS feed for hackathon listings, anywhere.** Devpost's
+  `feed.rss` returns the homepage as HTML, and MLH has no feed at all.
+  The feeds that work are tech-news feeds — TechCabal and Gadget for
+  EMEA, AIM and YourStory for India — and they find hackathons
+  *mentioned in articles*, which is noisy and will miss most.
+- **Devpost serves a Cloudflare bot challenge to a headless browser.**
+  Both the listing and a single competition page came back as the
+  challenge, not the page. The capture machinery is fine — it recorded
+  14 responses and warcio read every record — but the browser has to be
+  a real one with a profile that has solved the challenge before.
+
+So the routes to "find them all" are: the Wayback Machine, which
+`src/archive.ts` already reads; a persistent real-Chrome profile for
+the capture, which is a small change to a script that already works; or
+a platform with a real API, where the data is clean but the prizes are
+smaller.
 
 ### The mail transport — MOSTLY DONE
 

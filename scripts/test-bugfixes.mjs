@@ -1,9 +1,11 @@
 
 import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { makeSql } from "./do-sql.mjs";
 import { registerHackathonRoutes } from "../src/hackathons.ts";
 import { registerInboxRoutes, insertInboxItem } from "../src/inbox.ts";
+import { parseRawMail } from "../src/mime.ts";
 import { registerAttachmentRoutes } from "../src/attachments.ts";
 import { registerSettingsRoutes } from "../src/settings.ts";
 import { registerCapacityRoutes } from "../src/capacity.ts";
@@ -393,6 +395,81 @@ console.log("\n=== 9. Mail ingestion ===");
       await call("DELETE", "/api/inbox/" + e.id);
     }
   }
+}
+
+
+console.log("\n=== 10. The raw MIME parser, against a real message ===");
+{
+  // A real Devpost message, read through the Yahoo Mail API. It is
+  // multipart/alternative, both parts quoted-printable, with a folded
+  // header block and a Received chain.
+  const raw = readFileSync(
+    new URL("./fixtures/sample-raw-email.txt", import.meta.url), "utf8");
+
+  const mail = parseRawMail(raw);
+  check("the raw source parses", mail.ok === true, mail.error || "");
+
+  check("the sender is the address, not the display name",
+        mail.from === "support@devpost.com", mail.from);
+  check("the display name is kept separately",
+        mail.fromName === "Devpost", mail.fromName);
+  check("the subject is the subject line",
+        mail.subject === "Meet the Shipaton 2026 winners - RevenueCat Shipaton 2026",
+        mail.subject);
+  check("the recipient is read",
+        mail.to === "andiekobbietks@outlook.com", mail.to);
+  check("the date parses to a timestamp",
+        mail.dateMs !== null && mail.dateMs > 0, String(mail.dateMs));
+  check("the Message-Id is read",
+        mail.messageId === "<20261021083212.563c9a8209281088@cio8.devpost.com>",
+        mail.messageId);
+  check("the Reply-To is read",
+        /shipaton@revenuecat\.com/.test(mail.replyTo), mail.replyTo);
+
+  // quoted-printable: the bytes and the soft breaks both have to be
+  // handled, or the text comes out with =E2=86=92 in it.
+  check("the text body is decoded",
+        mail.textBody.includes("Hey Shippers!"), mail.textBody.slice(0, 60));
+  check("the quoted-printable bytes are decoded",
+        mail.textBody.includes("→"), "the arrow is missing");
+  check("the quoted-printable bytes are decoded, part two",
+        mail.textBody.includes("©"), "the copyright is missing");
+  check("the soft line breaks are removed",
+        !mail.textBody.includes("=\n") && !/=\s*$/.test(mail.textBody.split("\n")[0]),
+        "a soft break survived");
+  check("the words are not split by the soft breaks",
+        mail.textBody.includes("last night at The Shippies"),
+        "the sentence did not reassemble");
+  check("the HTML part is decoded too",
+        mail.htmlBody.includes("<!DOCTYPE html>"), mail.htmlBody.slice(0, 50));
+
+  // The header block has a Received chain, so a header is a list.
+  const received = mail.headers.filter((h) => h.name === "received");
+  check("the repeated Received headers are all kept", received.length >= 3,
+        received.length + " received headers");
+  check("the header list is in order",
+        mail.headers[0].name === "received", mail.headers[0].name);
+
+  // The inbox takes the raw source directly.
+  const r = await call("POST", "/api/inbox", { raw });
+  const body = await r.json();
+  check("the inbox accepts a raw source", r.status === 201 || r.status === 200,
+        "HTTP " + r.status);
+  check("the stored message has the sender",
+        body.sender === "support@devpost.com", body.sender || "");
+  check("the stored message has the subject",
+        body.subject === "Meet the Shipaton 2026 winners - RevenueCat Shipaton 2026",
+        body.subject || "");
+
+  // The same message again must not be a second copy.
+  const again = await call("POST", "/api/inbox", { raw });
+  const againBody = await again.json();
+  check("the same message is not stored twice",
+        againBody.duplicate === true || again.status === 200,
+        "HTTP " + again.status + " duplicate=" + againBody.duplicate);
+  const inbox = await (await call("GET", "/api/inbox")).json();
+  const copies = inbox.filter((e) => e.subject === mail.subject);
+  check("the inbox holds one copy", copies.length === 1, copies.length + " copies");
 }
 
 console.log("\n" + "=".repeat(60));

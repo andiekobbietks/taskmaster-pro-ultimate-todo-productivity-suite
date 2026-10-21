@@ -555,7 +555,7 @@ def main():
         ["", "GET /api/tickets/:id/attachments", "List a ticket's attachments"],
         ["", "GET /api/attachments/:id", "Download or preview an attachment"],
         ["", "DELETE /api/attachments/:id", "Delete an attachment"],
-        ["Inbox", "POST /api/inbox", "Receive a parsed email and link it by content"],
+        ["Inbox", "POST /api/inbox", "Receive an email, raw source or fields, and link it by content"],
         ["", "POST /api/inbox/fetch", "Pull new mail from the configured server"],
         ["", "GET /api/inbox", "List, filter by unread or platform"],
         ["", "GET /api/inbox/stats", "Counts by read, processed and platform"],
@@ -605,6 +605,7 @@ def main():
         ["src/profile.ts", "The eligibility profile: one type, one default, read by both the engine and the Settings screen"],
         ["src/jmap.ts", "JMAP client for JMAP-compatible mail servers"],
         ["src/mail.ts", "Mail ingestion: reads the configured server and hands the messages to the inbox"],
+        ["src/mime.ts", "Raw MIME parsing: headers, multipart, quoted-printable, base64"],
         ["src/app.jsx", "The whole front end — one file, compiled by esbuild"],
         ["src/components/", "Reusable interface components"],
         ["src/lib/", "Shared helpers: the API client, and email formatting"],
@@ -626,7 +627,7 @@ def main():
         ["The digest ranks competitions but not your own tasks", "src/capacity.ts", "The digest never reads the todos table, so it cannot tell what is already committed. Its today_tasks field holds competitions, not tasks, which the heading in the Today view gets wrong."],
         ["Email body rendered as plain text, so rich email loses its formatting", "src/components/InboxPrimitives.jsx", "Deliberate. Injecting HTML would need a sanitiser; plain text has nothing to sanitise."],
         ["The seed fixtures contain example personal data", "seed/hackathons.json", "Anonymised to placeholder country codes. The real profile is supplied through the API."],
-        ["Only JMAP is supported, so the IMAP settings do nothing", "src/settings.ts, src/mail.ts", "Known gap. Mail is fetched over JMAP (RFC 8620) by an hourly cron, or by the Fetch mail now button. There is no IMAP client, so a Yahoo or Gmail user has to use a JMAP provider or keep forwarding mail to POST /api/inbox."],
+        ["The raw mail format is handled, but there is no IMAP transport", "src/mime.ts, src/mail.ts", "Known gap. A raw MIME source is parsed correctly - folded headers, repeated headers, multipart, quoted-printable, base64 - so POST /api/inbox takes either a raw source or structured fields. What is missing is the transport: mail is fetched over JMAP by an hourly cron, and there is no IMAP client, so a Yahoo or Gmail user has to use a JMAP provider, point the app at the Yahoo Mail API, or post the raw source in from outside."],
     ]
     story.append(mk_table(risks, [150, 110, 170]))
 

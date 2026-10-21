@@ -14,6 +14,7 @@
  */
 import { Hono } from "hono";
 import { fetchNewMail, JMAP_ID_PREFIX } from "./mail.ts";
+import { parseRawMail } from "./mime.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -248,11 +249,40 @@ export function registerInboxRoutes(app: Hono, sql: any) {
 
   app.post("/api/inbox", async (c) => {
     const data = await c.req.json();
-    if (!data.sender || !data.subject) {
+
+    // Two shapes arrive. A raw MIME source, from IMAP or the Yahoo Mail
+    // API. Or structured fields, from JMAP or a direct call.
+    let message = data;
+    let stableId: string | undefined;
+
+    if (typeof data.raw === "string" && data.raw.trim()) {
+      const parsed = parseRawMail(data.raw);
+      if (!parsed.ok) {
+        return c.json({ error: "Could not parse the raw message: " + parsed.error }, 400);
+      }
+      message = {
+        sender: parsed.from,
+        subject: parsed.subject,
+        received_at: parsed.dateMs ?? Date.now(),
+        body_text: parsed.textBody,
+        body_html: parsed.htmlBody,
+        has_attachments: parsed.attachmentNames.length > 0,
+        attachment_names: parsed.attachmentNames,
+      };
+      // The Message-Id is stable across fetches, so it makes a good key.
+      if (parsed.messageId) stableId = "inbox-msg-" + parsed.messageId.replace(/[<>]/g, "");
+    }
+
+    if (!message.sender || !message.subject) {
       return c.json({ error: "Sender and subject are required" }, 400);
     }
-    const result = insertInboxItem(sql, data);
+    const result = insertInboxItem(sql, message, stableId);
     if (!result.inserted) {
+      const existing = sql.exec("SELECT * FROM inbox WHERE id = ?", result.id).toArray();
+      if (existing.length > 0) {
+        // The same message, already here. Say so rather than failing.
+        return c.json({ ...rowToInboxItem(existing[0]), duplicate: true }, 200);
+      }
       return c.json({ error: "Failed to create inbox item" }, 500);
     }
     const row = sql.exec("SELECT * FROM inbox WHERE id = ?", result.id).toArray();

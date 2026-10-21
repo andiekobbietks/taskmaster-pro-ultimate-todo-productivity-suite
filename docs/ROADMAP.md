@@ -52,7 +52,8 @@ Broken chain, or no safety net. In critical-path order.
 | **Was** | `src/jmap.ts` exported four functions and nothing imported it. There was no IMAP client at all. The inbox filled only by a manual `POST /api/inbox`. |
 | **Now** | `src/mail.ts` reads the mail server configured in Settings and pulls anything new. `POST /api/inbox/fetch` does it on demand — a "Fetch mail now" button on the Settings email tab — and an hourly cron in `wrangler.json` does it in production, through the same route. |
 | **Deduplication** | Messages from the mail server get a stable id (`inbox-jmap-<id>`), so fetching the same message twice is skipped rather than duplicated. The insert was extracted into `insertInboxItem` so both the manual route and the fetch share it. |
-| **Still missing** | **IMAP.** Only JMAP (RFC 8620) is implemented, so the IMAP host, port, user and password in Settings do nothing. A Yahoo or Gmail user has to use a JMAP provider or keep forwarding mail. |
+| **The format** | `src/mime.ts` parses a raw MIME source: folded headers, repeated headers, multipart, quoted-printable, base64, RFC 2047. `POST /api/inbox` takes either a raw source or structured fields, so anything that can fetch mail can feed the app. Tested against a real Devpost message. |
+| **Still missing** | **The transport.** Only JMAP (RFC 8620) is implemented, so the IMAP host, port, user and password in Settings do nothing. A Yahoo or Gmail user has to use a JMAP provider, point the app at the Yahoo Mail API, or post the raw source in from outside. |
 | **Proof** | 12 checks in `scripts/test-bugfixes.mjs`: no server configured is refused with an explanation, an unreachable server reports the cause, a stable id is not stored twice, and a message that names a competition is linked to it |
 
 ### M2 — Make the digest use the eligibility engine — DONE

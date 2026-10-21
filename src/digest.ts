@@ -23,6 +23,9 @@ import {
 } from "./timezone.ts";
 import { sendPush } from "./push.ts";
 import { readPushKeys } from "./push-routes.ts";
+import { sendEmail, type EmailPayload, logDelivery, resolveEmailConfig } from "./email.ts";
+import { resolveRecipients } from "./email-routes.ts";
+import { readSettingsSection } from "./settings-reader.ts";
 
 export interface DigestItem {
   id: string;
@@ -225,8 +228,9 @@ export function digestIsDue(
 /**
  * Send the digest, if it is due.
  *
- * The push is the only channel that works yet: there is no outbound
- * email sender yet, and a push is what a phone can show.
+ * Two channels: push (always tries) and email (only if the settings
+ * say it is enabled and a provider is configured). The email body
+ * uses the same plain‑text format that the lock screen shows.
  */
 export async function sendDigestIfDue(
   sql: any,
@@ -281,6 +285,31 @@ export async function sendDigestIfDue(
     results.push({ status: res.status, ok: res.ok });
   }
 
+  // --- Email channel (only when configured and a provider is set) ---
+  const emailSettings = readSettingsSection(sql, "email") as any;
+  const emailConfig = resolveEmailConfig(sql, env);
+  const recipients = resolveRecipients(sql, emailConfig);
+  if (emailConfig.provider && recipients.length) {
+    const closingText = digest.closing.map((c: any) => c.name + (c.daysLeft === 0 ? " (today)" : " in " + c.daysLeft + " day" + (c.daysLeft === 1 ? "" : "s"))).join(", ") || "none";
+    const emailBody = [digest.title, "", digest.body, "", "Closing this week: " + closingText].join("\n");
+    for (const to of recipients) {
+      const payload: EmailPayload = {
+        to,
+        from: emailConfig.from_address || emailSettings.from_address,
+        subject: digest.title,
+        body: emailBody,
+        context: { digest_date: digest.date },
+      };
+      try {
+        const res = await sendEmail(sql, env, payload);
+        await logDelivery(sql, payload, res);
+        results.push({ channel: "email", to, ok: res.ok, messageId: res.messageId, status: res.status, error: res.ok ? undefined : res.message });
+      } catch (e) {
+        results.push({ channel: "email", to, ok: false, error: String(e) });
+      }
+    }
+  }
+
   // The marker is written only after the send, so a failed send is
   // retried on the next tick.
   writeDigestState(sql, { last_date: digest.date, sent_at: now.getTime() });
@@ -288,14 +317,4 @@ export async function sendDigestIfDue(
   return { sent: true, why: due.why, recipients: results.length, results, digest };
 }
 
-/** One section of the stored settings, read straight from the table. */
-function readSettingsSection(sql: any, section: string): any {
-  try {
-    const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
-    if (rows.length === 0) return {};
-    const all = parseJson<any>(rows[0].value, {});
-    return all[section] || {};
-  } catch {
-    return {};
-  }
-}
+

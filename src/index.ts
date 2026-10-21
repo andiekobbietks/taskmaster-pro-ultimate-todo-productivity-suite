@@ -308,47 +308,14 @@ export class App extends DurableObject {
     registerDevpostRoutes(this.app, this.ctx.storage.sql);
     registerCalendarRoutes(this.app, this.ctx.storage.sql);
     registerPushRoutes(this.app, this.ctx.storage.sql, this.env);
+import { registerEmailRoutes } from "./email-routes.ts";
     registerDigestRoutes(this.app, this.ctx.storage.sql, this.env);
+    registerEmailRoutes(this.app, this.ctx.storage.sql, this.env);
 
     // --- Debug / diagnostics routes ---
     app.get("/api/debug/email", (c) => {
       const provider = String(c.env.EMAIL_PROVIDER || "").toLowerCase();
       return c.json({ provider: provider || null });
-    });
-
-    app.post("/api/email/test", async (c) => {
-      const provider = String(c.env.EMAIL_PROVIDER || "").toLowerCase();
-      switch (provider) {
-        case "sendgrid": {
-          const key = String(c.env.SENDGRID_API_KEY || "").trim();
-          if (!key) return c.json({ ok: false, error: "SENDGRID_API_KEY not set" }, 400);
-          const body = JSON.stringify({
-            from: { email: "digest@taskmaster-pro.example.com" },
-            personalizations: [{ to: [{ email: "test@taskmaster-pro.example.com" }] }],
-            subject: "TaskMaster Pro — test email",
-            content: [{ type: "text/plain", value: "This is a test email from TaskMaster Pro." }],
-          });
-          const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body,
-          });
-          if (res.ok) return c.json({ ok: true, status: await res.text() });
-          const txt = await res.text();
-          return c.json({ ok: false, error: `SendGrid ${res.status}: ${txt}` });
-        }
-        case "ses": {
-          const region = String(c.env.SES_REGION || "us-east-1");
-          const sender = String(c.env.SES_SENDER || "").trim();
-          if (!sender) return c.json({ ok: false, error: "SES_SENDER not set" }, 400);
-          return c.json({ ok: true, status: "SES test (sandbox‑only – sent to verified address only)" });
-        }
-        case "oracle": {
-          const ok = !!(c.env.ORACLE_SMTP_HOST && c.env.ORACLE_SMTP_USER && c.env.ORACLE_SMTP_PASS);
-          return c.json({ ok, status: ok ? "Oracle creds present" : "Missing Oracle SMTP config" });
-        }
-        default:
-          return c.json({ ok: false, error: "No email provider configured" });
-      }
     });
 
     app.get("/api/debug/mcp", (c) => {

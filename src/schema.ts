@@ -126,6 +126,24 @@ export const SCHEMA: string[] = [
     count INTEGER DEFAULT 0,
     window_start INTEGER NOT NULL
     )`,
+  `CREATE TABLE IF NOT EXISTS email_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    address TEXT NOT NULL UNIQUE,
+    name TEXT DEFAULT '',
+    active INTEGER DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    last_sent INTEGER DEFAULT NULL,
+    last_error TEXT DEFAULT ''
+    )`,
+  `CREATE TABLE IF NOT EXISTS email_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    address TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    status TEXT NOT NULL,
+    message_id TEXT DEFAULT NULL,
+    error TEXT DEFAULT NULL,
+    created_at INTEGER NOT NULL
+    )`,
 ];
 
 /**

@@ -1,0 +1,66 @@
+openapi: 3.0.3
+info:
+  title: TaskMaster Pro — Developer Portal
+  description: |
+    Contract reference for the embedded MCP server (`src/mcp.ts`, 13 tools)
+    and the HTTP routes (`src/index.ts`, `src/email-routes.ts`).
+    The spec is generated from the route handlers; it is not a separate
+    contract — the code is the contract.
+  version: 2.0.0-committed
+paths:
+  /health:
+    get:
+      summary: Health check (all deployments)
+      responses: { 200: { description: OK } }
+  /api/debug/email:
+    get: { summary: Current email provider, responses: { 200: { description: OK } } }
+  /api/debug/mcp:
+    get: { summary: MCP server tools list, responses: { 200: { description: OK } } }
+  /api/debug/push-census:
+    get: { summary: Push subscription census, responses: { 200: { description: OK } } }
+  /api/debug/digest-preview:
+    get: { summary: Digest preview (sample profile), responses: { 200: { description: OK } } }
+  /api/debug/profile:
+    get: { summary: Stored profile, responses: { 200: { description: OK } } }
+  /api/debug/settings-diff:
+    get: { summary: Settings drift from default, responses: { 200: { description: OK } } }
+  /api/debug/reset:
+    post: { summary: Reset to defaults, responses: { 200: { description: OK } } }
+  /api/debug/health:
+    get: { summary: Full system status, responses: { 200: { description: OK } } }
+  /api/email/status:
+    get:
+      summary: Provider configured + missing fields + recipients + credentials present
+      responses: { 200: { description: Status object } }
+  /api/email/test:
+    post:
+      summary: Send one test message (resolves config from env + settings)
+      requestBody: { content: { application/json: { schema: { type: object } } } }
+      responses: { 200: { description: Sent or rejected with reason }, 400: { description: Invalid address or not ready } }
+  /api/email/deliveries:
+    get:
+      summary: Last 50 delivery attempts (newest first)
+      responses: { 200: { description: Delivery log } }
+  /api/email/subscribers:
+    get: { summary: Active subscribers, responses: { 200: { description: List } } }
+    post:
+      summary: Add a subscriber (validates address before storing)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { address: { type: string }, name: { type: string } } } } } }
+      responses: { 200: { description: Added }, 400: { description: Invalid address } }
+  /api/digest/preview:
+    get: { summary: Digest content (without sending), responses: { 200: { description: DigestContent } } }
+  /api/digest/send:
+    post: { summary: Send if due (cron calls this), responses: { 200: { description: Sent or not due } } }
+  /api/digest/send-now:
+    post: { summary: Force send regardless of clock, responses: { 200: { description: Digest sent } } }
+  /api/push/status:
+    get: { summary: Push subscriptions count + health, responses: { 200: { description: OK } } }
+  /api/settings:
+    get: { summary: Full settings (secrets masked via SECRET_MASK), responses: { 200: { description: Settings } } }
+    put:
+      summary: Update settings (merges with stored rather than replacing)
+      requestBody: { content: { application/json: { schema: { type: object } } } }
+      responses: { 200: { description: Merged view } }
+servers:
+  - url: http://127.0.0.1:8787
+    description: Local dev server (matches .dev.vars + VAPID keys)

@@ -73,6 +73,19 @@ export interface Settings {
     yahoo_client_secret: string;
     yahoo_refresh_token: string;
     yahoo_mailbox_id: string;
+    // Outbound email (digest / test). One provider at a time.
+    provider: "oracle" | "sendgrid" | "ses" | "";
+    sendgrid_api_key: string;
+    ses_region: string;
+    ses_sender: string;
+    ses_access_key: string;
+    ses_secret_key: string;
+    oracle_smtp_host: string;
+    oracle_smtp_port: number;
+    oracle_smtp_user: string;
+    oracle_smtp_pass: string;
+    from_address: string;
+    from_name: string;
   };
   capture: CaptureSettings;
   notifications: {
@@ -108,6 +121,18 @@ const DEFAULT_SETTINGS: Settings = {
     yahoo_client_secret: "",
     yahoo_refresh_token: "",
     yahoo_mailbox_id: "/",
+    provider: "",
+    sendgrid_api_key: "",
+    ses_region: "us-east-1",
+    ses_sender: "",
+    ses_access_key: "",
+    ses_secret_key: "",
+    oracle_smtp_host: "smtp-mail.oracle.com",
+    oracle_smtp_port: 587,
+    oracle_smtp_user: "",
+    oracle_smtp_pass: "",
+    from_address: "",
+    from_name: "TaskMaster Pro",
   },
   capture: {
     sources: [],
@@ -186,6 +211,7 @@ function deobfuscate(value: string): string {
 const SENSITIVE_FIELDS = new Set([
   "imap_password", "jmap_password", "yahoo_client_secret", "yahoo_refresh_token",
   "azure_sas_token", "s3_secret_key",
+  "sendgrid_api_key", "ses_access_key", "ses_secret_key", "oracle_smtp_pass",
 ]);
 
 function obfuscateSettings(settings: any): any {

@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import { DEFAULT_PROFILE, readProfile, writeProfile, type UserProfile } from "./profile.ts";
 import { isValidTimeZone } from "./timezone.ts";
 import { testYahooConnection, type YahooConfig } from "./yahoo.ts";
+import { maskSecret, SECRET_MASK } from "./lib/secret.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -249,9 +250,10 @@ function deobfuscateSettings(settings: any): any {
  *
  * The screen shows this instead of the value, so the API never hands a
  * secret back. A person who wants to change one types a new value; the
- * old one stays until they do.
+ * old one stays until they do. The first three alphanumeric characters
+ * are preserved so the user can tell one secret from another.
  */
-export const SECRET_MASK = "********";
+export { SECRET_MASK };
 
 /**
  * Replace the sensitive values with the mask.
@@ -265,7 +267,7 @@ export function maskSettings(settings: any): any {
     if (typeof section === "object" && section !== null) {
       for (const [key, value] of Object.entries(section)) {
         if (SENSITIVE_FIELDS.has(key) && typeof value === "string" && value !== "") {
-          (section as any)[key] = SECRET_MASK;
+          (section as any)[key] = maskSecret(value);
         }
       }
     }

@@ -20,11 +20,12 @@ import {
   Sun, Moon, Briefcase, User, Sparkles, Inbox, Folder,
   Clock, Play, Pause, RotateCcw, BarChart3, CheckSquare, AlertCircle,
   Flame, MoreHorizontal, ArrowRight, X, Menu, Settings, Check, HelpCircle,
-  ExternalLink
+  ExternalLink, ChevronDown
 } from "lucide-react";
 
 import { api, describeError } from "./lib/api.js";
 import { todayLocal, daysUntilLocal, browserTimeZone, describeBrowserZone } from "./lib/time.js";
+import { maskSecret, isMasked, withoutMasks } from "./lib/secret.js";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import {
   EmailListItem, EmailDetail, InboxSplitView, EmailListSkeleton,
@@ -46,6 +47,41 @@ function platformClasses(platform) {
     unstop: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
   };
   return map[platform] || "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400";
+}
+
+/**
+ * Password-style input for secrets.
+ *
+ * When the API has masked the value (first 3 alphanumerics visible, rest
+ * as bullets) the field shows the mask as its placeholder and a red
+ * "Revoke" button appears. Typing a new value replaces the secret.
+ */
+function SecretInput({ value, onChange, placeholder, label, onRevoke, id }) {
+  const masked = isMasked(value);
+  return (
+    <div>
+      <label htmlFor={id} className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          id={id}
+          type="password"
+          value={masked ? "" : (value || "")}
+          placeholder={masked ? String(value) : placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex-1 w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+        />
+        {masked && (
+          <button
+            type="button"
+            onClick={onRevoke}
+            className="shrink-0 h-9 px-2.5 rounded-md text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900 transition-colors"
+          >
+            Revoke
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -294,19 +330,6 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
   };
 
   // --- The Yahoo application and the capture manifest ---------------------
-
-  // A secret the API has masked must not be written back. Anything that
-  // still holds the mask is left out of the payload, so saving one field
-  // does not wipe the others.
-  const SECRET_MASK = "********";
-  const withoutMasks = (section) => {
-    if (!section) return section;
-    const out = { ...section };
-    for (const key of Object.keys(out)) {
-      if (out[key] === SECRET_MASK) delete out[key];
-    }
-    return out;
-  };
 
   const testYahooConnection = async () => {
     setYahooTesting(true);
@@ -1377,10 +1400,14 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                   <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Container</label>
                                   <input type="text" value={settings.storage?.azure_container || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_container: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
                                 </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">SAS token</label>
-                                  <input type="password" value={settings.storage?.azure_sas_token || ''} onChange={(e) => saveSettings({ storage: { ...settings.storage, azure_sas_token: e.target.value } })} className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none" />
-                                </div>
+                                <SecretInput
+                                  id="azure_sas_token"
+                                  label="SAS token"
+                                  value={settings.storage?.azure_sas_token}
+                                  placeholder="sp=r&st=..."
+                                  onChange={(value) => saveSettings({ storage: withoutMasks({ ...settings.storage, azure_sas_token: value }) })}
+                                  onRevoke={() => saveSettings({ storage: withoutMasks({ ...settings.storage, azure_sas_token: '' }) })}
+                                />
                               </>
                             )}
 
@@ -1583,7 +1610,7 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
 
                         <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
                           <h3 className="text-sm font-semibold mb-3">Email inbox</h3>
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             <div>
                               <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Inbox address</label>
                               <input
@@ -1594,52 +1621,56 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                 className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
                               />
                             </div>
-                            <div>
-                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP host</label>
-                              <input
-                                type="text"
-                                value={settings.email?.imap_host || 'imap.mail.yahoo.com'}
-                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_host: e.target.value } })}
-                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP port</label>
-                              <input
-                                type="number"
-                                value={settings.email?.imap_port || 993}
-                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_port: parseInt(e.target.value) || 993 } })}
-                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP username</label>
-                              <input
-                                type="text"
-                                value={settings.email?.imap_user || ''}
-                                onChange={(e) => saveSettings({ email: { ...settings.email, imap_user: e.target.value } })}
-                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP password (app password)</label>
-                              <input
-                                type="password"
-                                value={settings.email?.imap_password === SECRET_MASK ? '' : (settings.email?.imap_password || '')}
-                                      placeholder={settings.email?.imap_password === SECRET_MASK ? 'Set - type to change' : ''}
-                                onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, imap_password: e.target.value }) })}
-                                className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
-                              />
-                            </div>
+                            <details className="group rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30">
+                              <summary className="flex cursor-pointer list-none items-center justify-between p-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                <span>IMAP server <span className="ml-1.5 text-xs font-normal text-neutral-400">IMAP4 credentials for polling mail</span></span>
+                                <ChevronDown className="w-4 h-4 shrink-0 transition-transform group-open:rotate-180" />
+                              </summary>
+                              <div className="space-y-3 p-3 pt-0">
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP host</label>
+                                  <input
+                                    type="text"
+                                    value={settings.email?.imap_host || 'imap.mail.yahoo.com'}
+                                    onChange={(e) => saveSettings({ email: { ...settings.email, imap_host: e.target.value } })}
+                                    className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP port</label>
+                                  <input
+                                    type="number"
+                                    value={settings.email?.imap_port || 993}
+                                    onChange={(e) => saveSettings({ email: { ...settings.email, imap_port: parseInt(e.target.value) || 993 } })}
+                                    className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">IMAP username</label>
+                                  <input
+                                    type="text"
+                                    value={settings.email?.imap_user || ''}
+                                    onChange={(e) => saveSettings({ email: { ...settings.email, imap_user: e.target.value } })}
+                                    className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none"
+                                  />
+                                </div>
+                                <SecretInput
+                                  id="imap_password"
+                                  label="IMAP password (app password)"
+                                  value={settings.email?.imap_password}
+                                  placeholder=""
+                                  onChange={(value) => saveSettings({ email: withoutMasks({ ...settings.email, imap_password: value }) })}
+                                  onRevoke={() => saveSettings({ email: withoutMasks({ ...settings.email, imap_password: '' }) })}
+                                />
+                              </div>
+                            </details>
 
-                            {/* JMAP (RFC 8620) — the alternative to IMAP, implemented in
-                                src/jmap.ts. Leave blank to use IMAP only. */}
-                            <div className="pt-2 mt-1 border-t border-neutral-200 dark:border-neutral-800">
-                              <p className="text-xs text-neutral-400 mb-3">
-                                JMAP (RFC 8620) — optional. Leave blank to use IMAP only.
-                              </p>
-                            
-                              <div className="space-y-3">
+                            <details className="group rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30">
+                              <summary className="flex cursor-pointer list-none items-center justify-between p-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                <span>JMAP server <span className="ml-1.5 text-xs font-normal text-neutral-400">RFC 8620 credentials for polling mail</span></span>
+                                <ChevronDown className="w-4 h-4 shrink-0 transition-transform group-open:rotate-180" />
+                              </summary>
+                              <div className="space-y-3 p-3 pt-0">
                                 <div>
                                   <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">JMAP server URL</label>
                                   <input
@@ -1662,19 +1693,18 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                   />
                                 </div>
                             
-                                <div>
-                                  <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">JMAP password (app password)</label>
-                                  <input
-                                    type="password"
-                                    value={settings.email?.jmap_password === SECRET_MASK ? '' : (settings.email?.jmap_password || '')}
-                                      placeholder={settings.email?.jmap_password === SECRET_MASK ? 'Set - type to change' : ''}
-                                    onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, jmap_password: e.target.value }) })}
-                                    className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                                  />
-                                </div>
+                                <SecretInput
+                                  id="jmap_password"
+                                  label="JMAP password (app password)"
+                                  value={settings.email?.jmap_password}
+                                  placeholder=""
+                                  onChange={(value) => saveSettings({ email: withoutMasks({ ...settings.email, jmap_password: value }) })}
+                                  onRevoke={() => saveSettings({ email: withoutMasks({ ...settings.email, jmap_password: '' }) })}
+                                />
                               </div>
+                            </details>
 
-                              {/* Pull mail now. The hourly cron does this in
+                            {/* Pull mail now. The hourly cron does this in
                                   production; a cron never fires in local
                                   dev, so the button is how the inbox fills
                                   on a laptop. */}
@@ -1705,12 +1735,12 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                   permission, then paste the three values
                                   here. The app fetches your mail itself
                                   with these, inside the Worker. */}
-                              <div className="pt-3 mt-1 border-t border-neutral-200 dark:border-neutral-800">
-                                <p className="text-xs text-neutral-500 mb-2">
-                                  Yahoo Mail API &mdash; optional. Takes precedence over JMAP.
-                                </p>
-
-                                <div className="space-y-3">
+                              <details className="group rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30">
+                                <summary className="flex cursor-pointer list-none items-center justify-between p-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                  <span>Yahoo Mail API <span className="ml-1.5 text-xs font-normal text-neutral-400">OAuth credentials for Yahoo mail</span></span>
+                                  <ChevronDown className="w-4 h-4 shrink-0 transition-transform group-open:rotate-180" />
+                                </summary>
+                                <div className="space-y-3 p-3 pt-0">
                                   <div>
                                     <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Client ID</label>
                                     <input
@@ -1722,29 +1752,23 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                     />
                                   </div>
 
-                                  <div>
-                                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Client secret</label>
-                                    <input
-                                      type="password"
-                                      value={settings.email?.yahoo_client_secret === SECRET_MASK ? '' : (settings.email?.yahoo_client_secret || '')}
-                                      placeholder={settings.email?.yahoo_client_secret === SECRET_MASK ? 'Set - type to change' : ''}
-                                      placeholder="type to set it"
-                                      onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_client_secret: e.target.value }) })}
-                                      className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                                    />
-                                  </div>
+                                  <SecretInput
+                                    id="yahoo_client_secret"
+                                    label="Client secret"
+                                    value={settings.email?.yahoo_client_secret}
+                                    placeholder="your Yahoo consumer secret"
+                                    onChange={(value) => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_client_secret: value }) })}
+                                    onRevoke={() => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_client_secret: '' }) })}
+                                  />
 
-                                  <div>
-                                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Refresh token</label>
-                                    <input
-                                      type="password"
-                                      value={settings.email?.yahoo_refresh_token === SECRET_MASK ? '' : (settings.email?.yahoo_refresh_token || '')}
-                                      placeholder={settings.email?.yahoo_refresh_token === SECRET_MASK ? 'Set - type to change' : ''}
-                                      placeholder="type to set it"
-                                      onChange={(e) => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_refresh_token: e.target.value }) })}
-                                      className="w-full h-9 px-3 rounded-md text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                                    />
-                                  </div>
+                                  <SecretInput
+                                    id="yahoo_refresh_token"
+                                    label="Refresh token"
+                                    value={settings.email?.yahoo_refresh_token}
+                                    placeholder="your Yahoo refresh token"
+                                    onChange={(value) => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_refresh_token: value }) })}
+                                    onRevoke={() => saveSettings({ email: withoutMasks({ ...settings.email, yahoo_refresh_token: '' }) })}
+                                  />
 
                                   <div>
                                     <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Mailbox</label>
@@ -1773,11 +1797,10 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                     </span>
                                   )}
                                 </div>
-                              </div>
+                              </details>
                             </div>
                           </div>
                         </div>
-                      </div>
                     )}
 
                     {/* Developer settings */}

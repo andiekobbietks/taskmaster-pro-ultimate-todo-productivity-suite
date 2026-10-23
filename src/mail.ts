@@ -11,6 +11,7 @@
 import { readSettings } from "./settings.ts";
 import { fetchEmailsSince, type JMAPConfig, type JMAPEmail } from "./jmap.ts";
 import { hasYahooConfig, listMessages, getRawMessage, type YahooConfig } from "./yahoo.ts";
+import { detectPlatform } from "./platform-domains.ts";
 
 export interface MailFetchResult {
   ok: boolean;
@@ -22,6 +23,48 @@ export interface MailFetchResult {
   /** Which transport was used */
   source: "yahoo" | "jmap" | "none";
   message: string;
+}
+
+/**
+ * Keywords that identify a message as hackathon-related even when the sender
+ * is not a known platform domain. This gate is applied to every mail ingest
+ * path so the inbox cannot fill up with unrelated personal mail.
+ */
+const HACKATHON_KEYWORDS = new Set([
+  "hackathon",
+  "hack",
+  "competition",
+  "challenge",
+  "contest",
+  "prize",
+  "devpost",
+  "mlh",
+  "hackerearth",
+  "kaggle",
+  "lablab",
+  "ethglobal",
+  "devfolio",
+  "unstop",
+  "hackerrank",
+  "submission",
+  "deadline",
+  "register",
+  "registration",
+]);
+
+/**
+ * Decide whether a message is allowed into the inbox from a mail server.
+ *
+ * Known platform senders pass automatically. Everything else needs a
+ * hackathon-related keyword in the subject or sender address.
+ */
+export function isHackathonEmail(sender: string, subject: string): boolean {
+  if (detectPlatform(sender)) return true;
+  const text = ((subject || "") + " " + (sender || "")).toLowerCase();
+  for (const kw of HACKATHON_KEYWORDS) {
+    if (text.includes(kw)) return true;
+  }
+  return false;
 }
 
 /**
@@ -111,9 +154,18 @@ async function fetchFromYahoo(email: any): Promise<MailFetchResult> {
   };
 
   const listing = await listMessages(config, 25);
+  const candidates = ((listing as any).messages || []) as Array<{
+    id: string;
+    subject?: string;
+    from?: string;
+  }>;
   const raws: Array<{ id: string; raw: string }> = [];
 
-  for (const message of (listing as any).messages || []) {
+  for (const message of candidates) {
+    // Never download or store non-hackathon mail from Yahoo.
+    if (!isHackathonEmail(message.from || "", message.subject || "")) {
+      continue;
+    }
     try {
       const raw = await getRawMessage(config, message.id);
       raws.push({ id: message.id, raw });
@@ -124,12 +176,12 @@ async function fetchFromYahoo(email: any): Promise<MailFetchResult> {
 
   return {
     ok: true,
-    fetched: raws.length,
+    fetched: candidates.length,
     messages: [],
     raws,
     source: "yahoo",
     message: raws.length === 0
       ? "Nothing new."
-      : `Fetched ${raws.length} message(s) from Yahoo.`,
+      : `Fetched ${raws.length} hackathon message(s) from Yahoo.`,
   };
 }

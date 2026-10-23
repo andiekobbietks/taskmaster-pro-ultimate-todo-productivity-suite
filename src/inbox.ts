@@ -13,8 +13,9 @@
  * - No external dependencies in this module
  */
 import { Hono } from "hono";
-import { fetchNewMail, JMAP_ID_PREFIX } from "./mail.ts";
+import { fetchNewMail, JMAP_ID_PREFIX, isHackathonEmail } from "./mail.ts";
 import { parseRawMail } from "./mime.ts";
+import { detectPlatform } from "./platform-domains.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -67,29 +68,6 @@ function rowToInboxItem(r: any): InboxItem {
   };
 }
 
-// ── Platform detection ───────────────────────────────────────────────
-
-const PLATFORM_DOMAINS: Record<string, string> = {
-  "devpost.com": "devpost",
-  "devpost.org": "devpost",
-  "mlh.io": "mlh",
-  "mlh.com": "mlh",
-  "kaggle.com": "kaggle",
-  "lablab.ai": "lablab",
-  "ethglobal.com": "ethglobal",
-  "devfolio.co": "devfolio",
-  "unstop.com": "unstop",
-  "hackerrank.com": "hackerrank",
-  "hackerearth.com": "hackerearth",
-};
-
-function detectPlatform(sender: string): string | null {
-  const domain = sender.toLowerCase().split("@")[1] || "";
-  for (const [d, platform] of Object.entries(PLATFORM_DOMAINS)) {
-    if (domain.includes(d)) return platform;
-  }
-  return null;
-}
 
 /**
  * Normalise a string for fuzzy comparison: lowercase, strip punctuation,
@@ -307,6 +285,8 @@ export function registerInboxRoutes(app: Hono, sql: any) {
       for (const raw of result.raws || []) {
         const parsed = parseRawMail(raw.raw);
         if (!parsed.ok) { skipped++; continue; }
+        // Defence in depth: refuse to ingest anything that is not hackathon-related.
+        if (!isHackathonEmail(parsed.from, parsed.subject)) { skipped++; continue; }
         const stored = insertInboxItem(sql, {
           sender: parsed.from,
           subject: parsed.subject,
@@ -321,6 +301,7 @@ export function registerInboxRoutes(app: Hono, sql: any) {
       }
 
       for (const m of result.messages) {
+        if (!isHackathonEmail(m.from, m.subject)) { skipped++; continue; }
         const stored = insertInboxItem(sql, {
           sender: m.from,
           subject: m.subject,

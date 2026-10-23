@@ -44,12 +44,19 @@ export class App extends DurableObject {
     // Rate limiting middleware (100 requests per minute per IP).
     // Diagnostics and checkpoint routes are internal developer tools; don't
     // throttle them so the checkpoint CLI/widget stays responsive.
+    // In local dev there is no Cloudflare/proxy IP, so the bucket becomes
+    // 'unknown' and local AI agents / rapid UI automation hit the ceiling.
+    // Skip rate limiting entirely for unknown IPs: production always has
+    // cf-connecting-ip supplied by Cloudflare.
     this.app.use("/*", async (c, next) => {
       const path = c.req.path;
       if (path.startsWith("/api/diagnostics") || path.startsWith("/api/checkpoints")) {
         return next();
       }
       const ip = c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "unknown";
+      if (ip === "unknown") {
+        return next();
+      }
       const now = Date.now();
       const windowMs = 60000; // 1 minute
       const maxRequests = 100;

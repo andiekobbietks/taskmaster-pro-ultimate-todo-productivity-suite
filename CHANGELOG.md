@@ -9,6 +9,49 @@ Each tagged release on GitHub is generated from the matching section below by
 [`.github/workflows/release.yml`](.github/workflows/release.yml), so the
 changelog is the single source of truth for what a release contains.
 
+## [1.4.0] - 2026-10-23
+
+### Added
+
+- **Court-ready Hackathon Lifecycle & Evidence Dossier.** A new route and local PDF builder turn a hackathon ticket and its linked evidence into a signed, reproducible bundle.
+  - `GET /api/hackathons/:id/dossier-data` returns a canonical JSON payload containing the hackathon record, the user's eligibility profile, the computed qualification path, every matching inbox message, and every non-deleted attachment, plus a `master_sha256` over the canonical JSON so the bundle can be integrity-checked.
+  - `scripts/build-dossier.py` renders the PDF locally with ReportLab. It is deliberately not run inside the Cloudflare Worker because ReportLab is a Python library; the Worker serves the data, the user's machine produces the document.
+  - `scripts/dossier-fixture-json.mjs` generates a fixture payload in-process against the in-memory SQLite harness, so the dossier shape can be verified without a running wrangler dev server.
+
+### Before
+
+- Hackathon evidence lived in three separate places: the hackathon card, the inbox, and the attachment list. If a deadline, prize rule, or eligibility verdict changed, there was no snapshot to prove what the page said at the time you applied.
+- Export meant screenshots and emails scattered across folders, with no single hash or index tying them to a specific competition.
+
+### After
+
+- One API call returns everything for one ticket in a stable, ordered JSON payload.
+- The same data feeds a formatted PDF with cover sheet, hackathon summary, eligibility explanation, email timeline, artifact register, and integrity declaration.
+- The payload is hashed before the hash field is injected, so tampering with any email, attachment, or profile value invalidates the dossier.
+
+### Why now
+
+Portfolio readiness and dispute protection. Hackathon terms change, deadlines slip, and eligibility wording can be ambiguous. A signed dossier gives you:
+- An audit trail if an organiser rejects an entry after the fact.
+- A single file to attach to a prize appeal, tax record, or portfolio case study.
+- A reproducible artifact reviewers can generate themselves from the same JSON.
+
+### Scenarios
+
+1. **Rejected entry appeal.** You qualify under "EU citizens", the site later changes to "EU residents", and your entry is rejected. The dossier shows the original rule, your profile, and the qualifying path at the time of submission.
+2. **Prize/tax audit.** A sponsor asks for proof of the competition date, prize pool, and your eligibility. The PDF contains the official URL, deadlines, prize, and attachments.
+3. **Portfolio evidence.** You want to show a mentor or employer that you shipped for a specific hackathon. The dossier bundles the submission emails and artifacts in one document.
+4. **Deadline dispute.** The organiser extends the deadline and denies your early submission. The dossier's email timeline and generation timestamp prove when you entered.
+
+### Changed
+
+- `src/dossier-routes.ts` imports use explicit `.ts` extensions so the route can be exercised under `node --experimental-strip-types` in the in-process test harness.
+
+### Security
+
+- Dossier data is scoped strictly to the requested `ticket_id`. Soft-deleted attachments (`deleted_at` is set) are excluded from the payload.
+- The `master_sha256` is computed with `crypto.subtle` over the canonical JSON before the field is injected, preventing circular hashing.
+
 ## [1.1.0] - 2026-10-20
 
 ### Added

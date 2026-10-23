@@ -6,8 +6,8 @@
  * capture_jobs table existed in the app and in neither test - so the
  * statements live here and everyone runs the same list.
  *
- * The statements are plain SQL, so the same list works against the
- * Durable Object's storage and against a node:sqlite database.
+ * The statements are plain SQL, so the same list works against the Durable
+ * Object's storage and against a node:sqlite database.
  */
 export const SCHEMA: string[] = [
   `CREATE TABLE IF NOT EXISTS lists (
@@ -149,6 +149,22 @@ export const SCHEMA: string[] = [
     message_id TEXT DEFAULT NULL,
     error TEXT DEFAULT NULL,
     created_at INTEGER NOT NULL
+    )`,
+  `CREATE TABLE IF NOT EXISTS checkpoints (
+    id TEXT PRIMARY KEY,
+    tag TEXT NOT NULL,
+    label TEXT DEFAULT '',
+    kind TEXT DEFAULT 'manual',
+    created_at INTEGER NOT NULL,
+    payload TEXT NOT NULL
+    )`,
+  `CREATE TABLE IF NOT EXISTS diagnostics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts INTEGER NOT NULL,
+    level TEXT NOT NULL,
+    source TEXT NOT NULL,
+    message TEXT NOT NULL,
+    payload TEXT DEFAULT '{}'
     )`,
 ];
 

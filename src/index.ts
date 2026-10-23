@@ -15,6 +15,8 @@ import { registerCalendarRoutes } from "./calendar-routes";
 import { registerPushRoutes } from "./push-routes";
 import { registerDigestRoutes } from "./digest-routes";
 import { registerEmailRoutes } from "./email-routes";
+import { registerCheckpointRoutes } from "./checkpoints";
+import { registerDiagnosticsRoutes, errorLoggingMiddleware } from "./diagnostics";
 import { createSchema } from "./schema";
 import { Hono } from "hono";
 
@@ -35,6 +37,9 @@ export class App extends DurableObject {
       c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
       c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'");
     });
+
+    // Structured diagnostics: capture 500s and uncaught exceptions.
+    this.app.use("/*", errorLoggingMiddleware(this.ctx.storage.sql));
 
     // Rate limiting middleware (100 requests per minute per IP)
     this.app.use("/*", async (c, next) => {
@@ -316,6 +321,8 @@ export class App extends DurableObject {
 
     registerDigestRoutes(this.app, this.ctx.storage.sql, this.env);
     registerEmailRoutes(this.app, this.ctx.storage.sql, this.env);
+    registerCheckpointRoutes(this.app, this.ctx.storage.sql);
+    registerDiagnosticsRoutes(this.app, this.ctx.storage.sql);
 
     // --- Demo button (landing page): seed demo data on request ---
     this.app.post("/api/demo/seed", async (c) => {

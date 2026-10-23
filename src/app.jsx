@@ -31,6 +31,7 @@ import {
 } from "./components/InboxPrimitives";
 import { CalendarWizard, ExperimentalBadge } from "./components/CalendarWizard";
 import { PushSettings, registerServiceWorker } from "./components/PushSettings";
+import CheckpointCLI from "./components/CheckpointCLI";
 
 /** Platform badge colours used for hackathon source chips. */
 function platformClasses(platform) {
@@ -685,6 +686,27 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
     fetchCapacity();
     fetchWeeklyPlan();
   }, [fetchTodos, fetchLists, fetchStats, loadHackathons, loadInbox, loadInboxStats, loadEligibility, loadSettings, fetchDigest, fetchCapacity, fetchWeeklyPlan]);
+
+  // Capture unhandled browser errors and rejected promises for the
+  // diagnostics log. Failures are posted best-effort; if the server is down
+  // the error still surfaces in the console.
+  useEffect(() => {
+    const send = (source, message, payload) => {
+      fetch("./api/diagnostics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ level: "error", source, message, payload }),
+      }).catch(() => {});
+    };
+    const onError = (e) => send("window.onerror", e.message, { filename: e.filename, lineno: e.lineno });
+    const onRejection = (e) => send("unhandledrejection", String(e.reason), {});
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
 
   // --- Hackathon CRUD -------------------------------------------------
 
@@ -3192,5 +3214,6 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
 createRoot(document.getElementById("root")).render(
   <ErrorBoundary>
     <App />
+    <CheckpointCLI />
   </ErrorBoundary>
 );

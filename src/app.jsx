@@ -1331,7 +1331,7 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
 
                     {/* Settings tabs */}
                     <div className="flex items-center gap-1 border-b border-neutral-200 dark:border-neutral-800 pb-2">
-                      {['storage', 'profile', 'notifications', 'email', 'capture', 'calendar', 'developer'].map(tab => (
+                      {['storage', 'profile', 'notifications', 'email', 'capture', 'calendar', 'developer', 'advanced'].map(tab => (
                         <button
                           key={tab}
                           onClick={() => setSettingsTab(tab)}
@@ -1958,6 +1958,34 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                             Health check
                           </button>
                           <textarea id="debug-health" className="w-full h-30 rounded-md border border-neutral-300 dark:border-neutral-600 text-sm font-mono p-2 m-2 resize-y" readonly></textarea>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Advanced settings */}
+                    {settingsTab === 'advanced' && settings && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white dark:bg-[#111827] rounded-xl border border-neutral-200 dark:border-neutral-800">
+                          <h3 className="text-sm font-semibold mb-1">Advanced</h3>
+                          <p className="text-xs text-neutral-500 mb-3">
+                            Experimental or internal features. Turn these on only when you need them.
+                          </p>
+
+                          <label className="flex items-center gap-3 p-3 rounded-lg bg-neutral-50 dark:bg-neutral-800/50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={settings.advanced?.checkpoint_cli_enabled || false}
+                              onChange={(e) => saveSettings({ advanced: { ...settings.advanced, checkpoint_cli_enabled: e.target.checked } })}
+                              aria-label="Enable Checkpoint CLI"
+                              className="rounded border-neutral-300 dark:border-neutral-600 text-brand-600 focus:ring-brand-500/40 cursor-pointer"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-neutral-700 dark:text-neutral-200">Checkpoint CLI</div>
+                              <div className="text-xs text-neutral-500">
+                                Show the floating developer terminal for checkpoints, diagnostics and rollbacks.
+                              </div>
+                            </div>
+                          </label>
                         </div>
                       </div>
                     )}
@@ -3228,6 +3256,9 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
             </div>
           )}
 
+          {/* Developer tooling is opt-in from Settings → Advanced. */}
+          {settings?.advanced?.checkpoint_cli_enabled && <CheckpointCLI />}
+
           {/* Failures are surfaced here instead of vanishing into the console. */}
           <ErrorBanner error={error} onDismiss={clearError} />
         </div>
@@ -3237,6 +3268,5 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
 createRoot(document.getElementById("root")).render(
   <ErrorBoundary>
     <App />
-    <CheckpointCLI />
   </ErrorBoundary>
 );

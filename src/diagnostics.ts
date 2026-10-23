@@ -26,8 +26,16 @@ export function registerDiagnosticsRoutes(app: Hono, sql: any) {
   });
 
   app.post("/api/diagnostics", async (c) => {
+    let body: any;
     try {
-      const body = await c.req.json();
+      body = await c.req.json();
+    } catch (e) {
+      // Malformed client payloads are not server errors; log them at info so
+      // the diagnostics table stays useful, but return 400, not 500.
+      logDiagnostic(sql, "info", "client", "Malformed diagnostics payload", { error: String(e) });
+      return c.json({ ok: false, error: "Invalid JSON" }, 400);
+    }
+    try {
       logDiagnostic(sql, body.level || "info", body.source || "client", body.message || "", body.payload);
       return c.json({ ok: true });
     } catch (e) {

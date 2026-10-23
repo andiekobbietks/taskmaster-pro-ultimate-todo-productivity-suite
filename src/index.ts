@@ -41,8 +41,14 @@ export class App extends DurableObject {
     // Structured diagnostics: capture 500s and uncaught exceptions.
     this.app.use("/*", errorLoggingMiddleware(this.ctx.storage.sql));
 
-    // Rate limiting middleware (100 requests per minute per IP)
+    // Rate limiting middleware (100 requests per minute per IP).
+    // Diagnostics and checkpoint routes are internal developer tools; don't
+    // throttle them so the checkpoint CLI/widget stays responsive.
     this.app.use("/*", async (c, next) => {
+      const path = c.req.path;
+      if (path.startsWith("/api/diagnostics") || path.startsWith("/api/checkpoints")) {
+        return next();
+      }
       const ip = c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "unknown";
       const now = Date.now();
       const windowMs = 60000; // 1 minute

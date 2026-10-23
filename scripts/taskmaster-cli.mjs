@@ -49,14 +49,22 @@ function log(msg) {
   fs.appendFileSync(LOG, line + '\n', { encoding: 'utf8' });
 }
 
-async function api(p) {
+async function api(p, opts = {}) {
   try {
-    const res = await fetch(BASE + p);
+    const res = await fetch(BASE + p, opts);
     return await res.json();
   } catch (e) {
     log('API ERROR: ' + p + ' — ' + e.message);
     return null;
   }
+}
+
+async function postJson(p, body) {
+  return api(p, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
 }
 
 function help() {
@@ -65,10 +73,24 @@ function help() {
   console.log('Commands: help | status | logs | rollback <tag> | forward <tag> | export');
 }
 
-function status() {
+async function status() {
   console.log(BANNER);
   console.log('Checking server at ' + BASE);
-  api('/api/debug/status').then(d => console.log('Server response:', d || 'UNREACHABLE — restart workerd at :8787'));
+  try {
+    const health = await api('/health');
+    if (!health) {
+      console.log('Server response: UNREACHABLE — restart workerd at :8787');
+      return;
+    }
+    const diags = await api('/api/diagnostics');
+    const recent = (diags && diags.events) ? diags.events.slice(-5) : [];
+    console.log('Server response:', health);
+    console.log('Recent diagnostics events:', recent.length);
+    recent.forEach(e => console.log('  - [' + e.severity + '] ' + e.type + ': ' + e.message));
+  } catch (e) {
+    log('STATUS ERROR: ' + e.message);
+    console.log('Server response: UNREACHABLE — restart workerd at :8787');
+  }
 }
 
 function logs() {

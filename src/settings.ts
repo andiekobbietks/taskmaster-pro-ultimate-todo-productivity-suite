@@ -97,6 +97,9 @@ export interface Settings {
   };
   // The same shape the eligibility engine reads. See src/profile.ts.
   profile: UserProfile;
+  advanced?: {
+    checkpoint_cli_enabled?: boolean;
+  };
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -148,6 +151,9 @@ const DEFAULT_SETTINGS: Settings = {
     deadline_reminders: true,
   },
   profile: { ...DEFAULT_PROFILE },
+  advanced: {
+    checkpoint_cli_enabled: false,
+  },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import { registerDigestRoutes } from "./digest-routes";
 import { registerEmailRoutes } from "./email-routes";
 import { registerCheckpointRoutes } from "./checkpoints";
 import { registerDiagnosticsRoutes, errorLoggingMiddleware } from "./diagnostics";
+import { registerDossierRoutes } from "./dossier-routes";
 import { createSchema } from "./schema";
 import { Hono } from "hono";
 
@@ -336,6 +337,7 @@ export class App extends DurableObject {
     registerEmailRoutes(this.app, this.ctx.storage.sql, this.env);
     registerCheckpointRoutes(this.app, this.ctx.storage.sql);
     registerDiagnosticsRoutes(this.app, this.ctx.storage.sql);
+    registerDossierRoutes(this.app, this.ctx.storage.sql);
 
     // --- Demo button (landing page): seed demo data on request ---
     this.app.post("/api/demo/seed", async (c) => {

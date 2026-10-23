@@ -30,3 +30,7 @@ screenshots/
 
 # Local-only drafts - never publish (kept out after the 2aa2ab4 incident)
 docs/blog/
+
+# Generated dossier fixtures and PDFs produced by local scripts.
+dossier-input.json
+*.dossier.pdf

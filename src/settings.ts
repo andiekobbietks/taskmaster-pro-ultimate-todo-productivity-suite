@@ -282,9 +282,20 @@ export function maskSettings(settings: any): any {
  */
 export function readSettings(sql: any): any {
   const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
-  const settings = rows.length > 0
-    ? parseJson(rows[0].value, DEFAULT_SETTINGS)
-    : { ...DEFAULT_SETTINGS };
+  const stored = rows.length > 0 ? parseJson(rows[0].value, {}) : {};
+  // Deep-merge: stored wins for keys present, defaults fill missing.
+  function deepMerge(t: any, s: any): any {
+    const o = { ...t };
+    for (const k of Object.keys(s)) {
+      if (s[k] !== null && typeof s[k] === "object" && !Array.isArray(s[k]) && !(s[k] instanceof Date)) {
+        o[k] = deepMerge(o[k] || {}, s[k]);
+      } else {
+        o[k] = s[k];
+      }
+    }
+    return o;
+  }
+  const settings = deepMerge({ ...DEFAULT_SETTINGS }, stored);
   const deobfuscated = deobfuscateSettings(settings);
   deobfuscated.profile = readProfile(sql);
   return deobfuscated;

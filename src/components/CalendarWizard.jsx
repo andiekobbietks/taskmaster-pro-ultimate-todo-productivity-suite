@@ -102,14 +102,29 @@ export function CalendarWizard({ isOpen = false, onClose = () => {} }) {
     );
   };
 
-  const feedUrl = () =>
+  const feedUrl = (path = "/api/calendar.ics") =>
     typeof window !== "undefined"
-      ? window.location.origin + "/api/calendar.ics"
-      : "/api/calendar.ics";
+      ? window.location.origin + path
+      : path;
 
   const push = async () => {
     setBusy(true);
     setError("");
+
+    // subscribe and download do not need a server push; the calendar client
+    // fetches the feed URL itself. Skip the POST and show the URL instead.
+    if (!chosen?.needs_auth) {
+      setResult({
+        ok: true,
+        noPush: true,
+        method: chosen.id,
+        url: feedUrl(chosen.url),
+        count: selected.length,
+      });
+      setBusy(false);
+      return;
+    }
+
     try {
       const body = await api("./api/calendar/push", {
         method: "POST",
@@ -311,6 +326,14 @@ export function CalendarWizard({ isOpen = false, onClose = () => {} }) {
               {result.error && (
                 <p className="text-xs text-neutral-500 mt-2">{result.error}</p>
               )}
+              {result.noPush && result.url && (
+                <div className="mt-2 p-2 rounded bg-neutral-50 dark:bg-neutral-900">
+                  <p className="text-xs font-medium mb-1">Your feed URL</p>
+                  <code className="block text-xs break-all text-neutral-600 dark:text-neutral-400">
+                    {result.url}
+                  </code>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -326,11 +349,15 @@ export function CalendarWizard({ isOpen = false, onClose = () => {} }) {
                   </li>
                 ))}
               </ul>
-              {chosen?.id === "subscribe" && (
+              {(chosen?.id === "subscribe" || chosen?.id === "download") && (
                 <div className="p-3 rounded-lg bg-neutral-50 dark:bg-neutral-900">
-                  <p className="text-xs font-medium mb-1">Paste this into your calendar</p>
+                  <p className="text-xs font-medium mb-1">
+                    {chosen.id === "download"
+                      ? "Download this calendar file"
+                      : "Paste this into your calendar"}
+                  </p>
                   <code className="block text-xs break-all text-neutral-600 dark:text-neutral-400">
-                    {feedUrl()}
+                    {feedUrl(chosen.url)}
                   </code>
                 </div>
               )}
@@ -361,7 +388,13 @@ export function CalendarWizard({ isOpen = false, onClose = () => {} }) {
             disabled={busy || (selected.length === 0 && !result)}
             className="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40"
           >
-            {busy ? "Working…" : result ? "Close" : "Put them on the calendar"}
+            {busy
+              ? "Working…"
+              : result
+              ? "Close"
+              : chosen?.needs_auth
+              ? "Put them on the calendar"
+              : "Done"}
           </button>
         )}
       </div>

@@ -19,11 +19,22 @@ export interface ICalEvent {
   summary: string;
   description: string;
   url: string;
+  location?: string;
+  categories?: string[];
 }
 
 /** A UTC timestamp in the iCal form: 20261021T165233Z. */
 function dtstamp(): string {
   return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+/** Minimal RFC 5545 text escape for DESCRIPTION, LOCATION, etc. */
+function icalEscape(text: string): string {
+  return String(text ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
 }
 
 /** Build the full iCal document from an array of ICalEvent. */
@@ -38,11 +49,13 @@ export function icalDocument(events: ICalEvent[]): string {
     lines.push(`DTSTAMP:${dtstamp()}`);
     lines.push(`DTSTART:${e.dtstart}`);
     lines.push(`DTEND:${e.dtend}`);
-    lines.push(`SUMMARY:${e.summary}`);
-    // iCal DESCRIPTION may contain newlines; escape as needed
-    const desc = e.description.replace(/\n/g, "\\n");
-    lines.push(`DESCRIPTION:${desc}`);
-    lines.push(`URL:${e.url}`);
+    lines.push(`SUMMARY:${icalEscape(e.summary)}`);
+    lines.push(`DESCRIPTION:${icalEscape(e.description)}`);
+    if (e.location) lines.push(`LOCATION:${icalEscape(e.location)}`);
+    if (e.categories?.length) {
+      lines.push(`CATEGORIES:${e.categories.map(icalEscape).join(",")}`);
+    }
+    lines.push(`URL:${icalEscape(e.url)}`);
     lines.push("END:VEVENT");
   }
   lines.push("END:VCALENDAR");
@@ -61,14 +74,39 @@ export function hackathonToIcal(
   const title = String(r.name || "Untitled hackathon");
   // Prize may have markup; keep plain
   const prize = String(r.prize || "").replace(/<[^>]*>/g, "").trim();
-  // Build description: platform + eligibility + prize note
-  const rules = (r.eligibility_json ? JSON.parse(r.eligibility_json) : {});
+  // Build a richer description: platform, eligibility, location,
+  // registration count, and the competition URL.
+  const rules = r.eligibility_json ? JSON.parse(r.eligibility_json) : {};
+  const notes = r.notes ? JSON.parse(r.notes) : {};
   const eligibilityNote =
     rules.eligibility_type === "invite_only"
-      ? "Invite-only: see qualification_path"
-      : "Unrestricted";
-  const bits: string[] = [platformName, prize || "", eligibilityNote].filter(Boolean);
-  const description = bits.join(" · ");
+      ? "Invite-only"
+      : rules.eligibility_type === "unrestricted"
+      ? "Open to all"
+      : `Eligibility: ${rules.eligibility_type || "see listing"}`;
+  const regionNote =
+    Array.isArray(rules.regions) && rules.regions.length
+      ? `Regions: ${rules.regions.join(", ")}`
+      : "";
+  const regNote =
+    typeof notes.registrations === "number"
+      ? `Registrations: ${notes.registrations.toLocaleString()}`
+      : "";
+  const locationNote = r.displayed_location
+    ? `Location: ${String(r.displayed_location)}`
+    : "";
+  const urlNote = r.url ? `URL: ${r.url}` : "";
+  const bits: string[] = [
+    platformName,
+    r.platform ? `Source: ${r.platform}` : "",
+    prize ? `Prize: ${prize}` : "",
+    eligibilityNote,
+    regionNote,
+    locationNote,
+    regNote,
+    urlNote,
+  ].filter(Boolean);
+  const description = bits.join("\n");
   // The event covers the competition: it starts when the competition
   // starts and ends when submissions close. (Starting it at the
   // deadline was wrong: the event said "Oct 15" to "Oct 15".)
@@ -100,6 +138,10 @@ export function hackathonToIcal(
     summary: title,
     description,
     url: String(r.url || ""),
+    location: r.displayed_location
+      ? String(r.displayed_location)
+      : undefined,
+    categories: r.platform ? [String(r.platform)] : undefined,
   };
 }
 

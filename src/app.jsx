@@ -19,8 +19,10 @@ import {
   CheckCircle2, Circle, Plus, Trash2, Pin, Calendar, Tag, Search,
   Sun, Moon, Briefcase, User, Sparkles, Inbox, Folder,
   Clock, Play, Pause, RotateCcw, BarChart3, CheckSquare, AlertCircle,
-  Flame, MoreHorizontal, ArrowRight, X, Menu, Settings, Check, HelpCircle
+  Flame, MoreHorizontal, ArrowRight, X, Menu, Settings, Check, HelpCircle,
+  ExternalLink
 } from "lucide-react";
+
 import { api, describeError } from "./lib/api.js";
 import { todayLocal, daysUntilLocal, browserTimeZone, describeBrowserZone } from "./lib/time.js";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -29,6 +31,21 @@ import {
 } from "./components/InboxPrimitives";
 import { CalendarWizard, ExperimentalBadge } from "./components/CalendarWizard";
 import { PushSettings, registerServiceWorker } from "./components/PushSettings";
+
+/** Platform badge colours used for hackathon source chips. */
+function platformClasses(platform) {
+  const map = {
+    devpost: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+    mlh: "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
+    hackerearth: "bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300",
+    kaggle: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
+    lablab: "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300",
+    ethglobal: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300",
+    devfolio: "bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300",
+    unstop: "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
+  };
+  return map[platform] || "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400";
+}
 
 /**
  * A dismissible banner that tells the person what failed and offers a retry.
@@ -2499,7 +2516,7 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                       className="rounded border-neutral-300 dark:border-neutral-600 text-brand-600 focus:ring-brand-500/40 cursor-pointer"
                                     />
                                     <h3 className="text-sm font-semibold tracking-tight">{h.name}</h3>
-                                    <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                                    <span className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded ${platformClasses(h.platform)}`}>
                                       {h.platform}
                                     </span>
                                     {h.status === 'open' && (
@@ -2538,8 +2555,48 @@ const [isCalendarWizardOpen, setIsCalendarWizardOpen] = useState(false);
                                     )}
                                   </div>
 
+                                  {eligibility[h.id] && (
+                                    <details className="mt-1 group">
+                                      <summary className="list-none inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-brand-600 cursor-pointer select-none">
+                                        <HelpCircle className="w-3 h-3" />
+                                        How was this decided?
+                                      </summary>
+                                      <div className="mt-1.5 text-xs text-neutral-600 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 p-2 rounded-md">
+                                        <p className="font-medium">
+                                          Verdict:{" "}
+                                          {eligibility[h.id].eligible ? (
+                                            <span className="text-green-600">Eligible</span>
+                                          ) : (
+                                            <span className="text-red-500">Not eligible</span>
+                                          )}
+                                        </p>
+                                        {eligibility[h.id].qualification_path && (
+                                          <p className="mt-1">
+                                            <span className="text-neutral-500">Path:</span>{" "}
+                                            {eligibility[h.id].qualification_path}
+                                          </p>
+                                        )}
+                                        {eligibility[h.id].reasons?.length > 0 && (
+                                          <ul className="list-disc ml-4 mt-1 space-y-0.5">
+                                            {eligibility[h.id].reasons.map((r, i) => (
+                                              <li key={i}>{r}</li>
+                                            ))}
+                                          </ul>
+                                        )}
+                                      </div>
+                                    </details>
+                                  )}
+
                                   {h.url && (
-                                    <div className="mt-2">
+                                    <div className="mt-2 flex items-center gap-3">
+                                      <a
+                                        href={h.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[10px] font-medium text-brand-600 dark:text-brand-400 hover:underline inline-flex items-center gap-1"
+                                      >
+                                        Open hackathon <ExternalLink className="w-3 h-3" />
+                                      </a>
                                       <button
                                         onClick={() => fetchArchiveForTicket(h.id, h.url)}
                                         className="text-[10px] font-medium text-teal-600 dark:text-teal-400 hover:underline"

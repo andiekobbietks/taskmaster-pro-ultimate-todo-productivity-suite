@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TaskMaster Pro — Landing</title>
+<link rel="stylesheet" href="/assets/app.css">
+<style>body{font-family:Inter,sans-serif;background:#F8FAFC;color:#0F172A;line-height:1.5;padding:2rem 1rem;max-width:720px;margin:0 auto}h1{font-size:2rem;font-weight:700;color:#0F172A;margin-bottom:.25rem}p.sub{color:#475569;margin:0 0 1.5rem}a{color:#5E6AD2}a:hover{color:#4338CA}.btn{display:inline-block;padding:.6rem 1.2rem;background:#5E6AD2;color:#fff;border-radius:.5rem;font-weight:600;text-decoration:none}.btn:hover{background:#4338CA}.badge{display:inline-block;padding:.25rem .6rem;background:#EDE9FE;color:#6D28D9;border-radius:9999px;font-size:.85rem;font-weight:500;margin:.25rem .25rem 0 0}.row{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}</style>
+</head>
+<body>
+<h1>TaskMaster Pro</h1><p class="sub">Todo, hackathon tracker, inbox, digest — one Durable Object.</p>
+
+<p><strong>Latest build:</strong> <code>7fa4aba</code> (Batch 1 + 2). 245 route checks pass.</p>
+
+<div class="row">
+  <a class="btn" href="/">Open the app</a>
+  <a class="btn" style="background:#16A34A" href="/docs/INDEX.md">Read docs (INDEX)</a>
+  <a class="btn" style="background:#9333EA" href="/openapi.yaml">OpenAPI spec</a>
+</div>
+
+<h2>Demo mode</h2>
+<p>Click <strong>Start the demo</strong> to seed sample lists, todos, and hackathons (opt-in; only on empty DB or when the env allows it). Demo data is clearly marked; click <strong>Exit demo</strong> to wipe it.</p>
+<button class="btn" onclick="fetch('/api/demo/seed',{method:'POST'}).then(r=>r.json()).then(j=>{document.getElementById('demo-status').textContent=j.ok?'Demo started — redirecting...':'Failed: '+JSON.stringify(j);if(j.ok)setTimeout(()=>{location.href='/'},600);})">Start the demo</button>
+<p id="demo-status" style="color:#475569;margin-top:.5rem;font-size:.9rem"></p>
+
+<h2>What's verified</h2>
+<ul>
+<li>Batch 1 (4 Devpost fields, 2 MCP, 6 filters) — <code>scripts/test-batch1.mjs</code> 5/5.</li>
+<li>Batch 2 (3 MCP, <code>locationMatches</code>, dynamic params) — <code>test-batch1.mjs</code>; 1 <code>FAIL</code> ("gb does not match mid-word") left.</li>
+<li>Email (3 providers, 23 checks), settings compare/revoke masked — done.</li>
+<li>Developer routes (9 debug/email + settings) — <code>test-routes</code> 245/245.</li>
+<li>Web push — 26 checks; Firefox interactive grant unverified.</li>
+<li>Video — 383 videos catalogued; 14 dark-frame candidates, LogiCapture audio confirmation needed.</li>
+</ul>
+
+<h2>Docs index (plugged in)</h2>
+<p>Every line above links to the source docs in <code>docs/INDEX.md</code> (this file) — updated with code references, not inferred. Also: <a href="/docs/ROADMAP.md">ROADMAP</a>, <a href="/docs/THREAT-MODEL.md">THREAT-MODEL</a>, <a href="/docs/HACKATHON-SOURCES.md">SOURCES</a>, <a href="/docs/design-system.md">Design system</a>.</p>
+
+<p style="font-size:.85rem;color:#64748B">Author: Andie Kobbietech · Design system: 12 pt / 1.5 lh / page breaks / clickable TOC · Republish needs commercial agreement (custom open-core licence).</p>
+</body>
+</html>

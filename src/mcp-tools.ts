@@ -72,7 +72,12 @@ export function locationMatches(location: string, query: string): boolean {
   const q = String(query || "").toLowerCase().trim();
   if (!q) return true;
   if (!loc) return false;
-  if (loc.includes(q)) return true;
+  // Whole-word match for 2-letter queries (rule 2: "gb" must not match "middgbrough").
+  const isTwoLetter = q.length === 2;
+  const qMatches = isTwoLetter
+    ? new RegExp('\\b' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(loc)
+    : loc.includes(q);
+  if (qMatches) return true;
 
   // Rule 3: the UK's spellings.
   const ukAliases = ["uk", "united kingdom", "great britain", "england", "scotland", "wales", "ni"];

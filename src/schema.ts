@@ -65,7 +65,9 @@ export const SCHEMA: string[] = [
     mime_type TEXT NOT NULL,
     data BLOB NOT NULL,
     size INTEGER NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    deleted_at INTEGER DEFAULT NULL,
+    purge_at INTEGER DEFAULT NULL
     )`,
   `CREATE TABLE IF NOT EXISTS archive_sources (
     id TEXT PRIMARY KEY,
@@ -160,4 +162,23 @@ export function createSchema(exec: any): void {
   for (const statement of SCHEMA) {
     exec.exec(statement);
   }
+  // Migrations for databases that predate a column. ALTER TABLE fails when
+  // the column exists, and failing here would take the whole DO down, so
+  // each one is tried and ignored in turn.
+  for (const statement of MIGRATIONS) {
+    try {
+      exec.exec(statement);
+    } catch {
+      // Column already there.
+    }
+  }
 }
+
+const MIGRATIONS: string[] = [
+  `ALTER TABLE attachments ADD COLUMN deleted_at INTEGER DEFAULT NULL`,
+  `ALTER TABLE attachments ADD COLUMN purge_at INTEGER DEFAULT NULL`,
+  `ALTER TABLE hackathons ADD COLUMN displayed_location TEXT DEFAULT ''`,
+  `ALTER TABLE hackathons ADD COLUMN prizes_counts TEXT DEFAULT ''`,
+  `ALTER TABLE hackathons ADD COLUMN time_left_to_submission INTEGER DEFAULT NULL`,
+  `ALTER TABLE hackathons ADD COLUMN featured INTEGER DEFAULT 0`,
+];

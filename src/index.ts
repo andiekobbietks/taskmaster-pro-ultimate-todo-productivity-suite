@@ -9,9 +9,12 @@ import { registerCaptureRoutes } from "./capture";
 import { registerMcpRoutes } from "./mcp-sdk";
 import { registerFeedRoutes } from "./feed-routes";
 import { registerDevpostRoutes } from "./devpost-routes";
+import { registerMlhRoutes } from "./mlh-routes";
+import { registerHackerEarthRoutes } from "./hackerearth-routes";
 import { registerCalendarRoutes } from "./calendar-routes";
 import { registerPushRoutes } from "./push-routes";
 import { registerDigestRoutes } from "./digest-routes";
+import { registerEmailRoutes } from "./email-routes";
 import { createSchema } from "./schema";
 import { Hono } from "hono";
 
@@ -306,20 +309,38 @@ export class App extends DurableObject {
     registerMcpRoutes(this.app, this.ctx.storage.sql);
     registerFeedRoutes(this.app, this.ctx.storage.sql);
     registerDevpostRoutes(this.app, this.ctx.storage.sql);
+    registerMlhRoutes(this.app, this.ctx.storage.sql);
+    registerHackerEarthRoutes(this.app, this.ctx.storage.sql);
     registerCalendarRoutes(this.app, this.ctx.storage.sql);
     registerPushRoutes(this.app, this.ctx.storage.sql, this.env);
-import { registerEmailRoutes } from "./email-routes.ts";
+
     registerDigestRoutes(this.app, this.ctx.storage.sql, this.env);
     registerEmailRoutes(this.app, this.ctx.storage.sql, this.env);
 
+    // --- Demo button (landing page): seed demo data on request ---
+    this.app.post("/api/demo/seed", async (c) => {
+      const sql = this.ctx.storage.sql;
+      const env = (c.env || this.env) as any;
+      const allowed = env?.SEED_DEMO_DATA === "true" || env?.DEMO_MODE === "true";
+      if (!allowed) return c.json({ ok: false, message: "Demo mode disabled (set SEED_DEMO_DATA=true or DEMO_MODE=true)" }, 403);
+      try {
+        const listCount = sql.exec("SELECT COUNT(*) AS n FROM lists").one();
+        if (listCount.n === 0) {
+          sql.exec("INSERT INTO lists (id,name,color,icon,sort_order) VALUES ('inbox','Inbox','#5E6AD2','inbox',0),('work','Work','#2563EB','briefcase',1),('personal','Personal','#16A34A','user',2),('ideas','Ideas','#9333EA','sparkles',3)");
+          sql.exec("INSERT INTO todos (title,description,completed,priority,due_date,list_id,tags,is_pinned,estimated_pomodoros,created_at) VALUES ('Demo: Redesign dashboard','UI design using CSS custom properties',0,'high','2026-10-21','work','[\"design\"]',1,2," + Date.now() + ")");
+        }
+        return c.json({ ok: true, message: "Demo data seeded; navigate to / to view" });
+      } catch (e) { return c.json({ ok: false, error: String(e) }, 500); }
+    });
+
     // --- Debug / diagnostics routes ---
-    app.get("/api/debug/email", (c) => {
+    this.app.get("/api/debug/email", (c) => {
       const provider = String(c.env.EMAIL_PROVIDER || "").toLowerCase();
       return c.json({ provider: provider || null });
     });
 
-    app.get("/api/debug/mcp", (c) => {
-      const sql = c.ctx.storage.sql;
+    this.app.get("/api/debug/mcp", (c) => {
+      const sql = this.ctx.storage.sql;
       try {
         const tools = sql.exec("SELECT name FROM mcp_tools ORDER BY name").toArray();
         const notifs = sql.exec("SELECT COUNT(*) AS n FROM mcp_notifications").toArray();
@@ -327,8 +348,8 @@ import { registerEmailRoutes } from "./email-routes.ts";
       } catch (e) { return c.json({ error: String(e) }, 500); }
     });
 
-    app.get("/api/debug/push-census", (c) => {
-      const sql = c.ctx.storage.sql;
+    this.app.get("/api/debug/push-census", (c) => {
+      const sql = this.ctx.storage.sql;
       try {
         const subs = sql.exec("SELECT endpoint, last_ok, last_error, failures FROM push_subscriptions").toArray();
         const total = subs.length, ok = subs.filter((s: any) => s.last_ok).length, failed = subs.filter((s: any) => s.failures && s.failures > 0).length;
@@ -336,17 +357,17 @@ import { registerEmailRoutes } from "./email-routes.ts";
       } catch (e) { return c.json({ error: String(e) }, 500); }
     });
 
-    app.get("/api/debug/digest-preview", (c) => {
-      const sql = c.ctx.storage.sql;
+    this.app.get("/api/debug/digest-preview", (c) => {
+      const sql = this.ctx.storage.sql;
       const p = { citizenships: ["IT"], residencies: ["GB"], residency_status: "settled", age: 25, is_student: false, team_size: 1, employed_by_sponsor: false, timezone: "Europe/Dublin" };
-      try { return c.json(buildDigest(sql, p, new Date()); } catch (e) { return c.json({ error: String(e) }, 500); }
+      try { return c.json(buildDigest(sql, p, new Date())); } catch (e) { return c.json({ error: String(e) }, 500); }
     });
 
-    app.get("/api/debug/profile", (c) => {
-      try { return c.json(readProfile(c.ctx.storage.sql)); } catch (e) { return c.json({ error: String(e) }, 500); }
+    this.app.get("/api/debug/profile", (c) => {
+      try { return c.json(readProfile(this.ctx.storage.sql)); } catch (e) { return c.json({ error: String(e) }, 500); }
     });
 
-    app.get("/api/debug/settings-diff", (c) => {
+    this.app.get("/api/debug/settings-diff", (c) => {
       try {
         const stored = ({ timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" });
         const def = { timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" };
@@ -355,8 +376,8 @@ import { registerEmailRoutes } from "./email-routes.ts";
       } catch (e) { return c.json({ error: String(e) }, 500); }
     });
 
-    app.post("/api/debug/reset", async (c) => {
-      const sql = c.ctx.storage.sql;
+    this.app.post("/api/debug/reset", async (c) => {
+      const sql = this.ctx.storage.sql;
       try {
         await writeProfile(sql, {
           citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
@@ -369,8 +390,8 @@ import { registerEmailRoutes } from "./email-routes.ts";
       } catch (e) { return c.json({ ok: false, error: String(e) }, 500); }
     });
 
-    app.get("/api/debug/health", (c) => {
-      const sql = c.ctx.storage.sql;
+    this.app.get("/api/debug/health", (c) => {
+      const sql = this.ctx.storage.sql;
       try {
         const p = readProfile(sql);
         return c.json({ email_provider: String(c.env.EMAIL_PROVIDER || "").toLowerCase() || null, profile: p, digest_time: "08:00" });
@@ -445,7 +466,7 @@ import { registerEmailRoutes } from "./email-routes.ts";
   }
 
   async fetch(request: Request) {
-    return this.app.fetch(request);
+    return this.app.fetch(request, this.env as any);
   }
 }
 
@@ -511,6 +532,19 @@ const worker = {
       }
     } catch (err) {
       console.error("scheduled digest failed:", err);
+    }
+
+    // The bin: free the bytes of pictures past their purge deadline. The
+    // default is 30 days and Settings can set it lower (minimum 1).
+    try {
+      const result = await env.APP.get(id).fetch(
+        new Request("https://internal/api/trash/purge", { method: "POST" })
+      );
+      if (result.status >= 400) {
+        console.error("scheduled trash purge failed:", result.status);
+      }
+    } catch (err) {
+      console.error("scheduled trash purge failed:", err);
     }
   },
 };

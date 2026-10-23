@@ -22,7 +22,7 @@ This app is a **reference implementation**: a real, runnable product that exerci
 
 ## Built by AK Build
 
-TaskMaster Pro was generated inside the AK Build agent workspace. The repository's earliest commits were authored by the platform agent before any human-authored commit:
+TaskMaster Pro was generated inside the [AK Build](https://github.com/andiekobbietks/ak-build) agent workspace. The repository's earliest commits were authored by the platform agent before any human-authored commit:
 
 | Hash | Date | Message | Author |
 |---|---|---|---|
@@ -33,7 +33,7 @@ The first human commit, `d9a5505` on 2026-10-16, arrived more than two weeks lat
 
 ### What AK Build is
 
-AK Build is a forked and adapted local development workspace originally based on Cloudflare's **VibeSDK**. The AK Build workspace's `vibesdk/README.md` describes it as the user-facing product of **VibeEdge Studio**, an AndieKobbieTech project building toward the **AKCloud** sovereign-cloud proposition:
+AK Build is a forked and adapted local development workspace originally based on Cloudflare's **VibeSDK**. Its public repository is [`andiekobbietks/ak-build`](https://github.com/andiekobbietks/ak-build); the workspace's `vibesdk/README.md` describes it as the user-facing product of **VibeEdge Studio**, an AndieKobbieTech project building toward the **AKCloud** sovereign-cloud proposition:
 
 > “AK Build gives a founder or small team a focused, inspectable environment for describing an idea, working with an AI agent, and shipping a live preview.”
 

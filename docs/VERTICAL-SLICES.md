@@ -51,7 +51,7 @@ Regenerate the source of truth with `npm run docs:readiness`.
 | A | Task lifecycle | yes | yes | yes | **shippable** |
 | B | Organisation (lists + tags) | partial | yes | yes | shippable, UI thin |
 | C | Filtering & search | yes | yes | yes | **shippable** |
-| D | Scheduling & prioritisation | yes | yes | yes | shippable, 1 phantom |
+| D | Scheduling & prioritisation | yes | yes | yes | shippable, 1 planned gap |
 | E | Pomodoro | partial | yes | yes | **not shippable** |
 | F | Stats | yes | yes | yes | **shippable** |
 | G | Shell & feedback | partial | n/a | n/a | shippable, 1 phantom |
@@ -143,7 +143,7 @@ planned, unimplemented view, not a phantom control exposed to users.
 
 `FEAT-015` **partial, 4 gaps** · `FEAT-016` implemented · `FEAT-017` **stub — phantom**
 
-**`FEAT-017` "Estimated pomodoros"** is the third phantom. The backend accepts
+**`FEAT-017` "Estimated pomodoros"** is one of the two remaining phantoms. The backend accepts
 the field and stores it, but the New Task form never sends it — the evidence in
 `features.json` notes it is "absent from the New Task form at 680-786". The
 README advertises "estimated and completed pomodoro counts per task". A user
@@ -240,10 +240,9 @@ anyone else yet.
 Judged feature-by-feature, the app looks like 24 of 31 usable. Judged by slice,
 three conclusions appear that the flat view hides:
 
-1. **Two of the three phantoms are UI-side, not backend-side.** `FEAT-017`
-   (estimated pomodoros) and `FEAT-019` (Upcoming tab) both have working
-   backends. The server honours the data; the interface simply never sends or
-   wires it. "Implement the backend" would not have fixed either.
+1. **The two remaining phantoms are UI-side, not backend-side.** `FEAT-017`
+   (estimated pomodoros) and `FEAT-026` (⌘K) are the canonical phantom features.
+   Both are interface-level gaps; neither needs a new backend to resolve.
 
 2. **Slice I is structurally absent, not partially built.** You cannot iterate
    toward auth by improving an existing slice, because there is no slice to

@@ -65,31 +65,6 @@ paths:
       responses:
         "200": { description: Session cookie cleared }
 
-  /auth/login:
-    post:
-      summary: Exchange the shared access key for a browser session
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token]
-              properties:
-                token: { type: string }
-      responses:
-        "200": { description: Signed HttpOnly session cookie issued }
-        "401": { description: Invalid access key }
-        "503": { description: Required production secrets are missing }
-
-  /auth/logout:
-    post:
-      summary: Clear the browser session
-      security: []
-      responses:
-        "200": { description: Session cookie cleared }
-
   /todos:
     get:
       summary: List todos
@@ -610,11 +585,6 @@ components:
       in: query
       name: api_token
       description: "Pass ?api_token=<API_TOKEN> when header auth is impractical"
-    browserSession:
-      type: apiKey
-      in: cookie
-      name: tm_session
-      description: "12-hour signed HttpOnly browser session issued by POST /auth/login"
     browserSession:
       type: apiKey
       in: cookie

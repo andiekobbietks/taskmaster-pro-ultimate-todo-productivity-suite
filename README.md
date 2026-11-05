@@ -153,7 +153,7 @@ Deployed Workers run with `APP_ENV=production` and fail closed with HTTP 503 unl
 Key points:
 
 - Only `GET /health` and the login/logout endpoints are public. The browser signs in at `/login.html`; the Worker exchanges the access key for a 12-hour signed `HttpOnly; SameSite=Strict` cookie. The key is not stored in browser JavaScript or browser storage. External API clients use `Authorization: Bearer <token>` (the `api_token` query parameter remains for compatibility).
-- The checkpoint/diagnostics UI widget is gated by an **Advanced** settings toggle, and the matching API routes are only enabled when `DEBUG_ROUTES_ENABLED=true`.
+- The checkpoint/diagnostics UI widget is gated by an **Advanced** settings toggle. Its API routes are registered but require authentication; the separate `/api/debug/*` endpoints are disabled unless `DEBUG_ROUTES_ENABLED=true`.
 - New or rewritten sensitive settings use AES-256-GCM when `SETTINGS_ENCRYPTION_KEY` is configured, and are compared in a masked view. Existing legacy XOR-obfuscated values are not automatically migrated; rewrite or migrate them before relying on AES-256-GCM protection. Non-development deployments refuse API requests without the key. `/api/settings/revoke` provides break-glass removal.
 - The token gate is single-tenant: it protects a private deployment, but does not provide per-user data partitions. Do not treat it as multi-user authorization.
 

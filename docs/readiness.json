@@ -340,7 +340,7 @@
       "stage": "beta",
       "label": "No phantom features",
       "why": "A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.",
-      "blockingFeature": "FEAT-010",
+      "blockingFeature": "FEAT-017",
       "effort": "small",
       "pass": false,
       "detail": "2 phantom feature(s)",
@@ -537,10 +537,10 @@
       "why": "A feature that appears to work but silently does nothing is worse than an absent one. Absent is honest; phantom misleads the user and the next developer.",
       "detail": "2 phantom feature(s)",
       "target": {
-        "id": "FEAT-010",
-        "name": "Filter by tag",
-        "status": "partial",
-        "evidence": "src/index.ts:24 (declared), 49-52 (clause), 27-60 (query builder); guarded by scripts/tier1-check.mjs DEAD-FILTER"
+        "id": "FEAT-017",
+        "name": "Estimated pomodoros",
+        "status": "stub",
+        "evidence": "src/index.ts:67, 86, 254; src/app.jsx:94 (newPomodoros state) - absent from the New Task form at 680-786"
       },
       "dependsOn": null
     },

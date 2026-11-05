@@ -1435,6 +1435,12 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   check("API with valid token returns 200", withToken.status === 200, "HTTP " + withToken.status);
   const health = await cCall("GET", "/health");
   check("health is exempt from token gate", health.status === 200, "HTTP " + health.status);
+  const wranglerConfig = JSON.parse(readFileSync(new URL("../wrangler.json", import.meta.url), "utf8"));
+  check("health is routed through the Worker before static assets",
+    wranglerConfig.assets.run_worker_first.includes("/health"));
+  const workerSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+  check("Worker forwards the health path to the Durable Object",
+    workerSource.includes('pathname.startsWith("/api/") || pathname === "/health"'));
   const scheduledRoutes = [
     ["/api/inbox/fetch", 400],
     ["/api/digest/send", 200],

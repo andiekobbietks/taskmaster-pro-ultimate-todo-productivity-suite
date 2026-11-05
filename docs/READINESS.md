@@ -78,7 +78,7 @@ Target: `FEAT-004` **Delete task** — partial (`src/index.ts:170-174, src/app.j
 
 *Current state:* FEAT-013 is "partial"
 
-Target: `FEAT-013` **Search title + description** — partial (`src/index.ts:8-10 (escapeLike), 54-58 (query), src/app.jsx:85 (searchQuery state), 340-344 (search input); guarded by scripts/tier1-check.mjs LIKE-ESCAPE`)
+Target: `FEAT-013` **Search title + description** — partial (`src/index.ts:46-48 (escapeLike), 130-133 (LIKE predicate and bound pattern), src/app.jsx:85 (searchQuery state), 340-344 (search input); guarded by scripts/tier1-check.mjs LIKE-ESCAPE`)
 
 ### `G-ACCESS-01` Access control exists
 

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { decryptSetting, encryptSetting } from "./settings-crypto.ts";
 
 const FORMAT = "taskmaster-pro-checkpoint";
 const VERSION = 2;
@@ -187,6 +188,7 @@ export function registerCheckpointRoutes(
   app: Hono,
   sql: any,
   transaction: (work: () => void) => void = (work) => work(),
+  env: any = {},
 ) {
   app.get("/api/checkpoints", (c) => {
     try {
@@ -217,9 +219,10 @@ export function registerCheckpointRoutes(
           max_payload_bytes: MAX_PAYLOAD_BYTES,
         }, 413);
       }
+      const protectedPayload = await encryptSetting(payload, env);
       sql.exec(
         "INSERT INTO checkpoints (id, tag, label, kind, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)",
-        id, tag, label, kind, createdAt, payload,
+        id, tag, label, kind, createdAt, protectedPayload,
       );
       return c.json({
         ok: true, id, tag, label, kind, created_at: createdAt,
@@ -230,14 +233,16 @@ export function registerCheckpointRoutes(
     }
   });
 
-  const restoreCheckpoint = (id: string, c: any) => {
+  const restoreCheckpoint = async (id: string, c: any) => {
     try {
       const rows = sql.exec("SELECT payload FROM checkpoints WHERE id = ?", id).toArray();
       const row = rows[0];
       if (!row) return c.json({ ok: false, error: "checkpoint not found" }, 404);
       let payload: any;
       try {
-        payload = JSON.parse(row.payload as string);
+        const plaintext = await decryptSetting(row.payload as string, env);
+        if (!plaintext) throw new Error("Unable to decrypt checkpoint; verify SETTINGS_ENCRYPTION_KEY");
+        payload = JSON.parse(plaintext);
         validatePayload(payload);
       } catch (e) {
         return c.json({ ok: false, error: String(e) }, 409);
@@ -253,7 +258,7 @@ export function registerCheckpointRoutes(
     }
   };
 
-  app.post("/api/checkpoints/:id/rollback", (c) => {
+  app.post("/api/checkpoints/:id/rollback", async (c) => {
     return restoreCheckpoint(c.req.param("id"), c);
   });
 
@@ -268,7 +273,7 @@ export function registerCheckpointRoutes(
       ).toArray();
       const row = rows[0];
       if (!row) return c.json({ ok: false, error: "no checkpoint with tag: " + tag }, 404);
-      return restoreCheckpoint(row.id, c);
+      return await restoreCheckpoint(row.id, c);
     } catch (e) {
       return c.json({ ok: false, error: String(e) }, 500);
     }

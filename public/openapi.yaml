@@ -6,10 +6,9 @@ info:
     `/api/v1`; unversioned `/api/*` paths remain stable during the 1.x lifetime
     and are rewritten to `/api/v1/*` internally.
 
-    Authentication is via `Authorization: Bearer <token>` or the query
-    parameter `?api_token=<token>`. When `API_TOKEN` is not configured the gate
+    Browser access uses a 12-hour signed HttpOnly session cookie created by `POST /api/auth/login`. External clients authenticate with `Authorization: Bearer <token>` or the compatibility query parameter `?api_token=<token>`. When `API_TOKEN` is not configured the gate
     stays open for local development; production deployments must set it with
-    `wrangler secret put API_TOKEN` and also set `SETTINGS_ENCRYPTION_KEY`. Only `GET /health` is public.
+    `wrangler secret put API_TOKEN` and also set `SETTINGS_ENCRYPTION_KEY`. Only `GET /health` and the login/logout endpoints are public.
     Scheduled inbox fetch, digest send and trash purge calls are made by the
     Worker with the configured bearer token; direct HTTP callers must also
     authenticate. Leaving either production secret unset causes API requests to fail closed

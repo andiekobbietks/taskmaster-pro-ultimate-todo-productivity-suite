@@ -1,0 +1,79 @@
+/* ── Self-hosted fonts (no Google Fonts CDN) ───────────────────────── */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Inter-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/Inter-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/Inter-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/Inter-Bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/JetBrainsMono-Medium.woff2") format("woff2");
+}
+
+/* ── Brand tokens ──────────────────────────────────────────────────── */
+
+:root {
+  --brand-50: #EEF0FB;
+  --brand-100: #DDE0F7;
+  --brand-200: #B9C0EF;
+  --brand-500: #7B85DC;
+  --brand-600: #5E6AD2;
+  --brand-700: #4A56C0;
+  --brand-800: #3A45A8;
+  --brand-900: #2A3284;
+  --brand-fg: var(--brand-600);
+  --brand-bg-subtle: var(--brand-50);
+}
+
+/* ── Animations used by modals and cards ───────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-scaleIn {
+  animation: scaleIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}

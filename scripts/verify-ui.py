@@ -278,7 +278,7 @@ def main():
 
         login_page.route("**/api/**", auth_gate)
         login_page.goto(BASE + "/", wait_until="domcontentloaded", timeout=30000)
-        login_page.wait_for_url(re.compile(r"/login\\.html\\?next="), timeout=15000)
+        login_page.wait_for_url(re.compile(r"/login\.html\?next="), timeout=15000)
         results.append(("unauthenticated browser is redirected to login",
                         "/login.html" in login_page.url))
         login_page.locator("#access-key").fill("test-access-key")

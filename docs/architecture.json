@@ -297,7 +297,7 @@
       "dataAtRest": "all application data",
       "maturity": "adequate",
       "risk": "high",
-      "notes": "Accepts Authorization: Bearer <token> or ?api_token=; returns 401 {error:'Unauthorized'} on mismatch. Only GET /health is public. Scheduled inbox fetch, digest send and trash purge calls carry the configured bearer token when invoked internally by the Worker. When API_TOKEN is unset the gate stays open for local development; production must configure it in Workers Secrets. The gate is single-tenant: it protects a private deployment but does not provide per-user data partitions."
+      "notes": "Accepts Authorization: Bearer <token> or ?api_token=; returns 401 {error:'Unauthorized'} on mismatch. Only GET /health is public. Scheduled inbox fetch, digest send and trash purge calls carry the configured bearer token when invoked internally by the Worker. When API_TOKEN is unset, only APP_ENV=development remains open; production fails closed with HTTP 503. wrangler.json sets production mode and .dev.vars.example opts local development in. The gate is single-tenant: it protects a private deployment but does not provide per-user data partitions."
     },
     {
       "id": "COMP-018",

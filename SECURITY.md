@@ -35,7 +35,7 @@ If private reporting is unavailable, open a regular issue asking for a secure ch
 - **Capture SSRF boundary:** the runner rejects non-HTTP(S) URLs, localhost and private/loopback/link-local/multicast/reserved IP literals. It does not resolve hostnames before navigation; a DNS name resolving to a private address may pass. Restrict the runner's network egress.
 - **Data isolation:** all callers with the token reach the same Durable Object state. There is no per-user or per-organisation row-level isolation.
 - **Browser input:** treat stored task, hackathon, mail and attachment metadata as untrusted. Validate at API boundaries and render user-controlled content safely.
-- **Backups and recovery:** checkpoints are application-level snapshots, not an independent backup or tested disaster-recovery service. Export and test recovery separately before production use.
+- **Backups and recovery:** versioned checkpoints cover the 13 application-data tables, including attachment BLOB bytes. They validate the complete inventory and restore transactionally, while preserving the checkpoint catalogue, rate limits, diagnostics and audit history. Runner-side WACZ files are excluded. Snapshots over 1 MiB are rejected. This is not an independent backup; use Cloudflare SQLite Durable Object PITR (up to 30 days) as a provider-level recovery layer and keep an off-platform export.
 - **Dependencies:** review dependency and Worker runtime updates regularly. The generated SBOM is an inventory, not proof that dependencies are vulnerability-free.
 
 ## What a good report includes

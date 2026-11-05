@@ -347,7 +347,7 @@ export class App extends DurableObject {
 
     registerDigestRoutes(this.app, this.ctx.storage.sql, this.env);
     registerEmailRoutes(this.app, this.ctx.storage.sql, this.env);
-    registerCheckpointRoutes(this.app, this.ctx.storage.sql);
+    registerCheckpointRoutes(this.app, this.ctx.storage.sql, (work) => this.ctx.storage.transactionSync(work));
     registerDiagnosticsRoutes(this.app, this.ctx.storage.sql);
     registerDossierRoutes(this.app, this.ctx.storage.sql);
 

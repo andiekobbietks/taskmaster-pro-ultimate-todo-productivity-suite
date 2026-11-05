@@ -76,8 +76,14 @@ None of these is a marketing quote on its own. Together they form the strongest 
 - **Progressive Web App (PWA)** support — installable on desktop and mobile
 - **Web push notifications** for reminders and digests
 - **Settings** with masked secrets, progressive disclosure, collapsible JMAP/IMAP sections, and revoke controls
-- **Diagnostics / checkpoint CLI** for endpoint failure logging and rollback snapshots, gated behind an Advanced settings toggle
+- **Diagnostics / checkpoint CLI** for endpoint failure logging and versioned SQLite recovery snapshots, gated behind an Advanced settings toggle
 - **Multi-source hackathon importers** (Devpost, MLH, HackerEarth)
+
+### Checkpoints and recovery boundary
+
+Checkpoints are versioned application-database snapshots. They include lists, todos, hackathons and profile data, attachments (including their original BLOB bytes), archive-source configuration, settings, capacity, inbox messages, capture-job metadata, push subscriptions, and email subscription/delivery records. Restore validates the complete table and column inventory before changing data, then replaces those application tables in one Durable Object SQLite transaction.
+
+A restore deliberately does **not** rewind the checkpoint catalogue, rate-limit counters, diagnostics, or audit history. WACZ files and other capture output held on the capture runner's filesystem are outside the Durable Object database and are not included. This is a same-object recovery point, not an independent backup. SQLite-backed Durable Objects also provide Cloudflare [Point-in-Time Recovery](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/) for database state up to 30 days in the past; this application checkpoint feature does not configure PITR. Enable and rehearse provider-level recovery separately, and keep an off-platform export for disaster recovery. Individual snapshots are limited to 1 MiB.
 
 ## Architecture
 
@@ -87,7 +93,7 @@ None of these is a marketing quote on its own. Together they form the strongest 
 - **Web Push** (`src/push.ts`) — hand-rolled VAPID delivery
 - **MCP server** (`src/mcp.ts`) — Streamable HTTP transport for the TaskMaster tool surface
 - **Scheduled function** (`scheduled()`) — cron-based digest and hackathon refresh hooks
-- **Stateless diagnostics** (`src/diagnostics.ts`, `src/checkpoints.ts`) — endpoint failure logging and full-table snapshots
+- **Stateless diagnostics** (`src/diagnostics.ts`, `src/checkpoints.ts`) — endpoint failure logging and versioned application-data snapshots
 
 ### Platform model
 

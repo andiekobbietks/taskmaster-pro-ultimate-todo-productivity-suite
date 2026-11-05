@@ -288,3 +288,8 @@ work, the second is half a day, the third is the critical finding above.
 ## Browser session authentication
 
 The web UI does not receive the Worker API secret. It signs in through `/login.html`; the Worker exchanges the access key for a 12-hour HMAC-signed HttpOnly cookie, marked Secure on HTTPS and SameSite=Strict. Cookie-authenticated unsafe requests must carry the exact same-origin `Origin` header. The browser key is not stored in JavaScript or browser storage. External clients and scheduled jobs use bearer tokens. This remains one shared access identity, not per-user authorization.
+
+
+## Checkpoint and recovery boundary
+
+The checkpoint implementation snapshots the 13 application-data tables declared in `src/checkpoints.ts`, including attachment BLOBs encoded losslessly as base64. Restore rejects legacy/incomplete inventories and schema-column mismatches before mutation, then restores inside the Durable Object's synchronous SQLite transaction and appends a restore audit event. Checkpoint catalogue entries, rate-limit counters, diagnostics and audit history are intentionally preserved across restore. WACZ archives and other files retained on capture-runner disks are outside SQLite and are not part of a checkpoint. Snapshots over 1 MiB are rejected to remain below Cloudflare's 2 MB row limit. A checkpoint is a same-object recovery point, not an off-platform backup. Keep an independent export and rehearse recovery.

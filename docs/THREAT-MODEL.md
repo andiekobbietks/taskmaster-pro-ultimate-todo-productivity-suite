@@ -43,29 +43,33 @@ it says so.
 
 ### B1 — Browser ↔ Worker
 
-**Spoofing — fails.** There is no authentication. `src/index.ts` has a
-security-headers middleware and a rate limiter, and nothing else. Anyone
-who can reach the Worker is the owner of the data. The only endpoint
-called out as unauthenticated is `/health`, and it is not the only one.
+**Spoofing — partly mitigated.** When `API_TOKEN` is configured, the
+shared bearer-token middleware in `src/auth.ts` protects the API. Only
+`GET /health` is public. The scheduled inbox fetch, digest send and trash
+purge operations also require the token; the Worker supplies it when it
+invokes those routes inside the Durable Object. If `API_TOKEN` is unset,
+the gate is intentionally open for local development, so an exposed
+deployment without the secret is unauthenticated. The token is shared by
+all callers and does not establish individual identity or tenant isolation.
 
-*Mitigation: none. This is the gap that gates everything else.*
+*Residual risk: configure a strong Worker secret before deployment, rotate
+it if exposed, and do not treat the shared token as multi-user authorization.*
 
-**Tampering — fails, same cause.** `PUT /api/settings` accepts a new
-profile, a new mail server and new storage credentials from anyone.
-`POST /api/capture/jobs` and `DELETE /api/hackathons/:id` likewise.
+**Tampering — partly mitigated.** With the token configured, unauthenticated
+callers cannot use the API to modify settings, create captures or delete
+hackathons. Any caller holding the shared token has the same application
+permissions; there are no per-user roles.
 
-**Repudiation — fails.** There is no audit trail. `src/index.ts`,
-`src/settings.ts`, `src/capture.ts` and `src/archive.ts` contain no
-activity log, no actor, no timestamped history of who changed what. A
-change to the profile or the storage credentials leaves no trace.
+**Repudiation — partly mitigated.** The application has an audit trail for
+selected settings and credential changes, but it is not a complete,
+tamper-proof record of every action and does not identify an individual
+when all callers share one token.
 
-**Information disclosure — partly fixed, and still open.** A secret is
-now write-only: `GET /api/settings` returns `********` for a set value
-rather than the value, and the screen only sends a new one when it is
-typed. That was fixed on 2026-10-21 after the assessment found the
-secrets coming back in the clear. But the endpoint is still
-unauthenticated, so anyone can *set* a secret, and the XOR obfuscation is
-not encryption — the key is in the source.
+**Information disclosure — partly mitigated.** Sensitive settings are
+masked on reads and the configured API token gates the API. The token is
+not per-user, and the single Durable Object stores one shared dataset.
+Secrets stored by the application must be assessed independently; masking
+a value in the UI does not by itself prove encryption at rest.
 
 **Denial of service — partly bounded.** The rate limiter allows 100
 requests a minute per IP, counted in the `rate_limits` table. The upload

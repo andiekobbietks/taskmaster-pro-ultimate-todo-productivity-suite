@@ -42,8 +42,9 @@ from urllib.parse import urlsplit
 
 def _is_private_host(host: str) -> bool:
     """True for loopback, link-local, private, multicast and reserved hosts."""
-    if ":" in host:
-        host = host.rsplit(":", 1)[0]
+    # urlsplit().hostname supplies a port-free hostname, including an
+    # unbracketed IPv6 literal. Do not split on ":" here: that would turn
+    # IPv6 loopback (::1) into an empty string and bypass the private check.
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
     if host.lower() in ("localhost", "localhost.localdomain"):
@@ -58,15 +59,17 @@ def _is_private_host(host: str) -> bool:
         return False
 
 
-def validate_capture_url(url: str, label: str = "URL") -> None:
-    """Reject non-http(s) schemes and private/loopback hosts."""
+def validate_capture_url(
+    url: str, label: str = "URL", allow_private: bool = False
+) -> None:
+    """Reject unsafe targets unless an isolated local test explicitly opts in."""
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https"):
         raise ValueError("%s must use http or https: %s" % (label, url))
-    host = parts.netloc
+    host = parts.hostname or ""
     if not host:
         raise ValueError("%s missing host: %s" % (label, url))
-    if _is_private_host(host):
+    if _is_private_host(host) and not allow_private:
         raise ValueError("%s points to a private/loopback host: %s" % (label, url))
 
 
@@ -326,13 +329,25 @@ def main():
                              "page's own origin")
     parser.add_argument("--dry-run", action="store_true",
                         help="Write the archive but do not post it")
+    parser.add_argument(
+        "--allow-private-capture", action="store_true",
+        help="Allow loopback/private capture targets for isolated local tests; "
+             "requires --dry-run",
+    )
     args = parser.parse_args()
 
-    try:
-        validate_capture_url(args.api, label="--api")
-    except ValueError as e:
-        print("ERROR: %s" % e)
-        sys.exit(1)
+    if args.allow_private_capture and not args.dry_run:
+        parser.error("--allow-private-capture requires --dry-run")
+
+    # A one-off dry run only writes the archive locally; it never contacts
+    # the TaskMaster API, so the default loopback API URL is irrelevant.
+    # --from-app still needs the API to fetch its queue, even in dry-run mode.
+    if not args.dry_run or args.from_app:
+        try:
+            validate_capture_url(args.api, label="--api")
+        except ValueError as e:
+            print("ERROR: %s" % e)
+            sys.exit(1)
 
     if args.from_app:
         # The app holds the manifest. Ask it what it wants done.
@@ -363,7 +378,10 @@ def main():
             url = job["url"]
             name = job.get("name") or url
             try:
-                validate_capture_url(url, label="capture URL")
+                validate_capture_url(
+                    url, label="capture URL",
+                    allow_private=args.allow_private_capture,
+                )
             except ValueError as e:
                 print("ERROR: %s" % e)
                 failures += 1

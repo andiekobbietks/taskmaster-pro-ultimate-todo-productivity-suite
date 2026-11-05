@@ -55,7 +55,7 @@ which parts are finished and which are only advertised.
 <summary><strong>Technical detail (skip if you don't need it)</strong></summary>
 
 A full-featured todo and productivity app built on **Cloudflare Workers**, using a
-**Durable Object** with an embedded SQLite database for persistent, per-user state
+**Durable Object** with an embedded SQLite database for persistent, shared state
 and a **Hono** REST API.
 
 </details>
@@ -88,10 +88,10 @@ and a **Hono** REST API.
 
 | | |
 |---|---|
-| **Works?** | Yes, as of `v1.0.1`. The previous release, `v1.0.0`, could not serve its own data at all — see [`docs/VERSION-HISTORY.md`](docs/VERSION-HISTORY.md). |
+| **Works?** | The current code works; `v1.0.1` is pending publication. The previous release, `v1.0.0`, could not serve its own data at all — see [`docs/VERSION-HISTORY.md`](docs/VERSION-HISTORY.md). |
 | **Safe for private or sensitive data?** | **No.** There are no user accounts yet. Anyone who finds the web address can read, change or delete everything on it. |
 | **Safe to share with a team?** | Only with people you trust completely, and only after the decisions in [`docs/THREAT-NOTE.md`](docs/THREAT-NOTE.md) are implemented. |
-| **Will it lose your data?** | No. Tasks are stored on the server, not in your browser, so you can close the tab and come back. |
+| **Will it lose your data?** | Tasks persist across browser sessions, but anyone who can reach the instance can delete them; this app does not provide backups or recovery. |
 | **Does it cost anything?** | No, on Cloudflare's free tier — comfortably so for a small team. |
 
 The one-line answer: **it is a working prototype.** The code is sound and tested by

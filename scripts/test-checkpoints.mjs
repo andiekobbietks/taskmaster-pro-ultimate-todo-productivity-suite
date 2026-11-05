@@ -113,6 +113,13 @@ assert.equal(db.prepare("SELECT count FROM rate_limits WHERE ip = '127.0.0.1'").
 assert.equal(db.prepare("SELECT count(*) AS n FROM audit_log WHERE action = 'after-checkpoint'").get().n, 1, "audit history is not rewound");
 assert.equal(db.prepare("SELECT count(*) AS n FROM audit_log WHERE action = 'checkpoint.restored'").get().n, 1, "successful restore is itself audited");
 
+// Plaintext v2 checkpoints created before this security change remain readable.
+const plaintextId = "plaintext-v2";
+sql.exec("INSERT INTO checkpoints (id, tag, label, kind, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)",
+  plaintextId, "plaintext-v2", "Pre-encryption checkpoint", "manual", 250, decryptedCheckpoint);
+const plaintextRestore = await call("POST", `/api/checkpoints/${plaintextId}/rollback`);
+assert.equal(plaintextRestore.status, 200, "existing plaintext v2 checkpoints remain restorable");
+
 const legacyId = "legacy-partial";
 sql.exec("INSERT INTO checkpoints (id, tag, label, kind, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)",
   legacyId, "legacy", "Old partial checkpoint", "manual", 300, JSON.stringify({ lists: [] }));

@@ -1349,23 +1349,8 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
     await next();
   });
 
-  function tokenAuth(env) {
-    return async (c, next) => {
-      const path = c.req.path;
-      if (path === "/health") return next();
-      const cronPaths = ["/api/inbox/fetch", "/api/digest/send", "/api/trash/purge"];
-      if (cronPaths.includes(path)) return next();
-      if (!env.API_TOKEN) return next();
-      const header = c.req.header("Authorization") || "";
-      const bearer = header.startsWith("Bearer ") ? header.slice(7) : c.req.query("api_token");
-      if (!bearer || bearer !== env.API_TOKEN) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
-      return next();
-    };
-  }
-
-  cApp.use("/api/*", tokenAuth(cEnv));
+  const { apiTokenAuth } = await import("../src/auth.ts");
+  cApp.use("/api/*", apiTokenAuth(cEnv));
   cApp.get("/health", (c) => c.json({ ok: true }));
   registerHackathonRoutes(cApp, csql);
   registerSettingsRoutes(cApp, csql, cEnv);
@@ -1397,8 +1382,12 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   check("API with valid token returns 200", withToken.status === 200, "HTTP " + withToken.status);
   const health = await cCall("GET", "/health");
   check("health is exempt from token gate", health.status === 200, "HTTP " + health.status);
-  const cronFetch = await cCall("POST", "/api/inbox/fetch");
-  check("cron fetch route is exempt from token gate", cronFetch.status !== 401, "HTTP " + cronFetch.status);
+  for (const path of ["/api/inbox/fetch", "/api/digest/send", "/api/trash/purge"]) {
+    const denied = await cCall("POST", path);
+    check(path + " rejects unauthenticated callers", denied.status === 401, "HTTP " + denied.status);
+    const allowed = await cCall("POST", path, undefined, { Authorization: "Bearer compliance-test-token" });
+    check(path + " accepts the bearer token", allowed.status !== 401, "HTTP " + allowed.status);
+  }
 
   // Audit trail
   const setAudit = await cCall("PATCH", "/api/settings/notifications", {

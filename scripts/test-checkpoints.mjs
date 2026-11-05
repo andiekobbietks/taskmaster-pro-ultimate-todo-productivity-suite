@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { makeSql } from "./do-sql.mjs";
 import { SCHEMA } from "../src/schema.ts";
 import { registerCheckpointRoutes } from "../src/checkpoints.ts";
+import { decryptSetting, encryptSetting } from "../src/settings-crypto.ts";
 
 const db = new DatabaseSync(":memory:");
 for (const statement of SCHEMA) db.exec(statement);
@@ -20,7 +21,8 @@ const transaction = (work) => {
   }
 };
 const app = new Hono();
-registerCheckpointRoutes(app, sql, transaction);
+const env = { SETTINGS_ENCRYPTION_KEY: "checkpoint-test-key" };
+registerCheckpointRoutes(app, sql, transaction, env);
 const call = (method, path, body) => app.request(path, {
   method,
   ...(body === undefined ? {} : {
@@ -49,6 +51,19 @@ assert.equal(created.status, 200);
 const checkpoint = await created.json();
 assert.equal(checkpoint.tables, 13);
 assert.ok(checkpoint.payload_bytes > 0);
+const storedCheckpoint = db.prepare("SELECT payload FROM checkpoints WHERE id = ?").get(checkpoint.id).payload;
+assert.ok(storedCheckpoint.startsWith("enc:v1:"), "checkpoint payload is encrypted at rest");
+assert.ok(!storedCheckpoint.includes("secret-key"), "archive source API keys are not visible in checkpoint storage");
+const decryptedCheckpoint = await decryptSetting(storedCheckpoint, env);
+assert.ok(decryptedCheckpoint.includes("secret-key"), "the encrypted checkpoint retains the archive key for restore");
+const largePlaintext = "checkpoint-data-".repeat(20000);
+const largeCiphertext = await encryptSetting(largePlaintext, env);
+assert.equal(await decryptSetting(largeCiphertext, env), largePlaintext, "large checkpoint payloads use safe chunked base64 encoding");
+const wrongKeyApp = new Hono();
+registerCheckpointRoutes(wrongKeyApp, sql, transaction, { SETTINGS_ENCRYPTION_KEY: "incorrect-key" });
+const wrongKeyResponse = await wrongKeyApp.request(`/api/checkpoints/${checkpoint.id}/rollback`, { method: "POST" });
+assert.equal(wrongKeyResponse.status, 409, "wrong encryption keys fail closed before restore");
+assert.equal(db.prepare("SELECT api_key FROM archive_sources WHERE id = 'archive-1'").get().api_key, "secret-key");
 const missingRollback = await call("POST", "/api/checkpoints/missing/rollback");
 assert.equal(missingRollback.status, 404, "missing checkpoint IDs return 404");
 const missingForward = await call("POST", "/api/checkpoints/forward", { tag: "missing" });

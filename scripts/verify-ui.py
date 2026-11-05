@@ -198,8 +198,14 @@ def run(page, results):
                     page.get_by_role("button", name="Fetch mail now", exact=True).count() == 1))
     results.append(("the Yahoo client id field is present",
                     page.get_by_placeholder("your Yahoo consumer key").count() == 1))
+    # The Yahoo controls are intentionally inside a collapsed disclosure.
+    # Scope the assertion to that panel so the storage provider's separate
+    # "Test connection" button cannot satisfy (or break) this check.
+    yahoo_panel = page.locator("details").filter(has_text="Yahoo Mail API")
+    yahoo_panel.locator("summary").click()
+    time.sleep(0.2)
     results.append(("the Yahoo test button is present",
-                    page.get_by_role("button", name="Test connection", exact=True).count() == 1))
+                    yahoo_panel.get_by_role("button", name="Test connection", exact=True).count() == 1))
     page.screenshot(path=os.path.join(SHOTS, "tm-settings-populated.png"), full_page=True)
 
     # The capture manifest tab.

@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { buildTodoQuery } from "./todo-query";
 import { registerHackathonRoutes } from "./hackathons";
 import { registerAttachmentRoutes } from "./attachments";
 import { registerArchiveRoutes } from "./archive";
@@ -158,37 +159,13 @@ export class App extends DurableObject {
     
     // REST API routes
     this.app.get("/api/todos", (c) => {
-      const status = c.req.query("status");
-      const priority = c.req.query("priority");
-      const search = c.req.query("search");
-      const tag = c.req.query("tag");
-      const listId = c.req.query("listId");
-
-      let query = "SELECT * FROM todos WHERE 1=1";
-      const params: any[] = [];
-
-      if (status === "active") {
-        query += " AND completed = 0";
-      } else if (status === "completed") {
-        query += " AND completed = 1";
-      }
-
-      if (priority && priority !== "all") {
-        query += " AND priority = ?";
-        params.push(priority);
-      }
-
-      if (listId && listId !== "all") {
-        query += " AND list_id = ?";
-        params.push(listId);
-      }
-
-      if (search) {
-        query += " AND (title LIKE ? OR description LIKE ?)";
-        params.push(`%${search}%`, `%${search}%`);
-      }
-
-      query += " ORDER BY is_pinned DESC, due_date ASC, created_at DESC";
+      const { query, params } = buildTodoQuery({
+        status: c.req.query("status"),
+        priority: c.req.query("priority"),
+        search: c.req.query("search"),
+        tag: c.req.query("tag"),
+        listId: c.req.query("listId"),
+      });
 
       const rows = this.ctx.storage.sql.exec(query, ...params).toArray();
       

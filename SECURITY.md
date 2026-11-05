@@ -30,7 +30,7 @@ If private reporting is unavailable, open a regular issue asking for a secure ch
 
 ## Current threat model and known limitations
 
-- **Authentication:** a configured shared bearer token protects `/api/*`; it does not identify individual users or provide fine-grained permissions.
+- **Authentication:** a configured shared access key protects `/api/*`. Browser sign-in exchanges it for a 12-hour signed HttpOnly, Secure-on-HTTPS, SameSite=Strict cookie. Cookie-authenticated unsafe methods require a same-origin `Origin` header to mitigate CSRF. External clients and scheduled jobs use bearer tokens. This remains shared access, not per-user identity or fine-grained permissions.
 - **Data isolation:** all callers with the token reach the same Durable Object state. There is no per-user or per-organisation row-level isolation.
 - **Browser input:** treat stored task, hackathon, mail and attachment metadata as untrusted. Validate at API boundaries and render user-controlled content safely.
 - **Backups and recovery:** checkpoints are application-level snapshots, not an independent backup or tested disaster-recovery service. Export and test recovery separately before production use.

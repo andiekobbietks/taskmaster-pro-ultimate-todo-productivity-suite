@@ -585,7 +585,7 @@
         "id": "FEAT-013",
         "name": "Search title + description",
         "status": "partial",
-        "evidence": "src/index.ts:8-10 (escapeLike), 54-58 (query), src/app.jsx:85 (searchQuery state), 340-344 (search input); guarded by scripts/tier1-check.mjs LIKE-ESCAPE"
+        "evidence": "src/index.ts:46-48 (escapeLike), 130-133 (LIKE predicate and bound pattern), src/app.jsx:85 (searchQuery state), 340-344 (search input); guarded by scripts/tier1-check.mjs LIKE-ESCAPE"
       },
       "dependsOn": null
     },

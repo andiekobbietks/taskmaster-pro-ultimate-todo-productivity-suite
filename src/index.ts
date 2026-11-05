@@ -24,7 +24,7 @@ import { buildDigest } from "./digest";
 import { readProfile, writeProfile } from "./profile";
 import { Hono } from "hono";
 
-import { apiTokenAuth } from "./auth";
+import { apiTokenAuth, registerAuthRoutes } from "./auth";
 
 export class App extends DurableObject {
   private app = new Hono();
@@ -113,6 +113,7 @@ export class App extends DurableObject {
 
     // Shared-secret auth on all API routes.
     this.app.use("/api/*", apiTokenAuth(env));
+    registerAuthRoutes(this.app, env);
 
     // URI versioning alias: /api/v1/* forwards to /api/*.
     // GDS API standards recommend path-based versioning; this alias lets

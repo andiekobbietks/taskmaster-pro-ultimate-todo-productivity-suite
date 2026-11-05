@@ -217,26 +217,70 @@ handlers.forEach((h, i) => {
   const [, verb, route] = h
   const { start, block } = blockAt(i)
 
-  // 4. dead query params — the phantom-filter detector
+  // 4. dead query params — a read is only useful if it reaches a SQL
+  // predicate AND a bound parameter. Follow simple local assignments so
+  // derived values such as pattern = escapeLike(search) are recognised.
   const params = [...new Set([...block.matchAll(/c\.req\.query\(\s*["\x27]([^"\x27]+)["\x27]\s*\)/g)].map(m => m[1]))]
+  const assignmentsIn = (scope) => [...scope.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+);?/g)]
+  const reachesPush = (scope, source) => {
+    const assignments = assignmentsIn(scope)
+    const tainted = new Set([source])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const m of assignments) {
+        if (!tainted.has(m[1]) && [...tainted].some(v => new RegExp("\\b" + v + "\\b").test(m[2]))) {
+          tainted.add(m[1]); changed = true
+        }
+      }
+    }
+    return [...scope.matchAll(/params\.push\(([^)]*)\)/g)]
+      .some(m => [...tainted].some(v => new RegExp("\\b" + v + "\\b").test(m[1])))
+  }
   for (const p of params) {
-    const decl = new RegExp(`const\\s+${p}\\s*=\\s*c\\.req\\.query\\([^)]*\\)\\s*;?`)
-    const without = block.replace(decl, '')
-    const uses = (without.match(new RegExp(`\\b${p}\\b`, 'g')) || []).length
-    if (uses === 0) {
+    const escaped = p.replace(/[.*+?^$()|[\]\\]/g, "\\$&")
+    const scopes = [...block.matchAll(new RegExp("if\\s*\\([^)]*\\b" + escaped + "\\b[^)]*\\)\\s*\\{([\\s\\S]*?)\\}", "g"))]
+      .map(m => m[1])
+    const wired = scopes.some(scope =>
+      /query\s*\+=\s*(?:"[^"]*\?"|'[^']*\?'|\x60[^\x60]*\?)/s.test(scope) &&
+      reachesPush(scope, p)
+    )
+    if (!wired) {
       report(FAIL, 'DEAD-FILTER',
-        `${verb.toUpperCase()} ${route}: reads query param "${p}" but never uses it — filter is advertised and does nothing`,
-        `${at('src/index.ts')}:${lineOf(workerSrc, `const ${p} =`, start)}`)
+        verb.toUpperCase() + " " + route + ': query param "' + p + '" does not reach both a SQL predicate and its bound parameters',
+        at('src/index.ts') + ':' + lineOf(workerSrc, 'const ' + p + ' =', start))
     }
   }
 
-  // 5. unescaped LIKE — params for a LIKE clause are built by template literal
+  // 5. unescaped LIKE — require an explicit ESCAPE clause and an escaped
+  // search value to flow into the bound parameter(s), including via locals.
   if (/LIKE \?/i.test(block)) {
-    const pushes = [...block.matchAll(/params\.push\(\s*`([^`]*)`/g)].map(m => m[1])
-    if (pushes.some(s => /\$\{/.test(s))) {
+    const searchMatch = block.match(/(?:const|let|var)\s+(\w+)\s*=\s*c\.req\.query\(\s*["\x27]search["\x27]\s*\)/)
+    const searchName = searchMatch?.[1]
+    const escapeClause = /LIKE \?\s+ESCAPE\s+["\x27][^"\x27]+["\x27]/i.test(block)
+    let escapedBeforeBinding = false
+    if (searchName) {
+      const assignments = assignmentsIn(block)
+      const tainted = new Set([searchName])
+      let changed = true
+      while (changed) {
+        changed = false
+        for (const m of assignments) {
+          if (!tainted.has(m[1]) && [...tainted].some(v => new RegExp("\\b" + v + "\\b").test(m[2]))) {
+            tainted.add(m[1]); changed = true
+          }
+        }
+      }
+      const pushes = [...block.matchAll(/params\.push\(([^)]*)\)/g)].map(m => m[1])
+      const bound = pushes.filter(arg => [...tainted].some(v => new RegExp("\\b" + v + "\\b").test(arg)))
+      const escaped = assignments.some(m => tainted.has(m[1]) && /escapeLike\s*\(/.test(m[2])) ||
+        bound.some(arg => /escapeLike\s*\(/.test(arg))
+      escapedBeforeBinding = bound.length > 0 && escaped
+    }
+    if (!escapeClause || !escapedBeforeBinding) {
       report(FAIL, 'LIKE-ESCAPE',
-        `${verb.toUpperCase()} ${route}: LIKE pattern built from raw user input without escaping % or _ — searching "100%" matches everything`,
-        `${at('src/index.ts')}:${lineOf(workerSrc, 'LIKE ?', start)}`)
+        verb.toUpperCase() + " " + route + ': LIKE input is not demonstrably escaped before binding, or SQL has no explicit ESCAPE clause',
+        at('src/index.ts') + ':' + lineOf(workerSrc, 'LIKE ?', start))
     }
   }
 })

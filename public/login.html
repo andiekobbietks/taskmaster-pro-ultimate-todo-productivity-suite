@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Sign in · TaskMaster Pro</title>
+  <style>
+    :root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; background: #f5f5f5; color: #171717; }
+    main { width: min(100%, 420px); padding: 32px; border: 1px solid #e5e5e5; border-radius: 18px; background: white; box-shadow: 0 16px 48px #0000000d; }
+    h1 { margin: 0 0 8px; font-size: 1.5rem; letter-spacing: -.03em; }
+    p { color: #525252; line-height: 1.55; font-size: .92rem; }
+    label { display: block; margin: 22px 0 7px; font-size: .85rem; font-weight: 650; }
+    input { width: 100%; min-height: 46px; border: 1px solid #d4d4d4; border-radius: 9px; padding: 10px 12px; font: inherit; }
+    button { width: 100%; min-height: 46px; margin-top: 16px; border: 0; border-radius: 9px; background: #262626; color: white; font: inherit; font-weight: 650; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #message { min-height: 1.5em; margin: 12px 0 0; color: #b91c1c; font-size: .85rem; }
+    .note { margin-top: 22px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: .78rem; color: #737373; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #111; color: #fafafa; }
+      main { background: #1c1c1c; border-color: #404040; }
+      p { color: #a3a3a3; }
+      input { background: #262626; border-color: #525252; color: #fafafa; }
+      button { background: #fafafa; color: #171717; }
+      .note { border-color: #404040; color: #a3a3a3; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Sign in to TaskMaster Pro</h1>
+    <p>Enter the access key for this private TaskMaster Pro instance.</p>
+    <form id="login-form">
+      <label for="access-key">Access key</label>
+      <input id="access-key" name="token" type="password" autocomplete="current-password" required autofocus>
+      <button id="submit" type="submit">Continue</button>
+      <p id="message" role="alert" aria-live="polite"></p>
+    </form>
+    <p class="note">Your key is exchanged for a signed, HttpOnly browser session that expires after 12 hours. The key is not saved in browser storage.</p>
+  </main>
+  <script>
+    const form = document.getElementById("login-form");
+    const input = document.getElementById("access-key");
+    const button = document.getElementById("submit");
+    const message = document.getElementById("message");
+    const requestedNext = new URLSearchParams(location.search).get("next") || "/";
+    let next = "/";
+    try {
+      const candidate = new URL(requestedNext, location.origin);
+      if (candidate.origin === location.origin && candidate.pathname !== "/login.html") {
+        next = candidate.pathname + candidate.search + candidate.hash;
+      }
+    } catch {
+      next = "/";
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      message.textContent = "";
+      button.disabled = true;
+      button.textContent = "Signing in…";
+      try {
+        const response = await fetch("/api/auth/login", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: input.value }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Sign-in failed.");
+        input.value = "";
+        location.replace(next);
+      } catch (error) {
+        message.textContent = error.message || "Could not sign in. Try again.";
+        button.disabled = false;
+        button.textContent = "Continue";
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>

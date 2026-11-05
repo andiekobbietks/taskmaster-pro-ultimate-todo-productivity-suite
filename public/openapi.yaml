@@ -6,16 +6,13 @@ info:
     `/api/v1`; unversioned `/api/*` paths remain stable during the 1.x lifetime
     and are rewritten to `/api/v1/*` internally.
 
-    Authentication is via `Authorization: Bearer <token>` or the query
-    parameter `?api_token=<token>`. When `API_TOKEN` is not configured the gate
+    Browser access uses a 12-hour signed HttpOnly session cookie created by `POST /api/auth/login`. External clients authenticate with `Authorization: Bearer <token>` or the compatibility query parameter `?api_token=<token>`. When `API_TOKEN` is not configured the gate
     stays open for local development; production deployments must set it with
-    `wrangler secret put API_TOKEN`. The following paths are public or
-    internally authenticated and never require a token:
-
-    - `GET /health`
-    - `POST /api/v1/inbox/fetch` (cron internal)
-    - `POST /api/v1/digest/send` (cron internal)
-    - `POST /api/v1/trash/purge` (cron internal)
+    `wrangler secret put API_TOKEN` and also set `SETTINGS_ENCRYPTION_KEY`. Only `GET /health` and the login/logout endpoints are public.
+    Scheduled inbox fetch, digest send and trash purge calls are made by the
+    Worker with the configured bearer token; direct HTTP callers must also
+    authenticate. Leaving either production secret unset causes API requests to fail closed
+    with HTTP 503. Local development opts into `APP_ENV=development`.
 
     All API responses carry `Cache-Control: no-store, no-cache, must-revalidate,
     private`. API routes answer CORS preflight with `Access-Control-Allow-Origin`
@@ -34,6 +31,7 @@ servers:
 security:
   - bearerAuth: []
   - queryToken: []
+  - browserSession: []
 paths:
   /health:
     get:
@@ -41,6 +39,31 @@ paths:
       security: []
       responses:
         "200": { description: Service is healthy }
+
+  /auth/login:
+    post:
+      summary: Exchange the shared access key for a browser session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, format: password }
+      responses:
+        "200": { description: Signed HttpOnly session cookie issued }
+        "401": { description: Invalid access key }
+        "503": { description: Required production secrets are missing }
+
+  /auth/logout:
+    post:
+      summary: Clear the browser session
+      security: []
+      responses:
+        "200": { description: Session cookie cleared }
 
   /todos:
     get:
@@ -562,3 +585,8 @@ components:
       in: query
       name: api_token
       description: "Pass ?api_token=<API_TOKEN> when header auth is impractical"
+    browserSession:
+      type: apiKey
+      in: cookie
+      name: tm_session
+      description: "12-hour signed HttpOnly browser session issued by POST /auth/login"

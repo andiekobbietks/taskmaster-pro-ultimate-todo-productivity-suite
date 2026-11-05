@@ -1325,7 +1325,7 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   const cdb = new DatabaseSync(":memory:");
   for (const statement of SCHEMA) cdb.exec(statement);
   const csql = makeSql(cdb);
-  const cEnv = { API_TOKEN: "compliance-test-token" };
+  const cEnv = { API_TOKEN: "compliance-test-token", SETTINGS_ENCRYPTION_KEY: "test-encryption-key", APP_ENV: "production" };
   const cApp = new Hono();
 
   // Security headers, including cacheability for /api/*.
@@ -1349,28 +1349,41 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
     await next();
   });
 
-  function tokenAuth(env) {
-    return async (c, next) => {
-      const path = c.req.path;
-      if (path === "/health") return next();
-      const cronPaths = ["/api/inbox/fetch", "/api/digest/send", "/api/trash/purge"];
-      if (cronPaths.includes(path)) return next();
-      if (!env.API_TOKEN) return next();
-      const header = c.req.header("Authorization") || "";
-      const bearer = header.startsWith("Bearer ") ? header.slice(7) : c.req.query("api_token");
-      if (!bearer || bearer !== env.API_TOKEN) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
-      return next();
-    };
-  }
+  const { apiTokenAuth, registerAuthRoutes } = await import("../src/auth.ts");
+  cApp.use("/api/*", apiTokenAuth(cEnv));
 
-  cApp.use("/api/*", tokenAuth(cEnv));
+  // Production must fail closed when the secret has not been configured.
+  const missingSecretApp = new Hono();
+  missingSecretApp.use("/api/*", apiTokenAuth({ APP_ENV: "production" }));
+  missingSecretApp.get("/api/private", (c) => c.json({ ok: true }));
+  const missingSecret = await missingSecretApp.request("/api/private");
+  check("production fails closed when API_TOKEN is missing", missingSecret.status === 503, "HTTP " + missingSecret.status);
+
+  const missingEncryptionApp = new Hono();
+  missingEncryptionApp.use("/api/*", apiTokenAuth({ APP_ENV: "production", API_TOKEN: "configured-token" }));
+  missingEncryptionApp.get("/api/private", (c) => c.json({ ok: true }));
+  const missingEncryption = await missingEncryptionApp.request("/api/private");
+  check("production fails closed when settings encryption key is missing", missingEncryption.status === 503, "HTTP " + missingEncryption.status);
+  const unknownModeApp = new Hono();
+  unknownModeApp.use("/api/*", apiTokenAuth({ APP_ENV: "test", API_TOKEN: "configured-token" }));
+  unknownModeApp.get("/api/private", (c) => c.json({ ok: true }));
+  const unknownMode = await unknownModeApp.request("/api/private");
+  check("non-development modes fail closed without the encryption key", unknownMode.status === 503, "HTTP " + unknownMode.status);
+
+  // Local development may deliberately run without a secret.
+  const localDevApp = new Hono();
+  localDevApp.use("/api/*", apiTokenAuth({ APP_ENV: "development" }));
+  localDevApp.get("/api/private", (c) => c.json({ ok: true }));
+  const localDev = await localDevApp.request("/api/private");
+  check("development remains open without API_TOKEN", localDev.status === 200, "HTTP " + localDev.status);
   cApp.get("/health", (c) => c.json({ ok: true }));
   registerHackathonRoutes(cApp, csql);
   registerSettingsRoutes(cApp, csql, cEnv);
   registerCaptureRoutes(cApp, csql);
   registerInboxRoutes(cApp, csql, cEnv);
+  registerAttachmentRoutes(cApp, csql);
+  registerDigestRoutes(cApp, csql, cEnv);
+  registerAuthRoutes(cApp, cEnv);
 
   // URI versioning alias: /api/v1/* forwards to /api/*.
   cApp.all("/api/v1/*", async (c) => {
@@ -1388,6 +1401,31 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
     return cApp.request(path, init);
   };
 
+  // Browser login exchanges the shared key for a short-lived HttpOnly session.
+  const badLogin = await cCall("POST", "/api/auth/login", { token: "wrong-token" });
+  check("browser login rejects an incorrect key", badLogin.status === 401, "HTTP " + badLogin.status);
+  const login = await cCall("POST", "/api/auth/login", { token: "compliance-test-token" });
+  const setCookie = login.headers.get("Set-Cookie") || "";
+  const sessionCookie = setCookie.split(";")[0];
+  check("browser login creates a session", login.status === 200 && setCookie.includes("HttpOnly") && setCookie.includes("SameSite=Strict"), setCookie);
+  check("browser session cookie authenticates API calls",
+    (await cCall("GET", "/api/hackathons", undefined, { Cookie: sessionCookie })).status === 200);
+  const csrfDenied = await cCall("POST", "/api/hackathons", {
+    name: "Cross-origin attempt", platform: "devpost", prize: "$1",
+    eligibility: { eligibility_type: "unrestricted", regions: ["Global"], age_min: 13 },
+  }, { Cookie: sessionCookie, Origin: "https://attacker.example" });
+  check("browser session rejects cross-origin writes", csrfDenied.status === 403, "HTTP " + csrfDenied.status);
+  const sameOriginWrite = await cCall("POST", "/api/hackathons", {
+    name: "Browser session write", platform: "devpost", prize: "$1",
+    eligibility: { eligibility_type: "unrestricted", regions: ["Global"], age_min: 13 },
+  }, { Cookie: sessionCookie, Origin: "http://localhost" });
+  check("browser session permits same-origin writes", sameOriginWrite.status === 201, "HTTP " + sameOriginWrite.status);
+  check("invalid browser session cookie is rejected",
+    (await cCall("GET", "/api/hackathons", undefined, { Cookie: "tm_session=1.invalid" })).status === 401);
+  const logout = await cCall("POST", "/api/auth/logout", undefined, { Cookie: sessionCookie });
+  check("browser logout clears the session cookie",
+    logout.status === 200 && (logout.headers.get("Set-Cookie") || "").includes("Max-Age=0"));
+
   // Token gate
   const noToken = await cCall("GET", "/api/hackathons");
   check("API without token returns 401", noToken.status === 401, "HTTP " + noToken.status);
@@ -1397,8 +1435,24 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   check("API with valid token returns 200", withToken.status === 200, "HTTP " + withToken.status);
   const health = await cCall("GET", "/health");
   check("health is exempt from token gate", health.status === 200, "HTTP " + health.status);
-  const cronFetch = await cCall("POST", "/api/inbox/fetch");
-  check("cron fetch route is exempt from token gate", cronFetch.status !== 401, "HTTP " + cronFetch.status);
+  const wranglerConfig = JSON.parse(readFileSync(new URL("../wrangler.json", import.meta.url), "utf8"));
+  check("health is routed through the Worker before static assets",
+    wranglerConfig.assets.run_worker_first.includes("/health"));
+  const workerSource = readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+  check("Worker forwards the health path to the Durable Object",
+    workerSource.includes('pathname.startsWith("/api/") || pathname === "/health"'));
+  const scheduledRoutes = [
+    ["/api/inbox/fetch", 400],
+    ["/api/digest/send", 200],
+    ["/api/trash/purge", 200],
+  ];
+  for (const [path, expectedStatus] of scheduledRoutes) {
+    const denied = await cCall("POST", path);
+    check(path + " rejects unauthenticated callers", denied.status === 401, "HTTP " + denied.status);
+    const allowed = await cCall("POST", path, undefined, { Authorization: "Bearer compliance-test-token" });
+    check(path + " reaches its handler with a bearer token",
+      allowed.status === expectedStatus, "HTTP " + allowed.status + " (expected " + expectedStatus + ")");
+  }
 
   // Audit trail
   const setAudit = await cCall("PATCH", "/api/settings/notifications", {

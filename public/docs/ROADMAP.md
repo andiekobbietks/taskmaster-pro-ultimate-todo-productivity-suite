@@ -4,7 +4,7 @@ Ordered by the user's journey, not by feature. Every item states where the
 code is today, what it blocks, and how you know it is finished. Every line
 reference was read out of the source, not inferred.
 
-Last checked: 2026-10-21, at commit `93e2bae`.
+Last checked: 2026-11-05, at commit `35da513`.
 
 ---
 
@@ -69,16 +69,18 @@ Broken chain, or no safety net. In critical-path order.
 | | |
 |---|---|
 | **Was** | `.github/workflows/ci.yml` ran `npm test` only. The route regression suite and the browser suite ran nowhere but one machine, so 52 of the checks could rot silently. |
-| **Now** | A `browser` job installs Playwright, starts the mock API, and runs the 18 browser checks; the `test` job also runs the route regression suite. Screenshots go to the runner's temp directory, not `docs/`, so the docs drift gate is unaffected. |
-| **Proof** | 36 + 42 route checks and 18 browser checks now run on every push |
+| **Now** | A `browser` job installs Playwright, starts the mock API, and runs the 21 browser checks; the `test` job also runs the route regression suite. Screenshots go to the runner's temp directory, not `docs/`, so the docs drift gate is unaffected. |
+| **Proof** | 36 + 42 route checks and 21 browser checks now run on every push |
 
-### M4 — Authentication, before any public deployment
+### M4 — Authentication, before any public deployment — DONE
 
 | | |
 |---|---|
-| **Where** | `src/index.ts:10` — the Durable Object has security *headers* middleware but no identity check |
-| **Why** | Anyone with the URL has full read and write. Not needed for local dev, which is the current scope. This is the gate on the "scale out" step, not on the current one. |
-| **Done when** | Every `/api/*` route requires a token, and data is scoped per user |
+| **Where** | `src/auth.ts`, `public/login.html`, `src/lib/api.js` — shared-key login and signed browser sessions |
+| **Was** | Anyone with the URL had full read and write. No identity check existed. |
+| **Now** | The browser exchanges the shared access key for a 12-hour HMAC-signed HttpOnly cookie; the key is never stored in browser JavaScript. Unsafe cookie-authenticated requests require a same-origin `Origin` header. External clients and scheduled jobs use bearer tokens. Only `GET /health` and login/logout are public. The Worker routes `/health` to the Durable Object. Non-development deployments fail closed with HTTP 503 unless both `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY` are set. |
+| **Still single-user** | Data is not scoped per user; the Durable Object stores one dataset. The shared key gates access to that dataset, not to a user-specific partition. |
+| **Done when** | Browser sign-in, bearer clients, scheduled calls, production secret checks and the public health route are all covered by regression tests. |
 
 ---
 

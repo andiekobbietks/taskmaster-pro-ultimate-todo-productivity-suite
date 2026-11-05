@@ -24,34 +24,7 @@ import { buildDigest } from "./digest";
 import { readProfile, writeProfile } from "./profile";
 import { Hono } from "hono";
 
-/**
- * Shared-secret token auth for all `/api/*` routes.
- *
- * Exemptions:
- * - `/health` is public
- * - `/api/inbox/fetch`, `/api/digest/send`, `/api/trash/purge` are called by
- *   the Workers cron trigger itself from inside the DO; they authenticate by
- *   virtue of being internal to the worker.
- *
- * When `API_TOKEN` is not configured the gate stays open (local development).
- * In production set `API_TOKEN` via `wrangler secret put API_TOKEN`.
- */
-function apiTokenAuth(env: any): import("hono").MiddlewareHandler {
-  return async (c, next) => {
-    const path = c.req.path;
-    if (path === "/health") return next();
-    const cronPaths = ["/api/inbox/fetch", "/api/digest/send", "/api/trash/purge"];
-    if (cronPaths.includes(path)) return next();
-    const token = env.API_TOKEN;
-    if (!token) return next();
-    const header = c.req.header("Authorization") || "";
-    const bearer = header.startsWith("Bearer ") ? header.slice(7) : c.req.query("api_token");
-    if (!bearer || bearer !== token) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-    return next();
-  };
-}
+import { apiTokenAuth, registerAuthRoutes } from "./auth";
 
 export class App extends DurableObject {
   private app = new Hono();
@@ -140,6 +113,7 @@ export class App extends DurableObject {
 
     // Shared-secret auth on all API routes.
     this.app.use("/api/*", apiTokenAuth(env));
+    registerAuthRoutes(this.app, env);
 
     // URI versioning alias: /api/v1/* forwards to /api/*.
     // GDS API standards recommend path-based versioning; this alias lets
@@ -538,6 +512,7 @@ export class App extends DurableObject {
 interface Env {
   APP: DurableObjectNamespace;
   ASSETS: Fetcher;
+  API_TOKEN?: string;
   SEED_DEMO_DATA?: string;
 }
 
@@ -549,15 +524,15 @@ interface Env {
  * export, so Wrangler fails with "No matching export ... for import 'default'"
  * and every /api/* path is unreachable.
  *
- * Traffic is split here: /api/* goes to the single App instance, everything
- * else is served from static assets. `run_worker_first` in wrangler.json keeps
- * SPA fallback from swallowing /api/* before the Worker sees it.
+ * Traffic is split here: /api/* and /health go to the single App instance;
+ * everything else is served from static assets. `run_worker_first` in
+ * wrangler.json keeps the SPA fallback from swallowing these routes.
  */
 const worker = {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url);
 
-    if (pathname.startsWith("/api/")) {
+    if (pathname.startsWith("/api/") || pathname === "/health") {
       const id = env.APP.idFromName("taskmaster");
       return env.APP.get(id).fetch(request);
     }
@@ -576,7 +551,10 @@ const worker = {
     const id = env.APP.idFromName("taskmaster");
     try {
       await env.APP.get(id).fetch(
-        new Request("https://internal/api/inbox/fetch", { method: "POST" })
+        new Request("https://internal/api/inbox/fetch", {
+          method: "POST",
+          headers: env.API_TOKEN ? { Authorization: `Bearer ${env.API_TOKEN}` } : {},
+        })
       );
     } catch (err) {
       // A failed poll must not take the Worker down. The next hour tries
@@ -590,7 +568,10 @@ const worker = {
     // every zone, and daylight saving is handled in src/timezone.ts.
     try {
       const result = await env.APP.get(id).fetch(
-        new Request("https://internal/api/digest/send", { method: "POST" })
+        new Request("https://internal/api/digest/send", {
+          method: "POST",
+          headers: env.API_TOKEN ? { Authorization: `Bearer ${env.API_TOKEN}` } : {},
+        })
       );
       if (result.status >= 400) {
         console.error("scheduled digest failed:", result.status);
@@ -603,7 +584,10 @@ const worker = {
     // default is 30 days and Settings can set it lower (minimum 1).
     try {
       const result = await env.APP.get(id).fetch(
-        new Request("https://internal/api/trash/purge", { method: "POST" })
+        new Request("https://internal/api/trash/purge", {
+          method: "POST",
+          headers: env.API_TOKEN ? { Authorization: `Bearer ${env.API_TOKEN}` } : {},
+        })
       );
       if (result.status >= 400) {
         console.error("scheduled trash purge failed:", result.status);

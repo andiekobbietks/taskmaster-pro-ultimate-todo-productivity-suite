@@ -1,14 +1,8 @@
 # Security Policy
 
-## Supported versions
+## Project maturity and supported versions
 
-This project is **Alpha**. Only the newest published release is supported — there
-is no long-term-support branch and no back-porting of fixes.
-
-| Version | Supported |
-| ------- | --------- |
-| 1.0.x | ✅ |
-| < 1.0 (untagged `main`) | ⚠️ best-effort only |
+TaskMaster Pro is currently **Beta**. This is a single-tenant reference application, not a multi-user SaaS security boundary. The latest `main` branch is the development line; published releases should be treated as supported only when their release notes explicitly say so. Security fixes are made on the current development line and included in the next release.
 
 ## Reporting a vulnerability
 
@@ -20,43 +14,35 @@ Use [GitHub Private Vulnerability Reporting](../../security/advisories/new):
 2. Click **Report a vulnerability**.
 3. Describe what you found, how to reproduce it, and what you think the impact is.
 
-A maintainer is notified immediately when a private report is filed, and the
-conversation stays private until a fix ships. Credit is given in the release
-notes unless you ask to stay anonymous.
+If private reporting is unavailable, open a regular issue asking for a secure channel **without** including vulnerability details.
 
-If private reporting is unavailable for your account, open a regular issue asking
-for a secure channel **without** including any details of the vulnerability.
+## Deployment security requirements
 
-## Threat model (read this before deploying)
+- Configure strong, unique `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY` secrets before exposing a deployment: `npx wrangler secret put API_TOKEN` and `npx wrangler secret put SETTINGS_ENCRYPTION_KEY`.
+- The token is a shared-secret access gate, not per-user identity, role-based access control, or tenant isolation. Browser sessions inherit the same shared permissions.
+- Do not deploy without both secrets. `wrangler.json` marks deployed Workers as `APP_ENV=production`; if either `API_TOKEN` or `SETTINGS_ENCRYPTION_KEY` is missing, API requests fail closed with HTTP 503. Local development opts into `APP_ENV=development` in `.dev.vars`.
+- The public `GET /health` endpoint exposes only service health and version metadata. `/api/auth/login` exchanges the shared access key for a 12-hour signed `HttpOnly; SameSite=Strict` cookie; `/api/auth/logout` clears it. Browser code never stores the shared key. The cookie is Secure on HTTPS and same-site requests only.
+- Scheduled inbox fetch, digest send and trash purge operations require the same bearer token as other API routes. The Worker cron handler supplies it when invoking the Durable Object internally.
+- Prefer the `Authorization: Bearer` header. The documented `api_token` query parameter is retained for compatibility but can expose credentials in URLs, browser history, analytics and logs.
+- CORS currently reflects the request Origin. This is not an authentication mechanism; keep the API token secret and do not treat CORS as an access-control boundary.
+- This deployment uses one Durable Object/database named `taskmaster`. It is not a multi-tenant isolation model. Do not store sensitive personal, health, financial or confidential data without a separate security review and appropriate controls.
+- Keep secrets in Worker secrets, never in `wrangler.json`, source files or committed `.dev.vars`.
 
-This is an honest description of the current surface, not a compliance claim.
+## Current threat model and known limitations
 
-- **There is no authentication.** Every route in the API is reachable by anyone
-  who can reach the deployment. A deployed instance must be treated as
-  **public and untrusted**. Do not put real personal data in it.
-- **State lives inside a Durable Object's SQLite database.** There is no
-  separate database server, so there are no database credentials to leak and no
-  network-exposed DB port. The blast radius of a compromised Worker is the data
-  of that one object.
-- **The API trusts its callers.** Todo fields are stored as sent (after `.trim()`
-  and JSON encoding of tags). Output-escaping in the front end is the only XSS
-  boundary, so the front end must treat every stored string as hostile.
-- **Dependencies are deliberately few.** The only runtime dependency is `hono`.
-  A machine-readable inventory lives at [`docs/sbom.cyclonedx.json`](docs/sbom.cyclonedx.json).
-- **Secrets:** none are required to run or deploy the app today. If that ever
-  changes, this file must change with it.
+- **Authentication:** a configured shared access key protects `/api/*`. Browser sign-in exchanges it for a 12-hour signed HttpOnly, Secure-on-HTTPS, SameSite=Strict cookie. Cookie-authenticated unsafe methods require a same-origin `Origin` header to mitigate CSRF. External clients and scheduled jobs use bearer tokens. This remains shared access, not per-user identity or fine-grained permissions.
+- **Legacy settings:** configuring `SETTINGS_ENCRYPTION_KEY` does not rewrite legacy XOR-obfuscated values already in SQLite. Rewrite or migrate those values before treating them as AES-256-GCM encrypted at rest.
+- **Capture SSRF boundary:** the runner rejects non-HTTP(S) URLs, localhost and private/loopback/link-local/multicast/reserved IP literals. It does not resolve hostnames before navigation; a DNS name resolving to a private address may pass. Restrict the runner's network egress.
+- **Data isolation:** all callers with the token reach the same Durable Object state. There is no per-user or per-organisation row-level isolation.
+- **Browser input:** treat stored task, hackathon, mail and attachment metadata as untrusted. Validate at API boundaries and render user-controlled content safely.
+- **Backups and recovery:** checkpoints are application-level snapshots, not an independent backup or tested disaster-recovery service. Export and test recovery separately before production use.
+- **Dependencies:** review dependency and Worker runtime updates regularly. The generated SBOM is an inventory, not proof that dependencies are vulnerability-free.
 
 ## What a good report includes
 
-- The affected route or file (e.g. `PATCH /api/todos/:id`).
-- Reproduction steps that work against `npx wrangler dev`.
-- The impact you expect (data disclosure, data loss, cross-user access, XSS).
-- Whether you have already shared it anywhere.
+- The affected route or file.
+- Reproduction steps against a local Worker or a disposable test deployment.
+- Expected impact (data disclosure, data loss, cross-user access, injection or denial of service).
+- Whether the issue has already been shared publicly.
 
-## What happens next
-
-Reports are triaged against the maturity gates in
-[`docs/READINESS.md`](docs/READINESS.md). Anything that touches the
-Enterprise-Ready security gates is treated as blocking. Fixes ship in the next
-patch release via the [release workflow](.github/workflows/release.yml), and the
-advisory is published with the release notes.
+Security findings are triaged against [the readiness checklist](docs/READINESS.md). Any issue that permits unauthenticated data access or destructive operations is release-blocking.

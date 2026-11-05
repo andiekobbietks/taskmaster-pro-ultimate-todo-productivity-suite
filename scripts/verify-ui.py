@@ -250,6 +250,48 @@ def main():
         time.sleep(3)
 
         results = []
+
+        # Exercise the real browser login redirect without exposing a token
+        # to app JavaScript. The mock endpoint issues a test-only HttpOnly cookie.
+        login_page = browser.new_page(viewport={"width": 1200, "height": 900})
+        login_page.on("pageerror", lambda e: errors.append(str(e)))
+
+        def auth_gate(route):
+            request = route.request
+            if request.url.endswith("/api/auth/login"):
+                route.fulfill(
+                    status=200,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Set-Cookie": "tm_session=browser-test; Path=/; HttpOnly; SameSite=Strict",
+                    },
+                    body='{"ok":true}',
+                )
+            elif "tm_session=browser-test" in request.headers.get("cookie", ""):
+                route.continue_()
+            else:
+                route.fulfill(
+                    status=401,
+                    headers={"Content-Type": "application/json"},
+                    body='{"error":"Unauthorized"}',
+                )
+
+        login_page.route("**/api/**", auth_gate)
+        login_page.goto(BASE + "/", wait_until="domcontentloaded", timeout=30000)
+        login_page.wait_for_url(re.compile(r"/login\.html\?next="), timeout=15000)
+        results.append(("unauthenticated browser is redirected to login",
+                        "/login.html" in login_page.url))
+        login_page.locator("#access-key").fill("test-access-key")
+        login_page.get_by_role("button", name="Continue").click()
+        login_page.wait_for_url(BASE + "/", timeout=15000)
+        login_page.locator("text=Settings").first.wait_for(timeout=15000)
+        cookies = login_page.context.cookies()
+        results.append(("login issues an HttpOnly browser session",
+                        any(c["name"] == "tm_session" and c["httpOnly"] for c in cookies)))
+        results.append(("browser returns to the app after sign-in",
+                        "/login.html" not in login_page.url))
+        login_page.close()
+
         run(page, results)
 
         print("--- Offline ---")

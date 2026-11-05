@@ -43,29 +43,33 @@ it says so.
 
 ### B1 — Browser ↔ Worker
 
-**Spoofing — fails.** There is no authentication. `src/index.ts` has a
-security-headers middleware and a rate limiter, and nothing else. Anyone
-who can reach the Worker is the owner of the data. The only endpoint
-called out as unauthenticated is `/health`, and it is not the only one.
+**Spoofing — partly mitigated.** When `API_TOKEN` is configured, the
+shared bearer-token middleware in `src/auth.ts` protects the API. Only
+`GET /health` is public. The scheduled inbox fetch, digest send and trash
+purge operations also require the token; the Worker supplies it when it
+invokes those routes inside the Durable Object. If either `API_TOKEN` or `SETTINGS_ENCRYPTION_KEY` is unset, only
+`APP_ENV=development` remains open; production is configured as
+`APP_ENV=production` and fails closed with HTTP 503. The token is shared by
+all callers and does not establish individual identity or tenant isolation.
 
-*Mitigation: none. This is the gap that gates everything else.*
+*Residual risk: configure a strong Worker secret before deployment, rotate
+it if exposed, and do not treat the shared token as multi-user authorization.*
 
-**Tampering — fails, same cause.** `PUT /api/settings` accepts a new
-profile, a new mail server and new storage credentials from anyone.
-`POST /api/capture/jobs` and `DELETE /api/hackathons/:id` likewise.
+**Tampering — partly mitigated.** With the token configured, unauthenticated
+callers cannot use the API to modify settings, create captures or delete
+hackathons. Any caller holding the shared token has the same application
+permissions; there are no per-user roles.
 
-**Repudiation — fails.** There is no audit trail. `src/index.ts`,
-`src/settings.ts`, `src/capture.ts` and `src/archive.ts` contain no
-activity log, no actor, no timestamped history of who changed what. A
-change to the profile or the storage credentials leaves no trace.
+**Repudiation — partly mitigated.** The application has an audit trail for
+selected settings and credential changes, but it is not a complete,
+tamper-proof record of every action and does not identify an individual
+when all callers share one token.
 
-**Information disclosure — partly fixed, and still open.** A secret is
-now write-only: `GET /api/settings` returns `********` for a set value
-rather than the value, and the screen only sends a new one when it is
-typed. That was fixed on 2026-10-21 after the assessment found the
-secrets coming back in the clear. But the endpoint is still
-unauthenticated, so anyone can *set* a secret, and the XOR obfuscation is
-not encryption — the key is in the source.
+**Information disclosure — partly mitigated.** Sensitive settings are
+masked on reads and the configured API token gates the API. The token is
+not per-user, and the single Durable Object stores one shared dataset.
+Secrets stored by the application must be assessed independently; masking
+a value in the UI does not by itself prove encryption at rest.
 
 **Denial of service — partly bounded.** The rate limiter allows 100
 requests a minute per IP, counted in the `rate_limits` table. The upload
@@ -155,12 +159,14 @@ invisible.
 **Information disclosure — the real one.** The runner drives a browser
 to whatever URL it is given, with the person's cookies, on the person's
 machine. It records the responses it sees, and it writes them to disk.
-`scripts/capture-wacz.py` does **not** validate the URL: there is no
-scheme check, and no check against internal addresses. Pointed at
-`http://192.168.1.1/` it would capture the router's admin page, and the
-archive would be written to `captures/`. The default is same-origin only,
-which bounds what a *page* pulls in, but it does not bound what the
-*runner* is pointed at.
+`scripts/capture-wacz.py` validates the URL scheme and accepts only
+HTTP or HTTPS. It rejects localhost and private, loopback, link-local,
+multicast and reserved **IP literals** unless the explicit dry-run-only
+override is used. It does not resolve DNS names before navigation, however:
+a hostname that resolves to a private address can still pass this check.
+Run the capture runner with network egress restrictions and do not treat
+the URL validator as a complete SSRF boundary. DNS resolution and address
+pinning remain hardening work.
 
 **Denial of service — partly bounded.** A page that never settles is
 capped by the navigation timeout and the settle time.
@@ -215,10 +221,10 @@ before it is stored.
 
 | | Finding | Severity |
 |---|---|---|
-| 1 | **No authentication on any `/api/*` route.** Anyone with the URL has full read and write, including the storage credentials. | **Critical** |
-| 2 | **No audit trail.** Nothing records who changed the profile, the mail server or the credentials. | **High** |
-| 3 | **The capture runner does not validate the URL it is given.** It will drive a browser to an internal address and write what it sees to disk. | **High** |
-| 4 | **Secrets are XOR-obfuscated, not encrypted.** The key is in the source. | **Medium**, and it is a placeholder, not a design |
+| 1 | **Shared-token authentication, not individual identity.** Production requires `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY`; missing configuration fails closed with HTTP 503. Callers sharing the token still share the same data and permissions. | **Medium residual risk** |
+| 2 | **Incomplete actor attribution.** Selected settings and credential changes are audited, but a shared token cannot identify an individual and not every action is logged. | **Medium residual risk** |
+| 3 | **Capture URL validation is implemented.** Keep regression coverage for private, loopback and non-HTTP targets as capture code evolves. | **Reduced; regression risk** |
+| 4 | **Encryption depends on a deployment secret.** Sensitive settings use AES-256-GCM when `SETTINGS_ENCRYPTION_KEY` is configured; production now refuses API requests without it. Legacy XOR values remain a migration concern. | **Medium residual risk** |
 | 5 | **The Durable Object is a single thread.** One slow request, one large capture or one hung archive fetch stalls everything. | **Medium** |
 | 6 | **Captured pages and mail are untrusted input to an agent.** That is a prompt-injection path. | **Medium**, and inherent |
 | 7 | **The rate limit is per IP, in one shared object.** One attacker spends everyone's budget. | **Low** for personal use |
@@ -226,13 +232,11 @@ before it is stored.
 Findings 3 and the size caps in section 3 were **fixed on 2026-10-21**, during
 this assessment. Findings 1, 2, 4, 5, 6 and 7 are open.
 
-**Finding 3 is only half fixed.** The upload size and the decompressed
-size are now capped, so a large or expanding archive cannot stall the
-Durable Object. But `scripts/capture-wacz.py` still does not check the
-scheme of the URL it is given, and it still does not refuse a private
-address range. Pointed at `http://192.168.1.1/` it would drive the
-browser to the router's admin page and write what it saw to disk. That
-check is a dozen lines and it is the next thing to do.
+**Capture validation is partial.** The runner rejects non-HTTP(S) schemes,
+localhost and private/loopback/link-local/multicast/reserved IP literals.
+It does not resolve hostnames before navigation, so a hostname resolving
+to a private address may pass. Restrict runner egress at the network layer;
+DNS resolution and address pinning remain open hardening work.
 
 ## 5. About Vault and Supabase
 
@@ -264,19 +268,23 @@ Workers Secrets for the deployment secrets, Web Crypto for the per-user
 credentials at rest, and a token on the routes. The first is an hour's
 work, the second is half a day, the third is the critical finding above.
 
-## 6. What to do, in order
+## 6. Remaining work, in priority order
 
-1. **Put a token on the routes.** One shared secret, checked before the
-   routes run, would take finding 1 from critical to acceptable for a
-   self-hosted personal deployment. Per-user identity is the upgrade after
-   that.
-2. **Validate the URL in the capture runner.** Reject anything that is
-   not `http` or `https`, and warn about private address ranges. Half a
-   dozen lines, and it closes finding 3 properly.
-3. **Move the deployment secrets to Workers Secrets.** `wrangler secret put`
-   for the Yahoo client id, the client secret and the refresh token.
-4. **Encrypt the per-user credentials with Web Crypto**, with the key in a
-   Worker secret.
-5. **Write the audit trail** when there is more than one person using it.
-   Until then it is a single-user app and the trail has one author, which
-   is the easier case to fix later.
+1. **Per-user identity and data isolation.** Replace the shared bearer token
+   before offering this as a multi-user service. Scope every record and
+   authorization decision to a verified user or organisation.
+2. **CORS allowlist.** Replace reflected origins with an explicit allowlist
+   appropriate to the deployed frontend. CORS is not a substitute for auth.
+3. **Independent backups and recovery tests.** Checkpoints are useful
+   application snapshots, not an off-platform backup. Export data and rehearse
+   restoration from a separate copy.
+4. **Complete audit coverage.** Record security-relevant changes consistently
+   and attribute them to authenticated identities once per-user auth exists.
+5. **Operational hardening.** Review the shared per-IP rate-limit budget,
+   Durable Object single-thread latency, retention, alerting and dependency
+   updates before increasing the user or workload count.
+
+
+## Browser session authentication
+
+The web UI does not receive the Worker API secret. It signs in through `/login.html`; the Worker exchanges the access key for a 12-hour HMAC-signed HttpOnly cookie, marked Secure on HTTPS and SameSite=Strict. Cookie-authenticated unsafe requests must carry the exact same-origin `Origin` header. The browser key is not stored in JavaScript or browser storage. External clients and scheduled jobs use bearer tokens. This remains one shared access identity, not per-user authorization.

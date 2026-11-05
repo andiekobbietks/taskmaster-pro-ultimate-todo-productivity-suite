@@ -142,7 +142,7 @@ npx portless alias taskmaster 8787   # http://taskmaster.localhost
 
 ## Security
 
-This project is **Beta** and now gates `/api/*` with a bearer-token auth layer when `API_TOKEN` is configured. Local development leaves the gate open if no token is set, so set `API_TOKEN` via `wrangler secret put API_TOKEN` before exposing the Worker to untrusted networks.
+This project is **Beta** and now gates `/api/*` with a bearer-token auth layer when `API_TOKEN` is configured. Deployed Workers run with `APP_ENV=production` and fail closed with HTTP 503 if the secret is missing. Local development explicitly opts into `APP_ENV=development` in `.dev.vars`.
 
 Key points:
 

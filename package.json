@@ -24,7 +24,8 @@
     "test:ui": "python scripts/verify-ui.py",
     "storybook:build": "esbuild src/storybook.jsx --bundle --minify --format=iife --target=es2019 --jsx=automatic --loader:.jsx=jsx --outfile=public/assets/storybook.js",
     "storybook:serve": "npm run storybook:build && node scripts/mock-api.mjs 8821",
-    "handbook": "python scripts/build-handbook.py"
+    "handbook": "python scripts/build-handbook.py",
+    "test:checkpoints": "node --experimental-strip-types scripts/test-checkpoints.mjs"
   },
   "dependencies": {
     "hono": "^4.6.0",

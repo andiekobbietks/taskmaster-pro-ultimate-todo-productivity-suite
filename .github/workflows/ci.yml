@@ -123,11 +123,17 @@ jobs:
       - name: Run API tests
         run: npm test
 
+      - name: Run checkpoint recovery tests
+        run: npm run test:checkpoints
+
       # The regression suite for the settings merge, the settings reset, the
       # profile's single home and the digest's eligibility. It drives the
       # same real routes, so it belongs in the same job.
       - name: Run route regression tests
         run: node --experimental-strip-types scripts/test-bugfixes.mjs
+
+      - name: Run checkpoint recovery tests
+        run: node --experimental-strip-types scripts/test-checkpoints.mjs
 
       - name: Run todo filter regressions
         run: node --experimental-strip-types scripts/test-todo-filters.mjs

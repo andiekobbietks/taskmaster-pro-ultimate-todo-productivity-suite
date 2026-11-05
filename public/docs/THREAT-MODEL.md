@@ -283,3 +283,8 @@ work, the second is half a day, the third is the critical finding above.
 5. **Operational hardening.** Review the shared per-IP rate-limit budget,
    Durable Object single-thread latency, retention, alerting and dependency
    updates before increasing the user or workload count.
+
+
+## Browser session authentication
+
+The web UI does not receive the Worker API secret. It signs in through `/login.html`; the Worker exchanges the access key for a 12-hour HMAC-signed HttpOnly cookie, marked Secure on HTTPS and SameSite=Strict. Cookie-authenticated unsafe requests must carry the exact same-origin `Origin` header. The browser key is not stored in JavaScript or browser storage. External clients and scheduled jobs use bearer tokens. This remains one shared access identity, not per-user authorization.

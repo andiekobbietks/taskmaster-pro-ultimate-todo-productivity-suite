@@ -58,15 +58,17 @@ def _is_private_host(host: str) -> bool:
         return False
 
 
-def validate_capture_url(url: str, label: str = "URL") -> None:
-    """Reject non-http(s) schemes and private/loopback hosts."""
+def validate_capture_url(
+    url: str, label: str = "URL", allow_private: bool = False
+) -> None:
+    """Reject unsafe targets unless an isolated local test explicitly opts in."""
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https"):
         raise ValueError("%s must use http or https: %s" % (label, url))
     host = parts.netloc
     if not host:
         raise ValueError("%s missing host: %s" % (label, url))
-    if _is_private_host(host):
+    if _is_private_host(host) and not allow_private:
         raise ValueError("%s points to a private/loopback host: %s" % (label, url))
 
 
@@ -326,7 +328,15 @@ def main():
                              "page's own origin")
     parser.add_argument("--dry-run", action="store_true",
                         help="Write the archive but do not post it")
+    parser.add_argument(
+        "--allow-private-capture", action="store_true",
+        help="Allow loopback/private capture targets for isolated local tests; "
+             "requires --dry-run",
+    )
     args = parser.parse_args()
+
+    if args.allow_private_capture and not args.dry_run:
+        parser.error("--allow-private-capture requires --dry-run")
 
     # A one-off dry run only writes the archive locally; it never contacts
     # the TaskMaster API, so the default loopback API URL is irrelevant.
@@ -367,7 +377,10 @@ def main():
             url = job["url"]
             name = job.get("name") or url
             try:
-                validate_capture_url(url, label="capture URL")
+                validate_capture_url(
+                    url, label="capture URL",
+                    allow_private=args.allow_private_capture,
+                )
             except ValueError as e:
                 print("ERROR: %s" % e)
                 failures += 1

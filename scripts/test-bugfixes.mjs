@@ -1410,6 +1410,14 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   check("browser login creates a session", login.status === 200 && setCookie.includes("HttpOnly") && setCookie.includes("SameSite=Strict"), setCookie);
   check("browser session cookie authenticates API calls",
     (await cCall("GET", "/api/hackathons", undefined, { Cookie: sessionCookie })).status === 200);
+  const csrfDenied = await cCall("POST", "/api/hackathons", {
+    name: "Cross-origin attempt", platform: "manual",
+  }, { Cookie: sessionCookie, Origin: "https://attacker.example" });
+  check("browser session rejects cross-origin writes", csrfDenied.status === 403, "HTTP " + csrfDenied.status);
+  const sameOriginWrite = await cCall("POST", "/api/hackathons", {
+    name: "Browser session write", platform: "manual",
+  }, { Cookie: sessionCookie, Origin: "http://localhost" });
+  check("browser session permits same-origin writes", sameOriginWrite.status === 201, "HTTP " + sameOriginWrite.status);
   check("invalid browser session cookie is rejected",
     (await cCall("GET", "/api/hackathons", undefined, { Cookie: "tm_session=1.invalid" })).status === 401);
   const logout = await cCall("POST", "/api/auth/logout", undefined, { Cookie: sessionCookie });

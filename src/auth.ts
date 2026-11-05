@@ -110,7 +110,17 @@ export function apiTokenAuth(env: {
     if (bearer && constantTimeEqual(bearer, token)) return next();
 
     const session = cookieValue(c.req.header("Cookie") || "", SESSION_COOKIE);
-    if (session && await isValidSession(session, token)) return next();
+    if (session && await isValidSession(session, token)) {
+      // SameSite cookies are site-scoped, not origin-scoped. Check Origin on
+      // unsafe browser requests as a second CSRF boundary for sibling origins.
+      if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method.toUpperCase())) {
+        const origin = c.req.header("Origin");
+        if (!origin || origin !== new URL(c.req.url).origin) {
+          return c.json({ error: "Cross-origin request rejected" }, 403);
+        }
+      }
+      return next();
+    }
 
     return c.json({ error: "Unauthorized" }, 401);
   };

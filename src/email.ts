@@ -34,6 +34,7 @@
  */
 
 import { readSettingsSection } from "./settings-reader.ts";
+import { decryptSetting, isEncrypted } from "./settings-crypto.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -95,18 +96,23 @@ const EMPTY_CONFIG: EmailConfig = {
  * Settings win, but only where they carry a value. An empty form field
  * means "I did not fill this in", not "delete the working secret".
  */
-export function resolveEmailConfig(sql: any, env: any): EmailConfig {
+export async function resolveEmailConfig(sql: any, env: any): Promise<EmailConfig> {
   const s = (readSettingsSection(sql, "email") || {}) as any;
 
-  const pick = (key: keyof EmailConfig, envValue: any): any => {
-    const fromSettings = s[key];
-    if (fromSettings === undefined || fromSettings === null || fromSettings === "") {
-      return envValue;
-    }
-    return fromSettings;
+  const decryptIfNeeded = async (value: any): Promise<string> => {
+    if (typeof value !== "string" || value === "") return "";
+    return isEncrypted(value) ? decryptSetting(value, env) : value;
   };
 
-  const providerRaw = String(pick("provider", env?.EMAIL_PROVIDER) || "").toLowerCase();
+  const pick = async (key: keyof EmailConfig, envValue: any): Promise<string> => {
+    const fromSettings = s[key];
+    if (fromSettings === undefined || fromSettings === null || fromSettings === "") {
+      return String(envValue || "");
+    }
+    return await decryptIfNeeded(fromSettings);
+  };
+
+  const providerRaw = String(s.provider || env?.EMAIL_PROVIDER || "").toLowerCase();
   const provider: EmailProvider | null =
     providerRaw === "sendgrid" || providerRaw === "ses" || providerRaw === "oracle"
       ? (providerRaw as EmailProvider)
@@ -114,17 +120,17 @@ export function resolveEmailConfig(sql: any, env: any): EmailConfig {
 
   return {
     provider,
-    sendgrid_api_key: String(pick("sendgrid_api_key", env?.SENDGRID_API_KEY) || ""),
-    ses_region: String(pick("ses_region", env?.SES_REGION) || "us-east-1"),
-    ses_sender: String(pick("ses_sender", env?.SES_SENDER) || ""),
-    ses_access_key: String(pick("ses_access_key", env?.AWS_ACCESS_KEY_ID) || ""),
-    ses_secret_key: String(pick("ses_secret_key", env?.AWS_SECRET_ACCESS_KEY) || ""),
-    oracle_smtp_host: String(pick("oracle_smtp_host", env?.ORACLE_SMTP_HOST) || "smtp-mail.oracle.com"),
-    oracle_smtp_port: Number(pick("oracle_smtp_port", env?.ORACLE_SMTP_PORT) || 587),
-    oracle_smtp_user: String(pick("oracle_smtp_user", env?.ORACLE_SMTP_USER) || ""),
-    oracle_smtp_pass: String(pick("oracle_smtp_pass", env?.ORACLE_SMTP_PASS) || ""),
-    from_address: String(pick("from_address", env?.EMAIL_FROM) || ""),
-    from_name: String(pick("from_name", env?.EMAIL_FROM_NAME) || "TaskMaster Pro"),
+    sendgrid_api_key: await pick("sendgrid_api_key", env?.SENDGRID_API_KEY),
+    ses_region: String(s.ses_region || env?.SES_REGION || "us-east-1"),
+    ses_sender: String(s.ses_sender || env?.SES_SENDER || ""),
+    ses_access_key: await pick("ses_access_key", env?.AWS_ACCESS_KEY_ID),
+    ses_secret_key: await pick("ses_secret_key", env?.AWS_SECRET_ACCESS_KEY),
+    oracle_smtp_host: String(s.oracle_smtp_host || env?.ORACLE_SMTP_HOST || "smtp-mail.oracle.com"),
+    oracle_smtp_port: Number(s.oracle_smtp_port || env?.ORACLE_SMTP_PORT || 587),
+    oracle_smtp_user: await pick("oracle_smtp_user", env?.ORACLE_SMTP_USER),
+    oracle_smtp_pass: await pick("oracle_smtp_pass", env?.ORACLE_SMTP_PASS),
+    from_address: String(s.from_address || env?.EMAIL_FROM || ""),
+    from_name: String(s.from_name || env?.EMAIL_FROM_NAME || "TaskMaster Pro"),
   };
 }
 
@@ -217,7 +223,7 @@ export async function sendEmail(
   assertSafeHeader(payload.from, "from");
   assertSafeHeader(payload.subject, "subject");
 
-  const config = resolveEmailConfig(sql, env);
+  const config = await resolveEmailConfig(sql, env);
   switch (config.provider) {
     case "sendgrid":
       return sendViaSendGrid(config, payload);

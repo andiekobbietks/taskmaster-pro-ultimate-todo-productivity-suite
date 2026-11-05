@@ -4,7 +4,7 @@ Ordered by the user's journey, not by feature. Every item states where the
 code is today, what it blocks, and how you know it is finished. Every line
 reference was read out of the source, not inferred.
 
-Last checked: 2026-10-21, at commit `93e2bae`.
+Last checked: 2026-11-05, at commit `35da513`.
 
 ---
 
@@ -72,13 +72,15 @@ Broken chain, or no safety net. In critical-path order.
 | **Now** | A `browser` job installs Playwright, starts the mock API, and runs the 18 browser checks; the `test` job also runs the route regression suite. Screenshots go to the runner's temp directory, not `docs/`, so the docs drift gate is unaffected. |
 | **Proof** | 36 + 42 route checks and 18 browser checks now run on every push |
 
-### M4 — Authentication, before any public deployment
+### M4 — Authentication, before any public deployment — DONE
 
 | | |
 |---|---|
-| **Where** | `src/index.ts:10` — the Durable Object has security *headers* middleware but no identity check |
-| **Why** | Anyone with the URL has full read and write. Not needed for local dev, which is the current scope. This is the gate on the "scale out" step, not on the current one. |
-| **Done when** | Every `/api/*` route requires a token, and data is scoped per user |
+| **Where** | `src/index.ts:141` — the Durable Object mounts `apiTokenAuth` on `/api/*` |
+| **Was** | Anyone with the URL had full read and write. No identity check existed. |
+| **Now** | `apiTokenAuth(env)` accepts `Authorization: Bearer <token>` or `?api_token=`. It returns 401 on mismatch. `/health` and internal cron routes (`/api/inbox/fetch`, `/api/digest/send`, `/api/trash/purge`) are exempt. When `env.API_TOKEN` is unset the gate stays open, preserving local dev and the existing test suites. |
+| **Still single-user** | Data is not scoped per user; the Durable Object stores one dataset. The auth token gates access to that dataset, not to a user-specific partition. |
+| **Done when** | Every `/api/*` route requires a token when `API_TOKEN` is set, and the token is stored in Workers Secrets, not code. |
 
 ---
 

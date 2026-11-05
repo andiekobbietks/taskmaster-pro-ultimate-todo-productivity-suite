@@ -9,6 +9,74 @@ Each tagged release on GitHub is generated from the matching section below by
 [`.github/workflows/release.yml`](.github/workflows/release.yml), so the
 changelog is the single source of truth for what a release contains.
 
+## [1.5.0] - 2026-11-05
+
+### Added
+
+- **GDS API standards and Technology Code of Practice compliance pass.** The project now closes every blocker identified in `docs/THREAT-MODEL.md` §6 and `docs/ROADMAP.md` M4.
+  - Bearer-token authentication on `/api/*` (`src/index.ts:apiTokenAuth`), with `/health` and internal cron routes (`/api/inbox/fetch`, `/api/digest/send`, `/api/trash/purge`) exempt. Accepts `Authorization: Bearer <token>` or `?api_token=<token>`; returns 401 on mismatch. The gate stays open only when `API_TOKEN` is unset.
+  - Structured audit logging (`src/audit.ts`, `audit_log` table) for settings, profile, credential and reset changes. Reads via `GET /api/audit/log?limit=`; records actor and IP but never records secret values.
+  - AES-256-GCM settings encryption (`src/settings-crypto.ts`) keyed by `SETTINGS_ENCRYPTION_KEY`, with PBKDF2(SHA-256, 100000 iterations) and an `enc:v1:` prefix. Legacy XOR obfuscation is retained as a backwards-compatibility decoder only.
+  - Masked secret compare view and break-glass revoke: `/api/settings` returns only the first 3 alphanumerics of sensitive values; `/api/settings/revoke` deletes them immediately.
+  - CORS middleware on `/api/*` that echoes the request `Origin`, lists allowed methods and headers, short-circuits `OPTIONS` with 204, and sets `Access-Control-Max-Age: 86400`.
+  - Cache-control header `Cache-Control: no-store, no-cache, must-revalidate, private` on every `/api/` response.
+  - URI versioning alias `/api/v1/*` that forwards to `/api/*` while keeping unversioned paths stable.
+  - Complete OpenAPI 3.0.3 rewrite (`openapi.yaml` and `public/openapi.yaml`) generated from the real 113-route inventory, global `bearerAuth` + `queryToken` security, public endpoints marked `security: []`, and the two files kept byte-identical.
+  - Self-hosted fonts: Inter and JetBrains Mono woff2 files in `public/fonts/`; Google Fonts preconnect/stylesheet/`<noscript>` removed from `public/index.html` and `public/storybook.html`; `@font-face` rules added to `src/tailwind.css`; CSP tightened to `font-src 'self'`.
+  - Capture source URL validation in `src/capture.ts` and `scripts/capture-wacz.py` using `ipaddress`; rejects non-HTTP(S), missing host, `localhost`, loopback, private, link-local, multicast and reserved ranges before a job is created.
+  - Yahoo Mail API config resolved from `env` using the existing `src/email.ts` `pick()` rule; `fetchFromYahoo` now takes a resolved `YahooConfig`.
+  - `scripts/sync-hackathons.mjs` rewritten to call the server's own import routes (`/api/devpost/import`, `/api/mlh/import`) instead of reimplementing scrapers; supports `--api` and `--token`/`API_TOKEN`; exits non-zero when any source fails. HackerEarth returns HTTP 501 because a keyless importer is infeasible.
+  - Upstream schema-drift detection for Devpost (`src/devpost.ts`) plus a new MCP tool `inspect_schema_drift` (`src/mcp-tools.ts`) that reports the most recent drift diagnostics without changing the zod schema.
+  - Progressive-disclosure settings UI with collapsible JMAP and IMAP sections, an Advanced tab, and a gated `<CheckpointCLI />` widget.
+  - Terminal CLI at `scripts/taskmaster-cli.mjs` with a full REPL, `/help`, scenarios and export commands.
+
+### Before
+
+- `/api/*` had no authentication; anyone with the URL could read or write tasks, settings and hackathons.
+- Secrets were XOR-obfuscated with a key in the source, and sensitive values were returned in plaintext.
+- There was no audit trail for settings or credential changes.
+- No CORS or cache headers were set on API responses.
+- The API was unversioned and the OpenAPI spec was incomplete.
+- `scripts/capture-wacz.py` could be pointed at private/loopback addresses.
+- Google Fonts loaded an external stylesheet at page view.
+- Hackathon sync was implemented as scrapers inside the script, duplicating server logic.
+
+### After
+
+- `/api/*` is gated by a bearer token in production while remaining open for local development when no token is configured.
+- Sensitive settings are encrypted at rest, compared in a masked view, and can be revoked instantly.
+- Every settings/profile/credential change is written to `audit_log` with actor and IP.
+- API responses carry correct CORS and cache headers; clients can pin to `/api/v1/*`.
+- OpenAPI accurately describes the route surface and is identical in the repo root and `public/`.
+- Capture jobs are rejected before creation if the URL points to a non-public host.
+- No external stylesheet or script executes at page view; fonts are self-hosted.
+- `scripts/sync-hackathons.mjs` reuses the server's importers and fails loudly on errors.
+
+### Why now
+
+Portfolio readiness. The project was already feature-rich but still carried alpha-grade security assumptions. The compliance pass moves the baseline from "works for its author" to "can be deployed privately without leaking data or secrets", which is the precondition for any shared beta or public demo.
+
+### Scenarios
+
+1. **Private deployment.** You set `API_TOKEN` via `wrangler secret put API_TOKEN` and share the Worker URL with a trusted collaborator. Every write now requires the token, and every settings change is logged.
+2. **Lost laptop.** A secret stored in settings is compromised. You open Settings, use the masked compare to confirm which key it is, and click Revoke; the value is deleted immediately and the action is audited.
+3. **Automation script.** `scripts/sync-hackathons.mjs --api http://taskmaster.localhost --token $API_TOKEN` runs nightly, imports Devpost and MLH competitions through the authenticated API, and exits non-zero if an importer fails so your scheduler can alert you.
+4. **Schema drift alert.** Devpost changes a field name. The next import detects the drift, writes a `UPSTREAM_SCHEMA_DRIFT` diagnostic, and the MCP tool `inspect_schema_drift` surfaces it so the parser can be updated before silent data loss occurs.
+
+### Changed
+
+- `docs/architecture.json`, `docs/features.json`, `docs/sbom.cyclonedx.json` and `docs/readiness-gates.json` updated to reflect the 1.5.0 state; `docs/readiness.json` and `docs/READINESS.md` regenerated.
+- `README.md` security section rewritten from "Alpha / no auth" to describe the bearer-token gate, encrypted settings and debug-route gating.
+- Release stage moved from **alpha** to **beta** in `docs/sbom.cyclonedx.json`.
+
+### Security
+
+- `apiTokenAuth` returns 401 for missing or mismatched tokens and exempts only `/health` and cron-internal routes.
+- `audit_log` records field names, not values, for sensitive changes.
+- `src/settings-crypto.ts` uses AES-256-GCM with a random IV per encryption; no key leaves values in plaintext passthrough.
+- `/api/debug/*` routes are only registered when `DEBUG_ROUTES_ENABLED=true`.
+- Capture URL validation blocks SSRF vectors against private/internal hosts.
+
 ## [1.4.0] - 2026-10-23
 
 ### Added

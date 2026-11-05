@@ -92,11 +92,14 @@ export function parseSubmissionPeriod(
 /**
  * One page of open hackathons from the endpoint, or null when the
  * endpoint has changed shape (missing array, non-200).
+ *
+ * Returns both the parsed items and the raw JSON list so the drift
+ * detector can compare what was received against what was understood.
  */
 export async function fetchDevpostPage(
   page: number,
   doFetch: typeof fetch = fetch
-): Promise<DevpostHackathon[] | null> {
+): Promise<{ items: DevpostHackathon[]; raw: any[] } | null> {
   const url =
     BASE +
     "?status%5B%5D=open&per_page=40&page=" +
@@ -118,7 +121,7 @@ export async function fetchDevpostPage(
   }
   const list = body?.hackathons;
   if (!Array.isArray(list)) return null;
-  return list.map((h: any) => ({
+  const items = list.map((h: any) => ({
     id: Number(h.id),
     title: String(h.title ?? "Untitled"),
     url: String(h.url ?? ""),
@@ -143,6 +146,69 @@ export async function fetchDevpostPage(
     winners_announced: Boolean(h.winners_announced),
     submission_period_dates: String(h.submission_period_dates ?? ""),
   }));
+  return { items, raw: list };
+}
+
+export interface SchemaDriftReport {
+  source: "devpost";
+  detected_at: number;
+  total_records: number;
+  unparsed_dates_count: number;
+  missing_prize_count: number;
+  missing_keys: string[];
+  sample_received_keys: string[];
+  raw_sample: Record<string, unknown>;
+}
+
+/**
+ * Checks a batch of raw Devpost items against parsed output to catch schema shifts.
+ */
+export function detectDevpostDrift(
+  rawItems: any[],
+  parsedItems: Array<{ start_date: string | null; end_date: string | null; prize: string }>
+): SchemaDriftReport | null {
+  if (!rawItems || rawItems.length === 0) return null;
+
+  const sample = rawItems[0] || {};
+  const sampleKeys = Object.keys(sample);
+
+  // Expected canonical keys from Devpost's internal SPA endpoint
+  const EXPECTED_KEYS = [
+    "title",
+    "url",
+    "submission_period_dates",
+    "prize_amount",
+    "open_state"
+  ];
+
+  const missingKeys = EXPECTED_KEYS.filter((k) => !(k in sample));
+
+  let unparsedDates = 0;
+  let missingPrizes = 0;
+
+  for (const item of parsedItems) {
+    if (!item.start_date && !item.end_date) unparsedDates++;
+    if (!item.prize || item.prize === "$0" || item.prize === "N/A") missingPrizes++;
+  }
+
+  // Drift condition: primary keys missing, or >50% of the batch fails to parse dates
+  const isDateDrift = rawItems.length >= 2 && unparsedDates / rawItems.length > 0.5;
+  const isStructuralDrift = missingKeys.length > 0;
+
+  if (isStructuralDrift || isDateDrift) {
+    return {
+      source: "devpost",
+      detected_at: Date.now(),
+      total_records: rawItems.length,
+      unparsed_dates_count: unparsedDates,
+      missing_prize_count: missingPrizes,
+      missing_keys: missingKeys,
+      sample_received_keys: sampleKeys,
+      raw_sample: sample
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -171,15 +237,19 @@ export async function ingestDevpost(
   let endpointOk = true;
   const problems: string[] = [];
   let pagesUsed = 0;
+  const rawBatch: any[] = [];
+  const mappedBatch: Array<{ start_date: string | null; end_date: string | null; prize: string }> = [];
 
   for (let page = 1; page <= maxPages; page++) {
     pagesUsed = page;
-    const items = await fetchDevpostPage(page, doFetch);
-    if (items === null) {
+    const pageData = await fetchDevpostPage(page, doFetch);
+    if (pageData === null) {
       endpointOk = false;
       problems.push("page " + page + " did not answer as expected");
       break;
     }
+    const items = pageData.items;
+    rawBatch.push(...pageData.raw);
     if (items.length === 0) break;
     for (const h of items) {
       if (!h.url || !h.title) continue;
@@ -189,6 +259,7 @@ export async function ingestDevpost(
           ? "hack-devpost-" + h.id
           : "hack-devpost-url-" + Math.abs(h.url.split("").reduce((a: number, ch: string) => (a * 31 + ch.charCodeAt(0)) | 0, 7));
       const dates = parseSubmissionPeriod(h.submission_period_dates);
+      mappedBatch.push({ start_date: dates.start, end_date: dates.end, prize: h.prize_amount });
       const existing = sql
         .exec("SELECT id FROM hackathons WHERE id = ?", id)
         .toArray();
@@ -243,6 +314,23 @@ export async function ingestDevpost(
     }
     fetched += items.length;
     if (fetched >= 0 && items.length < 40) break; // short page = last page
+  }
+
+  const drift = detectDevpostDrift(rawBatch, mappedBatch);
+  if (drift) {
+    try {
+      sql.exec(
+        `INSERT INTO diagnostics (ts, level, source, message, payload)
+         VALUES (?, ?, ?, ?, ?)`,
+        Date.now(),
+        "warn",
+        "UPSTREAM_SCHEMA_DRIFT",
+        `Devpost API schema divergence detected: ${drift.missing_keys.join(", ") || "date parsing degradation"}`,
+        JSON.stringify(drift)
+      );
+    } catch (err) {
+      console.warn("[DRIFT_DETECTOR] Failed to write drift event:", err);
+    }
   }
 
   return {

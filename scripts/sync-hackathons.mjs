@@ -5,46 +5,79 @@
  *   node scripts/sync-hackathons.mjs --api http://localhost:8787
  *
  * Sources:
- *   - Devpost (scraped from hackathons page — no public API)
- *   - MLH events page
- *   - lablab.ai
+ *   - Devpost  -> POST /api/devpost/import
+ *   - MLH      -> POST /api/mlh/import
+ *   - HackerEarth -> deliberately skipped (no keyless feed; endpoint returns 501)
  *
- * The script is idempotent: it upserts by (platform, external_id) so
- * re-running it updates deadlines and prizes without duplicating rows.
+ * The script is idempotent: the server-side importers upsert by platform id,
+ * so re-running it updates deadlines and prizes without duplicating rows.
  */
 
 const SOURCES = [
   {
     name: "devpost",
-    url: "https://devpost.com/hackathons?open=true",
-    // Devpost has no public API; this is a placeholder for a scraper.
-    // For now, seed manually via the API or use the seed file.
-    enabled: false,
+    method: "POST",
+    path: "/api/devpost/import",
+    body: { pages: 2 },
+    enabled: true,
   },
   {
     name: "mlh",
-    url: "https://mlh.io/events",
-    enabled: false,
+    method: "POST",
+    path: "/api/mlh/import",
+    body: { season: "2026" },
+    enabled: true,
   },
   {
-    name: "lablab",
-    url: "https://lablab.ai/ai-hackathons",
+    name: "hackerearth",
+    method: "POST",
+    path: "/api/hackerearth/import",
+    body: {},
     enabled: false,
+    reason: "no known keyless JSON feed (server returns 501)",
   },
 ];
 
-async function sync(apiBase) {
-  let created = 0;
-  let updated = 0;
+async function request(apiBase, path, token, body) {
+  const headers = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+  if (token) headers.Authorization = "Bearer " + token;
+  const res = await fetch(apiBase.replace(/\/$/, "") + path, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body ?? {}),
+  });
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text };
+  }
+  return { status: res.status, ok: res.ok, body: json };
+}
+
+async function sync(apiBase, token) {
+  const results = [];
 
   for (const source of SOURCES) {
-    if (!source.enabled) continue;
+    if (!source.enabled) {
+      console.log(`Skipping ${source.name}${source.reason ? " (" + source.reason + ")" : ""}`);
+      continue;
+    }
     console.log(`Syncing ${source.name}...`);
-    // TODO: implement actual scraping per source
-    // For now, this is a scaffold — the seed file provides initial data.
+    const result = await request(apiBase, source.path, token, source.body);
+    results.push({ name: source.name, ...result });
+    if (!result.ok) {
+      console.error(`  ${source.name} failed: HTTP ${result.status}`, result.body);
+    } else {
+      console.log(`  ${source.name} ok:`, result.body);
+    }
   }
 
-  return { created, updated };
+  return results;
 }
 
 // CLI entry
@@ -52,10 +85,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const apiIdx = args.indexOf("--api");
   const apiBase = apiIdx >= 0 ? args[apiIdx + 1] : "http://localhost:8787";
+  const tokenIdx = args.indexOf("--token");
+  const token = tokenIdx >= 0 ? args[tokenIdx + 1] : process.env.API_TOKEN || "";
 
-  sync(apiBase)
-    .then((r) => {
-      console.log(`Sync complete: ${r.created} created, ${r.updated} updated`);
+  sync(apiBase, token)
+    .then((results) => {
+      const okCount = results.filter((r) => r.ok).length;
+      const failCount = results.length - okCount;
+      console.log(`\nSync complete: ${okCount} ok, ${failCount} failed`);
+      if (failCount > 0) process.exit(1);
     })
     .catch((err) => {
       console.error("Sync failed:", err);

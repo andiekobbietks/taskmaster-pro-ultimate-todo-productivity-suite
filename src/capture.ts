@@ -12,6 +12,37 @@ function now(): number {
   return Date.now();
 }
 
+function isPrivateHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/:\d+$/, "");
+  if (h === "localhost" || h === "localhost.localdomain") return true;
+  // Private IPv4 ranges and loopback.
+  if (
+    /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|0\.|255\.)/.test(h)
+  ) {
+    return true;
+  }
+  // IPv6 loopback / ULA / link-local.
+  if (/^::$|^::1$|^fc00:|^fe80:/i.test(h)) return true;
+  // Local-only names.
+  if (h.endsWith(".local") || h.endsWith(".localhost")) return true;
+  return false;
+}
+
+function validateCaptureSource(source: CaptureSource): string | null {
+  try {
+    const url = new URL(source.url);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "must use http or https";
+    }
+    if (isPrivateHost(url.hostname)) {
+      return "points to a private/loopback host";
+    }
+  } catch {
+    return "invalid URL";
+  }
+  return null;
+}
+
 export function registerCaptureRoutes(app: Hono, sql: any) {
   // --- The manifest ----------------------------------------------------
   app.get("/api/capture/manifest", (c) => {
@@ -89,6 +120,15 @@ export function registerCaptureRoutes(app: Hono, sql: any) {
       wanted = [{ url: body.url, name: body.name || body.url }];
     } else if (manifest.length > 0) {
       wanted = manifest.filter((s) => s.enabled !== false && s.url);
+    }
+
+    for (const source of wanted) {
+      const bad = validateCaptureSource(source);
+      if (bad) {
+        return c.json({
+          error: `Invalid capture source: ${source.url} (${bad})`,
+        }, 400);
+      }
     }
 
     if (wanted.length === 0) {

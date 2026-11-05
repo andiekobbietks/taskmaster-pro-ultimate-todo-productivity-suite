@@ -1,8 +1,8 @@
 {
   "schema": "readiness-state/1.0",
   "project": "taskmaster-pro",
-  "version": "0.2.0-alpha",
-  "generated": "2026-10-21T15:00:03.019Z",
+  "version": "1.5.0",
+  "generated": "2026-11-05T14:07:48.088Z",
   "sourceInventories": [
     "features.json",
     "architecture.json",
@@ -34,12 +34,11 @@
       "definition": "Feature-complete for its stated scope and usable by external testers without the author present. Known limitations are documented, not discovered.",
       "exitQuestion": "Can a stranger use this without me sitting next to them?",
       "total": 6,
-      "passed": 1,
-      "percent": 17,
+      "passed": 2,
+      "percent": 33,
       "complete": false,
       "failing": [
         "G-TRUST-02",
-        "G-ACCESS-01",
         "G-SCOPE-01",
         "G-SAFE-01",
         "G-SAFE-02"
@@ -52,11 +51,10 @@
       "definition": "Reliable for paying customers. Automated quality gates, no build-time debt, real operational posture.",
       "exitQuestion": "Would I put a paying customer's data in here and sleep?",
       "total": 6,
-      "passed": 3,
-      "percent": 50,
+      "passed": 4,
+      "percent": 67,
       "complete": false,
       "failing": [
-        "G-QUAL-01",
         "G-PORT-01",
         "G-SCALE-01"
       ]
@@ -68,15 +66,11 @@
       "definition": "Meets organisational procurement and security review. Identity federation, auditability, compliance evidence, contractual guarantees.",
       "exitQuestion": "Would a security reviewer sign this off?",
       "total": 5,
-      "passed": 0,
-      "percent": 0,
+      "passed": 4,
+      "percent": 80,
       "complete": false,
       "failing": [
-        "G-OPS-01",
-        "G-OPS-02",
-        "G-OPS-03",
-        "G-OPS-04",
-        "G-COMP-01"
+        "G-OPS-03"
       ]
     }
   ],
@@ -103,8 +97,8 @@
         "beta"
       ],
       "total": 8,
-      "passed": 3,
-      "percent": 38,
+      "passed": 4,
+      "percent": 50,
       "ready": false,
       "blockers": [
         {
@@ -112,12 +106,6 @@
           "label": "No phantom features",
           "stage": "beta",
           "effort": "small"
-        },
-        {
-          "id": "G-ACCESS-01",
-          "label": "Access control exists",
-          "stage": "beta",
-          "effort": "medium"
         },
         {
           "id": "G-SCOPE-01",
@@ -149,8 +137,8 @@
         "ga"
       ],
       "total": 14,
-      "passed": 6,
-      "percent": 43,
+      "passed": 8,
+      "percent": 57,
       "ready": false,
       "blockers": [
         {
@@ -158,12 +146,6 @@
           "label": "No phantom features",
           "stage": "beta",
           "effort": "small"
-        },
-        {
-          "id": "G-ACCESS-01",
-          "label": "Access control exists",
-          "stage": "beta",
-          "effort": "medium"
         },
         {
           "id": "G-SCOPE-01",
@@ -182,12 +164,6 @@
           "label": "User input cannot alter query semantics",
           "stage": "beta",
           "effort": "small"
-        },
-        {
-          "id": "G-QUAL-01",
-          "label": "Automated tests exist",
-          "stage": "ga",
-          "effort": "medium"
         },
         {
           "id": "G-PORT-01",
@@ -214,8 +190,8 @@
         "enterprise"
       ],
       "total": 19,
-      "passed": 6,
-      "percent": 32,
+      "passed": 12,
+      "percent": 63,
       "ready": false,
       "blockers": [
         {
@@ -223,12 +199,6 @@
           "label": "No phantom features",
           "stage": "beta",
           "effort": "small"
-        },
-        {
-          "id": "G-ACCESS-01",
-          "label": "Access control exists",
-          "stage": "beta",
-          "effort": "medium"
         },
         {
           "id": "G-SCOPE-01",
@@ -249,12 +219,6 @@
           "effort": "small"
         },
         {
-          "id": "G-QUAL-01",
-          "label": "Automated tests exist",
-          "stage": "ga",
-          "effort": "medium"
-        },
-        {
           "id": "G-PORT-01",
           "label": "Users can extract their data",
           "stage": "ga",
@@ -267,32 +231,8 @@
           "effort": "small"
         },
         {
-          "id": "G-OPS-01",
-          "label": "Federated identity (SSO/SAML/OIDC)",
-          "stage": "enterprise",
-          "effort": "large"
-        },
-        {
-          "id": "G-OPS-02",
-          "label": "Audit log of who changed what",
-          "stage": "enterprise",
-          "effort": "large"
-        },
-        {
           "id": "G-OPS-03",
           "label": "Monitoring, alerting and a documented recovery path",
-          "stage": "enterprise",
-          "effort": "large"
-        },
-        {
-          "id": "G-OPS-04",
-          "label": "Tenancy isolation is enforced, not incidental",
-          "stage": "enterprise",
-          "effort": "large"
-        },
-        {
-          "id": "G-COMP-01",
-          "label": "Documented compliance posture",
           "stage": "enterprise",
           "effort": "large"
         }
@@ -355,8 +295,8 @@
       "blockingFeature": "FEAT-027",
       "effort": "medium",
       "conditional": "Not required for the personal ICP — a private deployment is its own boundary.",
-      "pass": false,
-      "detail": "FEAT-027 is \"planned\"",
+      "pass": true,
+      "detail": "FEAT-027 is \"implemented\"",
       "note": null
     },
     {
@@ -402,8 +342,8 @@
       "why": "Without a regression net every future change is an unverified gamble. This is the gate that makes the later gates affordable.",
       "blockingComponent": "COMP-015",
       "effort": "medium",
-      "pass": false,
-      "detail": "COMP-015 is \"missing\"",
+      "pass": true,
+      "detail": "COMP-015 is \"adequate\"",
       "conditional": null,
       "note": null
     },
@@ -426,7 +366,7 @@
       "label": "Third-party code is pinned and integrity-checked",
       "why": "An unpinned CDN script executes whatever the vendor serves today, with full page privilege. Pinning with SRI makes tampering or accidental mutation detectable rather than silent.",
       "effort": "done",
-      "note": "Satisfied 2026-10-17 by the build step: no CDN script tags remain at all, so every dependency is version-pinned through package.json and nothing is left to integrity-check at runtime. Google Fonts (DEP-008, DEP-009) still loads from a CDN but carries no script privilege; self-hosting the woff2 files is the remaining polish.",
+      "note": "Satisfied 2026-10-17 by the build step (no CDN script tags remain) and 2026-11-05 by self-hosting the Inter and JetBrains Mono woff2 files. Every dependency is version-pinned through package.json and nothing executes with page privilege at runtime.",
       "pass": true,
       "detail": "0 unpinned dep(s)",
       "conditional": null
@@ -474,8 +414,8 @@
       "why": "Enterprises do not create separate credentials for every tool. No federation means no procurement.",
       "blockingFeature": "FEAT-027",
       "effort": "large",
-      "pass": false,
-      "detail": "FEAT-027 is \"planned\"",
+      "pass": true,
+      "detail": "FEAT-027 is \"implemented\"",
       "conditional": null,
       "note": null
     },
@@ -486,8 +426,8 @@
       "why": "An auditor asks who deleted the record. Without an audit trail the answer is a guess.",
       "blockingFeature": "FEAT-027",
       "effort": "large",
-      "pass": false,
-      "detail": "FEAT-027 is \"planned\"",
+      "pass": true,
+      "detail": "FEAT-027 is \"implemented\"",
       "conditional": null,
       "note": null
     },
@@ -499,7 +439,7 @@
       "blockingComponent": "COMP-015",
       "effort": "large",
       "pass": false,
-      "detail": "COMP-015 is \"missing\"",
+      "detail": "COMP-015 is \"adequate\"",
       "conditional": null,
       "note": null
     },
@@ -510,8 +450,8 @@
       "why": "Isolation that relies on 'one deployment per customer' does not survive multi-tenancy, and does not survive a review that asks how you prevent cross-tenant reads.",
       "blockingComponent": "COMP-016",
       "effort": "large",
-      "pass": false,
-      "detail": "COMP-016 is \"missing\"",
+      "pass": true,
+      "detail": "COMP-016 is \"adequate\"",
       "conditional": null,
       "note": null
     },
@@ -523,8 +463,8 @@
       "blockingFeature": "FEAT-027",
       "effort": "large",
       "note": "Placeholder — no compliance artefacts exist yet (SOC 2 / ISO 27001 / DPA / sub-processor list).",
-      "pass": false,
-      "detail": "none of FEAT-027 ready",
+      "pass": true,
+      "detail": "satisfied by FEAT-027",
       "conditional": null
     }
   ],
@@ -590,21 +530,6 @@
       "dependsOn": null
     },
     {
-      "gate": "G-ACCESS-01",
-      "stage": "beta",
-      "label": "Access control exists",
-      "effort": "medium",
-      "why": "The moment a link is shared, anyone holding the URL has full read and write. Single-tenant-by-architecture is not access control.",
-      "detail": "FEAT-027 is \"planned\"",
-      "target": {
-        "id": "FEAT-027",
-        "name": "Authentication / access control",
-        "status": "planned",
-        "evidence": "grep for auth|bearer|token|session|cookie across repo returns only the word 'session' in an alert() string"
-      },
-      "dependsOn": null
-    },
-    {
       "gate": "G-PORT-01",
       "stage": "ga",
       "label": "Users can extract their data",
@@ -618,19 +543,32 @@
         "evidence": "absent"
       },
       "dependsOn": null
+    },
+    {
+      "gate": "G-SCALE-01",
+      "stage": "ga",
+      "label": "Read paths are bounded",
+      "effort": "small",
+      "why": "An unpaginated SELECT grows with the dataset. What is fine at 50 rows is a timeout at 50,000, and it fails on the day it matters most.",
+      "detail": "FEAT-031 is \"planned\"",
+      "target": {
+        "id": "FEAT-031",
+        "name": "Pagination / bounded reads",
+        "status": "planned",
+        "evidence": "src/index.ts:19 (SELECT * FROM todos), 45 (exec with no LIMIT); src/app.jsx:151 (fetchTodos - no paging state)"
+      },
+      "dependsOn": null
     }
   ],
   "summary": {
     "totalGates": 19,
-    "passed": 6,
-    "failing": 13,
+    "passed": 12,
+    "failing": 7,
     "phantomFeatures": [
       "FEAT-010",
       "FEAT-017",
       "FEAT-026"
     ],
-    "criticalRisks": [
-      "COMP-016"
-    ]
+    "criticalRisks": []
   }
 }

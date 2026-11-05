@@ -14,7 +14,7 @@
 
 TaskMaster Pro is a to-do and productivity app that runs in a browser, saves state on the server, and works on a phone or laptop without an install. It handles tasks, lists, priorities, due dates, tags, pinned items, a per-task focus timer, search, a weekly dashboard, hackathon deadline tracking, email digests, web push reminders, and a small diagnostics/checkpoint CLI.
 
-It is **Alpha** — it works end to end, but it does not yet have user accounts or authentication. Do not load it with confidential data until you add an auth layer.
+It is **Beta** — it works end to end and now gates `/api/*` with a bearer token when `API_TOKEN` is configured. It remains single-tenant, so do not load it with confidential data until you understand that limit.
 
 ## Why it exists
 
@@ -89,6 +89,18 @@ None of these is a marketing quote on its own. Together they form the strongest 
 - **Scheduled function** (`scheduled()`) — cron-based digest and hackathon refresh hooks
 - **Stateless diagnostics** (`src/diagnostics.ts`, `src/checkpoints.ts`) — endpoint failure logging and full-table snapshots
 
+### Platform model
+
+TaskMaster Pro is a **time-sensitive execution engine**, not a hackathon app. The
+hackathon surface is **Module 1** plugged into a shared core that provides tasks,
+SQLite storage, attachments + trash, inbound mail, a live iCalendar feed, MCP
+tools, timezone scheduling and the security baseline.
+
+Future modules (grants, bug bounties, enterprise tenders) reuse the same core and
+add only domain-specific ingest, rules and evidence output. See
+[`docs/PLATFORM.md`](docs/PLATFORM.md) for the full module taxonomy and the Open
+Core commercial model.
+
 Runtime dependencies are deliberately tiny:
 
 ```json
@@ -121,21 +133,23 @@ npx portless alias taskmaster 8787   # http://taskmaster.localhost
 ## Developer notes
 
 - `npm test` runs the in-process test harness (36 tests).
-- `npm run test:routes` runs the route/bug-fix regression harness (245 tests).
-- `npm run test:push` exercises the VAPID + push encryption paths.
+- `npm run test:routes` runs the route/bug-fix regression harness (270 tests).
+- `npm run test:push` exercises the VAPID + push encryption paths (26 tests).
+- `npm run test:timezone` exercises date and iCalendar generation (42 tests).
 - `npm run seed` populates a fresh DO with sample data.
 - `npm run docs:readiness` exports the readiness checklist.
 - The terminal CLI is at `scripts/taskmaster-cli.mjs`.
 
 ## Security
 
-This project is **Alpha** and currently has **no authentication or authorization**. Do not deploy it with real user data or expose sensitive endpoints (`/api/debug/*`, `/api/diagnostics*`, `/api/checkpoints*`) to untrusted networks without adding an auth layer.
+This project is **Beta** and now gates `/api/*` with a bearer-token auth layer when `API_TOKEN` is configured. Local development leaves the gate open if no token is set, so set `API_TOKEN` via `wrangler secret put API_TOKEN` before exposing the Worker to untrusted networks.
 
 Key points:
 
-- Anyone who can reach the Worker can read or write any task or setting.
-- Push subscriptions, email subscriptions, and hackathon imports run without per-user checks.
-- The checkpoint/diagnostics UI widget is gated by an **Advanced** settings toggle, but the API routes are not authenticated.
+- When `API_TOKEN` is set, every `/api/*` route (except `/health` and internal cron routes) requires `Authorization: Bearer <token>` or `?api_token=<token>`.
+- The checkpoint/diagnostics UI widget is gated by an **Advanced** settings toggle, and the matching API routes are only enabled when `DEBUG_ROUTES_ENABLED=true`.
+- Sensitive settings are encrypted at rest with AES-256-GCM (`SETTINGS_ENCRYPTION_KEY`) and compared in a masked view; `/api/settings/revoke` provides break-glass removal.
+- The token gate is single-tenant: it protects a private deployment, but does not provide per-user data partitions. Do not treat it as multi-user authorization.
 
 ## License
 

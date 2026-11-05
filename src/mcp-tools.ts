@@ -383,6 +383,52 @@ export const MCP_TOOLS: McpTool[] = [
   ),
 
   tool(
+    "inspect_schema_drift",
+    "Examines recent upstream API schema shifts, missing keys, and unparsed " +
+      "raw payloads to diagnose parser breaks.",
+    {
+      source: z.string().optional()
+        .describe("Filter by provider (e.g., 'devpost', 'mlh')."),
+      limit: z.number().optional().default(5)
+        .describe("Number of recent drift events to return."),
+    },
+    async (args, sql) => {
+      const limit = Math.min(Number(args.limit) || 5, 100);
+      const filterSource = args.source ? "%" + String(args.source) + "%" : "%";
+
+      const rows = sql.exec(
+        `SELECT id, ts, level, source, message, payload
+         FROM diagnostics
+         WHERE source = 'UPSTREAM_SCHEMA_DRIFT' AND message LIKE ?
+         ORDER BY ts DESC
+         LIMIT ?`,
+        filterSource,
+        limit
+      ).toArray();
+
+      if (!rows || rows.length === 0) {
+        return JSON.stringify({
+          has_drift: false,
+          message: "No upstream schema drift events detected. Ingestion parsers are operating cleanly."
+        }, null, 2);
+      }
+
+      const events = rows.map((r: any) => ({
+        id: r.id,
+        timestamp: new Date(r.ts).toISOString(),
+        summary: r.message,
+        drift_report: safeJson(r.payload)
+      }));
+
+      return JSON.stringify({
+        has_drift: true,
+        event_count: events.length,
+        events
+      }, null, 2);
+    }
+  ),
+
+  tool(
     "eligible_hackathons",
     "The open competitions the user's profile makes them eligible for, with " +
       "prize, deadline, qualification path and reasons.",

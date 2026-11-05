@@ -160,7 +160,7 @@
       "why": "An unpinned CDN script executes whatever the vendor serves today, with full page privilege. Pinning with SRI makes tampering or accidental mutation detectable rather than silent.",
       "derivedFrom": { "unpinnedCount": 0, "sriCoverage": "all-cdn" },
       "effort": "done",
-      "note": "Satisfied 2026-10-17 by the build step: no CDN script tags remain at all, so every dependency is version-pinned through package.json and nothing is left to integrity-check at runtime. Google Fonts (DEP-008, DEP-009) still loads from a CDN but carries no script privilege; self-hosting the woff2 files is the remaining polish."
+      "note": "Satisfied 2026-10-17 by the build step (no CDN script tags remain) and 2026-11-05 by self-hosting the Inter and JetBrains Mono woff2 files. Every dependency is version-pinned through package.json and nothing executes with page privilege at runtime."
     },
     {
       "id": "G-BUILD-01",

@@ -19,7 +19,38 @@ import { registerCheckpointRoutes } from "./checkpoints";
 import { registerDiagnosticsRoutes, errorLoggingMiddleware } from "./diagnostics";
 import { registerDossierRoutes } from "./dossier-routes";
 import { createSchema } from "./schema";
+import { buildDigest } from "./digest";
+import { readProfile, writeProfile } from "./profile";
 import { Hono } from "hono";
+
+/**
+ * Shared-secret token auth for all `/api/*` routes.
+ *
+ * Exemptions:
+ * - `/health` is public
+ * - `/api/inbox/fetch`, `/api/digest/send`, `/api/trash/purge` are called by
+ *   the Workers cron trigger itself from inside the DO; they authenticate by
+ *   virtue of being internal to the worker.
+ *
+ * When `API_TOKEN` is not configured the gate stays open (local development).
+ * In production set `API_TOKEN` via `wrangler secret put API_TOKEN`.
+ */
+function apiTokenAuth(env: any): import("hono").MiddlewareHandler {
+  return async (c, next) => {
+    const path = c.req.path;
+    if (path === "/health") return next();
+    const cronPaths = ["/api/inbox/fetch", "/api/digest/send", "/api/trash/purge"];
+    if (cronPaths.includes(path)) return next();
+    const token = env.API_TOKEN;
+    if (!token) return next();
+    const header = c.req.header("Authorization") || "";
+    const bearer = header.startsWith("Bearer ") ? header.slice(7) : c.req.query("api_token");
+    if (!bearer || bearer !== token) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    return next();
+  };
+}
 
 export class App extends DurableObject {
   private app = new Hono();
@@ -36,7 +67,23 @@ export class App extends DurableObject {
       c.header("X-XSS-Protection", "1; mode=block");
       c.header("Referrer-Policy", "strict-origin-when-cross-origin");
       c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-      c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'");
+      c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'");
+      if (c.req.path.startsWith("/api/")) {
+        c.header("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      }
+    });
+
+    // CORS for API routes. Preflight answers before auth or rate limiting.
+    this.app.use("/api/*", async (c, next) => {
+      const origin = c.req.header("Origin") || "*";
+      c.header("Access-Control-Allow-Origin", origin);
+      c.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      c.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Audit-Actor");
+      c.header("Access-Control-Max-Age", "86400");
+      if (c.req.method === "OPTIONS") {
+        return c.body(null, 204);
+      }
+      await next();
     });
 
     // Structured diagnostics: capture 500s and uncaught exceptions.
@@ -90,9 +137,23 @@ export class App extends DurableObject {
       await next();
     });
 
-    // Health check endpoint (no auth required, no rate limit) (no auth required)
+    // Shared-secret auth on all API routes.
+    this.app.use("/api/*", apiTokenAuth(env));
+
+    // URI versioning alias: /api/v1/* forwards to /api/*.
+    // GDS API standards recommend path-based versioning; this alias lets
+    // clients pin to v1 while keeping the unversioned paths stable during
+    // the 1.x lifetime of the app.
+    this.app.all("/api/v1/*", async (c) => {
+      const url = new URL(c.req.url);
+      url.pathname = url.pathname.replace(/^\/api\/v1/, "/api");
+      const request = new Request(url, c.req.raw);
+      return this.app.fetch(request, this.env as any);
+    });
+
+    // Health check endpoint (no auth required, no rate limit)
     this.app.get("/health", (c) => {
-      return c.json({ status: "ok", version: "1.0.0", timestamp: Date.now() });
+      return c.json({ status: "ok", version: "1.5.0", timestamp: Date.now() });
     });
     
     // REST API routes
@@ -321,9 +382,9 @@ export class App extends DurableObject {
     registerHackathonRoutes(this.app, this.ctx.storage.sql);
     registerAttachmentRoutes(this.app, this.ctx.storage.sql);
     registerArchiveRoutes(this.app, this.ctx.storage.sql);
-    registerSettingsRoutes(this.app, this.ctx.storage.sql);
+    registerSettingsRoutes(this.app, this.ctx.storage.sql, env);
     registerCapacityRoutes(this.app, this.ctx.storage.sql);
-    registerInboxRoutes(this.app, this.ctx.storage.sql);
+    registerInboxRoutes(this.app, this.ctx.storage.sql, env);
     registerCaptureRoutes(this.app, this.ctx.storage.sql);
     registerMcpRoutes(this.app, this.ctx.storage.sql);
     registerFeedRoutes(this.app, this.ctx.storage.sql);
@@ -355,70 +416,75 @@ export class App extends DurableObject {
       } catch (e) { return c.json({ ok: false, error: String(e) }, 500); }
     });
 
-    // --- Debug / diagnostics routes ---
-    this.app.get("/api/debug/email", (c) => {
-      const provider = String(c.env.EMAIL_PROVIDER || "").toLowerCase();
-      return c.json({ provider: provider || null });
-    });
+    // --- Debug routes (development only) ---
+    // GDS API standards and the Technology Code of Practice say test and debug
+    // endpoints must not be exposed in production. They are only registered when
+    // DEBUG_ROUTES_ENABLED is set explicitly.
+    if (env?.DEBUG_ROUTES_ENABLED === "true") {
+      this.app.get("/api/debug/email", (c) => {
+        const provider = String(c.env.EMAIL_PROVIDER || "").toLowerCase();
+        return c.json({ provider: provider || null });
+      });
 
-    this.app.get("/api/debug/mcp", (c) => {
-      const sql = this.ctx.storage.sql;
-      try {
-        const tools = sql.exec("SELECT name FROM mcp_tools ORDER BY name").toArray();
-        const notifs = sql.exec("SELECT COUNT(*) AS n FROM mcp_notifications").toArray();
-        return c.json({ tools: tools.map((r: any) => r.name), notification_count: notifs.length > 0 ? notifs[0].n : 0, last_call: null });
-      } catch (e) { return c.json({ error: String(e) }, 500); }
-    });
+      this.app.get("/api/debug/mcp", (c) => {
+        const sql = this.ctx.storage.sql;
+        try {
+          const tools = sql.exec("SELECT name FROM mcp_tools ORDER BY name").toArray();
+          const notifs = sql.exec("SELECT COUNT(*) AS n FROM mcp_notifications").toArray();
+          return c.json({ tools: tools.map((r: any) => r.name), notification_count: notifs.length > 0 ? notifs[0].n : 0, last_call: null });
+        } catch (e) { return c.json({ error: String(e) }, 500); }
+      });
 
-    this.app.get("/api/debug/push-census", (c) => {
-      const sql = this.ctx.storage.sql;
-      try {
-        const subs = sql.exec("SELECT endpoint, last_ok, last_error, failures FROM push_subscriptions").toArray();
-        const total = subs.length, ok = subs.filter((s: any) => s.last_ok).length, failed = subs.filter((s: any) => s.failures && s.failures > 0).length;
-        return c.json({ total, ok, failed, last_ok_ts: subs.filter((s: any) => s.last_ok).map((s: any) => s.last_ok), last_error_sample: subs.filter((s: any) => s.last_error).map((s: any) => s.last_error).at(0) });
-      } catch (e) { return c.json({ error: String(e) }, 500); }
-    });
+      this.app.get("/api/debug/push-census", (c) => {
+        const sql = this.ctx.storage.sql;
+        try {
+          const subs = sql.exec("SELECT endpoint, last_ok, last_error, failures FROM push_subscriptions").toArray();
+          const total = subs.length, ok = subs.filter((s: any) => s.last_ok).length, failed = subs.filter((s: any) => s.failures && s.failures > 0).length;
+          return c.json({ total, ok, failed, last_ok_ts: subs.filter((s: any) => s.last_ok).map((s: any) => s.last_ok), last_error_sample: subs.filter((s: any) => s.last_error).map((s: any) => s.last_error).at(0) });
+        } catch (e) { return c.json({ error: String(e) }, 500); }
+      });
 
-    this.app.get("/api/debug/digest-preview", (c) => {
-      const sql = this.ctx.storage.sql;
-      const p = { citizenships: ["IT"], residencies: ["GB"], residency_status: "settled", age: 25, is_student: false, team_size: 1, employed_by_sponsor: false, timezone: "Europe/Dublin" };
-      try { return c.json(buildDigest(sql, p, new Date())); } catch (e) { return c.json({ error: String(e) }, 500); }
-    });
+      this.app.get("/api/debug/digest-preview", (c) => {
+        const sql = this.ctx.storage.sql;
+        const p = { citizenships: ["IT"], residencies: ["GB"], residency_status: "settled", age: 25, is_student: false, team_size: 1, employed_by_sponsor: false, timezone: "Europe/Dublin" };
+        try { return c.json(buildDigest(sql, p, new Date())); } catch (e) { return c.json({ error: String(e) }, 500); }
+      });
 
-    this.app.get("/api/debug/profile", (c) => {
-      try { return c.json(readProfile(this.ctx.storage.sql)); } catch (e) { return c.json({ error: String(e) }, 500); }
-    });
+      this.app.get("/api/debug/profile", (c) => {
+        try { return c.json(readProfile(this.ctx.storage.sql)); } catch (e) { return c.json({ error: String(e) }, 500); }
+      });
 
-    this.app.get("/api/debug/settings-diff", (c) => {
-      try {
-        const stored = ({ timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" });
-        const def = { timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" };
-        const diff = Object.keys(def).filter(k => stored[k] !== def[k]).map(k => `${k}: stored="${stored[k]}" vs default="${def[k]}"`);
-        return c.json({ diff: diff.length ? diff : "nothing different" });
-      } catch (e) { return c.json({ error: String(e) }, 500); }
-    });
+      this.app.get("/api/debug/settings-diff", (c) => {
+        try {
+          const stored = ({ timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" });
+          const def = { timezone: "Europe/Dublin", daily_digest: true, digest_time: "08:00" };
+          const diff = Object.keys(def).filter(k => stored[k] !== def[k]).map(k => `${k}: stored="${stored[k]}" vs default="${def[k]}"`);
+          return c.json({ diff: diff.length ? diff : "nothing different" });
+        } catch (e) { return c.json({ error: String(e) }, 500); }
+      });
 
-    this.app.post("/api/debug/reset", async (c) => {
-      const sql = this.ctx.storage.sql;
-      try {
-        await writeProfile(sql, {
-          citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
-          age: 25, is_student: false, team_size: 1, employed_by_sponsor: false, timezone: "Europe/Dublin",
-        });
-        await sql.exec(`INSERT INTO settings (key, value, updated_at) VALUES ('main', '{"storage":{"provider":"r2"},"notifications":{"daily_digest":true,"digest_time":"08:00"}}', ?)
-          ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`, [Date.now(), JSON.stringify({"storage":{"provider":"r2"},"notifications":{"daily_digest":true,"digest_time":"08:00"}}), Date.now()]);
-        await sql.exec("UPDATE mcp_notifications SET count = 0");
-        return c.json({ ok: true, message: "Reset to defaults" });
-      } catch (e) { return c.json({ ok: false, error: String(e) }, 500); }
-    });
+      this.app.post("/api/debug/reset", async (c) => {
+        const sql = this.ctx.storage.sql;
+        try {
+          writeProfile(sql, {
+            citizenships: ["IT"], residencies: ["GB"], residency_status: "settled",
+            age: 25, is_student: false, team_size: 1, employed_by_sponsor: false, timezone: "Europe/Dublin",
+          });
+          sql.exec(`INSERT INTO settings (key, value, updated_at) VALUES ('main', '{"storage":{"provider":"r2"},"notifications":{"daily_digest":true,"digest_time":"08:00"}}', ?)
+            ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`, Date.now(), JSON.stringify({"storage":{"provider":"r2"},"notifications":{"daily_digest":true,"digest_time":"08:00"}}), Date.now());
+          sql.exec("UPDATE mcp_notifications SET count = 0");
+          return c.json({ ok: true, message: "Reset to defaults" });
+        } catch (e) { return c.json({ ok: false, error: String(e) }, 500); }
+      });
 
-    this.app.get("/api/debug/health", (c) => {
-      const sql = this.ctx.storage.sql;
-      try {
-        const p = readProfile(sql);
-        return c.json({ email_provider: String(c.env.EMAIL_PROVIDER || "").toLowerCase() || null, profile: p, digest_time: "08:00" });
-      } catch (e) { return c.json({ error: String(e) }, 500); }
-    });
+      this.app.get("/api/debug/health", (c) => {
+        const sql = this.ctx.storage.sql;
+        try {
+          const p = readProfile(sql);
+          return c.json({ email_provider: String(c.env.EMAIL_PROVIDER || "").toLowerCase() || null, profile: p, digest_time: "08:00" });
+        } catch (e) { return c.json({ error: String(e) }, 500); }
+      });
+    }
 
     // Seed sample data ONLY when explicitly enabled.
     //

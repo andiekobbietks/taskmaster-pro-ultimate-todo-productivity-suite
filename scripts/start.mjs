@@ -2,11 +2,11 @@
  * Self-healing start script.
  *
  * What it does (always, idempotent):
- * 1. Check 8787: is the workerd server answering /api/debug/health?
+ * 1. Check 8787: is the workerd server answering /health?
  * 2. Check 8080: is the python static server blocking it?
- * 3. If 8080 is the python server (detects by POST /api/debug/health → HTML 404 or 501),
+ * 3. If 8080 is the python server (detects by GET /health → HTML 404 or 501),
  *    kill it, then start the proxy (dev-server.mjs) on 8080.
- * 4. Verify: POST creates a list through 8080; reports PASS or FAIL.
+ * 4. Verify: GET /health through 8080 reports PASS or FAIL.
  *
  * The user asked for "self healing and remediation that automatically
  * knows how to deal with this networking thing" — this runs without
@@ -29,10 +29,10 @@ console.log("=== Self-healing server check ===");
 // 1. Is 8787 the real app responding?
 let apiHealthy = false;
 try {
-  const res = await fetch(`http://127.0.0.1:${API_PORT}/api/debug/health`, { method: "GET" });
+  const res = await fetch(`http://127.0.0.1:${API_PORT}/health`, { method: "GET" });
   const j = await res.json().catch(() => null);
   apiHealthy = j?.status === "ok";
-  ok("8787 /api/debug/health responds (workerd)", apiHealthy);
+  ok("8787 /health responds (workerd)", apiHealthy);
 } catch {
   ok("8787 responds", false);
   console.log("  (workerd may need a restart — see wrangler2.log)");
@@ -41,10 +41,10 @@ try {
 // 2. Check 8080 — is it the broken python server?
 let pythonOn8080 = false;
 try {
-  const res = await fetch(`http://127.0.0.1:${PORT}/api/debug/health`, { method: "GET" });
+  const res = await fetch(`http://127.0.0.1:${PORT}/health`, { method: "GET" });
   const text = await res.text();
-  pythonOn8080 = text.includes("not found") || res.status === 404 || res.status === 501 || res.status === 404;
-  ok("8080 responds to /api/debug/health (not python static)", !pythonOn8080);
+  pythonOn8080 = text.includes("not found") || res.status === 404 || res.status === 501;
+  ok("8080 responds to /health (not python static)", !pythonOn8080);
   if (pythonOn8080) console.log("  (python -m http.server detected — will kill)");
 } catch {
   ok("8080 responds at all", false);
@@ -66,12 +66,12 @@ if (pythonOn8080) {
 // 4. Verify journey works through 8080 (either via proxy or direct to 8787 if 8080 empty).
 console.log("=== Final journey verification ===");
 try {
-  const res = await fetch(`http://127.0.0.1:${PORT}/api/debug/email`, { method: "GET" });
+  const res = await fetch(`http://127.0.0.1:${PORT}/health`, { method: "GET" });
   const j = await res.json().catch(() => ({}));
-  ok("GET /api/debug/email works through 8080", res.ok || j.provider !== undefined);
-  if (res.ok || j.provider !== undefined) console.log("  provider:", j.provider || j.error || "(present)");
+  ok("GET /health works through 8080", res.ok && j.status === "ok");
+  if (res.ok && j.status === "ok") console.log("  version:", j.version || "(present)");
 } catch (e) {
-  ok("GET /api/debug/email through 8080", false);
+  ok("GET /health through 8080", false);
   console.log("  error:", e.message.slice(0, 60));
   console.log("  hint: the proxy server (dev-server.mjs) needs the worker on 8787 running. Start it with: node scripts/dev-server.mjs 8080");
 }

@@ -287,7 +287,7 @@ export async function sendDigestIfDue(
 
   // --- Email channel (only when configured and a provider is set) ---
   const emailSettings = readSettingsSection(sql, "email") as any;
-  const emailConfig = resolveEmailConfig(sql, env);
+  const emailConfig = await resolveEmailConfig(sql, env);
   const recipients = resolveRecipients(sql, emailConfig);
   if (emailConfig.provider && recipients.length) {
     const closingText = digest.closing.map((c: any) => c.name + (c.daysLeft === 0 ? " (today)" : " in " + c.daysLeft + " day" + (c.daysLeft === 1 ? "" : "s"))).join(", ") || "none";

@@ -56,8 +56,8 @@ export function registerEmailRoutes(app: Hono, sql: any, env: any): void {
   // The Developer screen calls this so it can say "SendGrid, missing
   // the API key" instead of just "not configured".
 
-  app.get("/api/email/status", (c) => {
-    const config = resolveEmailConfig(sql, env);
+  app.get("/api/email/status", async (c) => {
+    const config = await resolveEmailConfig(sql, env);
     const readiness = emailReadiness(config);
     return c.json({
       provider: readiness.provider,
@@ -84,7 +84,7 @@ export function registerEmailRoutes(app: Hono, sql: any, env: any): void {
   // rather than as a provider error.
 
   app.post("/api/email/test", async (c) => {
-    const config = resolveEmailConfig(sql, env);
+    const config = await resolveEmailConfig(sql, env);
     const readiness = emailReadiness(config);
     if (!readiness.ready) {
       return c.json(

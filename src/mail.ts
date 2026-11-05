@@ -8,9 +8,9 @@
  * the insert, the platform detection and the matching to a competition, so
  * there is one place where a message becomes an inbox row.
  */
-import { readSettings } from "./settings.ts";
+import { readDecryptedSettings } from "./settings.ts";
 import { fetchEmailsSince, type JMAPConfig, type JMAPEmail } from "./jmap.ts";
-import { hasYahooConfig, listMessages, getRawMessage, type YahooConfig } from "./yahoo.ts";
+import { listMessages, getRawMessage, type YahooConfig } from "./yahoo.ts";
 import { detectPlatform } from "./platform-domains.ts";
 
 export interface MailFetchResult {
@@ -85,15 +85,32 @@ export const JMAP_ID_PREFIX = "inbox-jmap-";
  * the same minute as one already stored is not missed; the stable id then
  * catches the overlap.
  */
-export async function fetchNewMail(sql: any): Promise<MailFetchResult> {
-  const settings = readSettings(sql);
+export async function fetchNewMail(sql: any, env: any = {}): Promise<MailFetchResult> {
+  const settings = await readDecryptedSettings(sql, env);
   const email = settings.email || {};
+
+  // Merge settings with environment secrets. Settings win if they carry a
+  // value; an empty form field does not blank a working wrangler secret.
+  const pick = (key: string, envValue: any): any => {
+    const fromSettings = email[key];
+    if (fromSettings === undefined || fromSettings === null || fromSettings === "") {
+      return envValue;
+    }
+    return fromSettings;
+  };
+
+  const yahooConfig: YahooConfig = {
+    client_id: String(pick("yahoo_client_id", env?.YAHOO_CLIENT_ID) || ""),
+    client_secret: String(pick("yahoo_client_secret", env?.YAHOO_CLIENT_SECRET) || ""),
+    refresh_token: String(pick("yahoo_refresh_token", env?.YAHOO_REFRESH_TOKEN) || ""),
+    mailbox_id: String(pick("yahoo_mailbox_id", "/") || "/"),
+  };
 
   // The Yahoo Mail API comes first when it is set up. It is a plain HTTP
   // API, so the Worker can call it itself, and it hands back the raw
   // source of each message.
-  if (hasYahooConfig(email)) {
-    return fetchFromYahoo(email);
+  if (yahooConfig.client_id && yahooConfig.client_secret && yahooConfig.refresh_token) {
+    return fetchFromYahoo(yahooConfig);
   }
 
   const serverUrl = (email.jmap_server_url || "").trim();
@@ -145,14 +162,7 @@ export async function fetchNewMail(sql: any): Promise<MailFetchResult> {
  * The messages come back as raw MIME, so the inbox parses them the same
  * way it parses a message posted from outside.
  */
-async function fetchFromYahoo(email: any): Promise<MailFetchResult> {
-  const config: YahooConfig = {
-    client_id: email.yahoo_client_id,
-    client_secret: email.yahoo_client_secret,
-    refresh_token: email.yahoo_refresh_token,
-    mailbox_id: email.yahoo_mailbox_id || "/",
-  };
-
+async function fetchFromYahoo(config: YahooConfig): Promise<MailFetchResult> {
   const listing = await listMessages(config, 25);
   const candidates = ((listing as any).messages || []) as Array<{
     id: string;

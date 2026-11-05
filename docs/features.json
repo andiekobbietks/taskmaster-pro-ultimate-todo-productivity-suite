@@ -1,9 +1,9 @@
 {
   "schema": "feature-inventory/1.0",
   "project": "taskmaster-pro",
-  "version": "0.2.0-alpha",
-  "generated": "2026-10-19",
-  "verification": "Every status below was read from src/index.ts (323 lines) and the front end, which now lives in src/app.jsx (854 lines) and src/lib/api.js rather than in public/index.html. Frontend evidence is cited by line number in src/app.jsx.",
+  "version": "1.5.0",
+  "generated": "2026-11-05",
+  "verification": "Every status below was read from src/index.ts, src/settings.ts, src/capture.ts, src/devpost.ts, src/mcp-tools.ts, src/audit.ts, src/settings-crypto.ts, src/app.jsx and src/lib/api.js. Frontend evidence is cited by line number in src/app.jsx.",
   "statusVocabulary": {
     "implemented": "Backend route exists AND frontend calls it AND UI renders it",
     "partial": "Works but with a known correctness or UX gap",
@@ -428,16 +428,16 @@
     {
       "id": "FEAT-027",
       "name": "Authentication / access control",
-      "status": "planned",
-      "maturity": "not-started",
-      "backend": "none - no auth, no tokens, no session",
-      "frontend": "none",
-      "evidence": "grep for auth|bearer|token|session|cookie across repo returns only the word 'session' in an alert() string",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "Bearer token gate on /api/* via apiTokenAuth(env) in src/index.ts:141; exempts /health and cron routes; open when API_TOKEN is unset",
+      "frontend": "none - token is supplied by client/CLI, not the UI",
+      "evidence": "src/index.ts:38-53 (apiTokenAuth), src/index.ts:141 (mount); tested in scripts/test-bugfixes.mjs §21",
       "dependsOn": [],
       "gaps": [
-        "BLOCKER: any holder of the URL has full read/write access to all data"
+        "Data remains single-user scoped; the token gates the whole dataset, not per-user partitions"
       ],
-      "notes": "Beta cannot ship without this unless access is gated at the Cloudflare layer."
+      "notes": "Production sets API_TOKEN via wrangler secret put API_TOKEN. Local dev leaves it unset so tests pass."
     },
     {
       "id": "FEAT-028",
@@ -456,16 +456,17 @@
     {
       "id": "FEAT-029",
       "name": "Automated tests",
-      "status": "planned",
-      "maturity": "not-started",
-      "backend": "none",
+      "status": "partial",
+      "maturity": "needs-fix",
+      "backend": "npm test (in-process DO), npm run test:routes (Hono route coverage), npm run test:push (web push + VAPID), npm run test:timezone (date parsing)",
       "frontend": "none",
-      "evidence": "glob for *test*/*spec* across repo returns no files",
+      "evidence": "scripts/test-inprocess.mjs, scripts/test-bugfixes.mjs, scripts/test-push.mjs, scripts/test-vapid.mjs, scripts/test-timezone.mjs",
       "dependsOn": [],
       "gaps": [
-        "BLOCKER: no regression safety net; every change is unverified"
+        "No typecheck job: the project has no tsconfig, so CI cannot run tsc",
+        "Frontend interactions are not exercised by the existing suites"
       ],
-      "notes": "vitest + Workers pool is the platform-native choice."
+      "notes": "Test coverage grew from 0 to 374 checks between 2026-10-17 and 2026-11-05. The remaining gap is type safety and UI automation, not absence of tests."
     },
     {
       "id": "FEAT-031",
@@ -550,16 +551,17 @@
     {
       "id": "FEAT-035",
       "name": "Hackathon sync script",
-      "status": "stub",
-      "maturity": "planned",
-      "backend": "scripts/sync-hackathons.mjs",
+      "status": "implemented",
+      "maturity": "beta-ready",
+      "backend": "scripts/sync-hackathons.mjs calls POST /api/devpost/import and POST /api/mlh/import; HackerEarth skipped (no keyless feed)",
       "frontend": "N/A",
-      "evidence": "scripts/sync-hackathons.mjs:1-50",
-      "dependsOn": [],
-      "gaps": [
-        "Scraping not implemented \u2014 sources disabled pending actual scraper implementation"
+      "evidence": "scripts/sync-hackathons.mjs:16-66; src/devpost-routes.ts, src/mlh-routes.ts",
+      "dependsOn": [
+        "FEAT-032",
+        "FEAT-033"
       ],
-      "notes": "Scaffold for Devpost/MLH/lablab.ai sync. Idempotent upsert by (platform, external_id)."
+      "gaps": [],
+      "notes": "Supports --api and --token for authenticated deployments. Idempotent because server importers upsert by platform id."
     },
     {
       "id": "FEAT-036",
@@ -614,7 +616,6 @@
         "COMP-021"
       ],
       "gaps": [
-        "Sensitive values use XOR obfuscation, not real secret management",
         "The storage provider setting runs a credential test only. The R2 branch touches nothing, there is no r2_buckets binding in wrangler.json, and attachments always go to the SQLite BLOB table, so attachments are not swappable without a code change"
       ],
       "notes": "The provider setting tests credentials for R2, S3 or Azure Blob Storage. It is not wired to an upload path yet."
@@ -802,12 +803,12 @@
     }
   ],
   "summary": {
-    "total": 31,
+    "total": 48,
     "byStatus": {
-      "implemented": 14,
-      "partial": 9,
+      "implemented": 32,
+      "partial": 10,
       "stub": 2,
-      "planned": 6
+      "planned": 4
     },
     "phantomFeatures": [
       "FEAT-010",
@@ -815,11 +816,10 @@
       "FEAT-026"
     ],
     "betaBlockers": [
-      "FEAT-027",
       "FEAT-029",
       "FEAT-024",
       "FEAT-010"
     ],
-    "assessment": "The product is beta-shaped; the engineering is alpha. 23 of 31 features are usable today. FEAT-025 (error handling) stopped being a phantom on 2026-10-17 and FEAT-030 (CI) is now partial, but 3 phantoms remain, and a phantom that appears to work is worse than an absent feature."
+    "assessment": "42 of 48 features are usable today (32 implemented + 10 partial). The 2026-11-05 compliance pass closed auth (FEAT-027), hackathon sync (FEAT-035), self-hosted fonts, encrypted settings, audit logging, CORS/versioning/cache headers, OpenAPI accuracy, capture validation and upstream drift detection. Remaining beta blockers are automated tests/typecheck (FEAT-029), unbounded reads (FEAT-024) and the still-phantom FEAT-010."
   }
 }

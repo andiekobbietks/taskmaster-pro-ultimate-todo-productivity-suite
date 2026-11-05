@@ -13,6 +13,8 @@ import { DEFAULT_PROFILE, readProfile, writeProfile, type UserProfile } from "./
 import { isValidTimeZone } from "./timezone.ts";
 import { testYahooConnection, type YahooConfig } from "./yahoo.ts";
 import { maskSecret, SECRET_MASK } from "./lib/secret.js";
+import { writeAuditLog, readAuditLog } from "./audit.ts";
+import { encryptSetting, decryptSetting, isEncrypted } from "./settings-crypto.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -186,20 +188,9 @@ function parseJson<T>(s: string | null, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
 }
 
-// Simple XOR-based obfuscation for sensitive values.
-// NOT cryptographically secure — just prevents casual reading.
-// For production, use Cloudflare's secret management or a proper KMS.
-function obfuscate(value: string): string {
-  if (!value) return "";
-  const key = "taskmaster-pro-settings-key";
-  let result = "";
-  for (let i = 0; i < value.length; i++) {
-    result += String.fromCharCode(value.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-  }
-  return btoa(result);
-}
-
-function deobfuscate(value: string): string {
+// Legacy XOR-based obfuscation. Kept only so values written before the
+// Web Crypto migration can still be read. New values use AES-256-GCM.
+function legacyDeobfuscate(value: string): string {
   if (!value) return "";
   try {
     const key = "taskmaster-pro-settings-key";
@@ -210,16 +201,103 @@ function deobfuscate(value: string): string {
     }
     return result;
   } catch {
-    return "";
+    // Not a legacy XOR value (e.g. plaintext or already encrypted). Leave
+    // it for decryptSettings to handle.
+    return value;
   }
 }
 
-// Fields that should be obfuscated in storage
+// Fields that should be encrypted at rest
 const SENSITIVE_FIELDS = new Set([
   "imap_password", "jmap_password", "yahoo_client_secret", "yahoo_refresh_token",
   "azure_sas_token", "s3_secret_key",
   "sendgrid_api_key", "ses_access_key", "ses_secret_key", "oracle_smtp_pass",
 ]);
+
+/**
+ * Encrypt every sensitive field that is not already encrypted.
+ * Empty strings are left empty. If no encryption key is configured the
+ * value is stored as-is (development / test fallback).
+ */
+async function encryptSettings(settings: any, env: any): Promise<any> {
+  const copy = JSON.parse(JSON.stringify(settings));
+  for (const section of Object.values(copy)) {
+    if (typeof section === "object" && section !== null) {
+      for (const [key, value] of Object.entries(section)) {
+        if (SENSITIVE_FIELDS.has(key) && typeof value === "string" && value !== "" && !isEncrypted(value)) {
+          (section as any)[key] = await encryptSetting(value, env);
+        }
+      }
+    }
+  }
+  return copy;
+}
+
+/**
+ * Synchronous legacy deobfuscation. Encrypted `enc:v1:` values are left
+ * untouched so they can be decrypted asynchronously at the API boundary.
+ */
+function legacyDeobfuscateSettings(settings: any): any {
+  const copy = JSON.parse(JSON.stringify(settings));
+  for (const section of Object.values(copy)) {
+    if (typeof section === "object" && section !== null) {
+      for (const [key, value] of Object.entries(section)) {
+        if (SENSITIVE_FIELDS.has(key) && typeof value === "string" && value !== "" && !isEncrypted(value)) {
+          (section as any)[key] = legacyDeobfuscate(value);
+        }
+      }
+    }
+  }
+  return copy;
+}
+
+/**
+ * Decrypt `enc:v1:` values in place. Legacy XOR values are deobfuscated.
+ * If no key is configured, encrypted values become empty strings.
+ */
+async function decryptSettings(settings: any, env: any): Promise<any> {
+  const copy = JSON.parse(JSON.stringify(settings));
+  for (const section of Object.values(copy)) {
+    if (typeof section === "object" && section !== null) {
+      for (const [key, value] of Object.entries(section)) {
+        if (SENSITIVE_FIELDS.has(key) && typeof value === "string" && value !== "") {
+          if (isEncrypted(value)) {
+            (section as any)[key] = await decryptSetting(value, env);
+          } else {
+            // Legacy XOR values are base64-ish and reversible with the
+            // same function. If it is not valid base64 the helper returns "".
+            (section as any)[key] = legacyDeobfuscate(value);
+          }
+        }
+      }
+    }
+  }
+  return copy;
+}
+
+function auditActor(c: any): string {
+  return c.req.header("x-audit-actor") || "user";
+}
+
+function auditIp(c: any): string {
+  return c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for") || "";
+}
+
+function changedSensitiveFields(before: any, after: any): string[] {
+  const changed: string[] = [];
+  for (const section of Object.keys(after)) {
+    const beforeSection = before?.[section] || {};
+    const afterSection = after[section] || {};
+    for (const field of SENSITIVE_FIELDS) {
+      const b = beforeSection[field];
+      const a = afterSection[field];
+      if (typeof a === "string" && a !== "" && a !== b) {
+        changed.push(`${section}.${field}`);
+      }
+    }
+  }
+  return changed;
+}
 
 function obfuscateSettings(settings: any): any {
   const copy = JSON.parse(JSON.stringify(settings));
@@ -304,9 +382,21 @@ export function readSettings(sql: any): any {
     return o;
   }
   const settings = deepMerge({ ...DEFAULT_SETTINGS }, stored);
-  const deobfuscated = deobfuscateSettings(settings);
+  const deobfuscated = legacyDeobfuscateSettings(settings);
   deobfuscated.profile = readProfile(sql);
   return deobfuscated;
+}
+
+/**
+ * Read the whole settings object with sensitive values decrypted.
+ *
+ * Use this at API boundaries and anywhere the actual secret is needed
+ * (mail, email sending). Internal callers that only read non-sensitive
+ * configuration can use the synchronous readSettings().
+ */
+export async function readDecryptedSettings(sql: any, env: any): Promise<any> {
+  const settings = readSettings(sql);
+  return decryptSettings(settings, env);
 }
 
 /**
@@ -324,13 +414,13 @@ export function readSettings(sql: any): any {
  * @param sql - SQLite storage interface from Durable Object
  */
 
-export function registerSettingsRoutes(app: Hono, sql: any) {
+export function registerSettingsRoutes(app: Hono, sql: any, env: any = {}) {
   // --- Get all settings -----------------------------------------------
 
-  app.get("/api/settings", (c) => {
+  app.get("/api/settings", async (c) => {
     // A secret is write-only. The screen is told that it is set, not what
     // it is.
-    return c.json(maskSettings(readSettings(sql)));
+    return c.json(maskSettings(await readDecryptedSettings(sql, env)));
   });
 
   // --- Update all settings --------------------------------------------
@@ -338,13 +428,9 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
   app.put("/api/settings", async (c) => {
     const data = await c.req.json();
 
-    // Start from what is stored, not from the defaults — otherwise a
-    // one-section update resets every other section.
-    const storedRows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
-    const stored = storedRows.length > 0
-      ? deobfuscateSettings(parseJson(storedRows[0].value, DEFAULT_SETTINGS))
-      : { ...DEFAULT_SETTINGS };
-
+    // Start from what is stored, decrypted, not from the defaults —
+    // otherwise a one-section update resets every other section.
+    const stored = await readDecryptedSettings(sql, env);
     const settings = mergeSettings(stored, data);
 
     // If a profile came in, it wins and is written to the canonical table.
@@ -362,13 +448,31 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
       writeProfile(sql, mergedProfile);
       settings.profile = mergedProfile;
     }
-    const obfuscated = obfuscateSettings(settings);
+    const encrypted = await encryptSettings(settings, env);
 
     sql.exec(
       `INSERT INTO settings (key, value, updated_at) VALUES ('main', ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`,
-      JSON.stringify(obfuscated), now(), JSON.stringify(obfuscated), now()
+      JSON.stringify(encrypted), now(), JSON.stringify(encrypted), now()
     ).toArray();
+
+    const sensitiveChanged = changedSensitiveFields(stored, settings);
+    if (sensitiveChanged.length > 0) {
+      writeAuditLog(sql, {
+        actor: auditActor(c),
+        action: "credentials.updated",
+        resource: "settings",
+        details: { fields: sensitiveChanged },
+        ip: auditIp(c),
+      });
+    }
+    writeAuditLog(sql, {
+      actor: auditActor(c),
+      action: "settings.updated",
+      resource: "settings",
+      details: { sections: Object.keys(data) },
+      ip: auditIp(c),
+    });
 
     // Return the merged view, with the profile read from its canonical table.
     const result = { ...settings };
@@ -378,17 +482,15 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
 
   // --- Get a specific section -----------------------------------------
 
-  app.get("/api/settings/:section", (c) => {
+  app.get("/api/settings/:section", async (c) => {
     const section = c.req.param("section");
-    const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
-    const settings = rows.length > 0 ? parseJson(rows[0].value, DEFAULT_SETTINGS) : DEFAULT_SETTINGS;
-    const deobfuscated = deobfuscateSettings(settings);
+    const decrypted = await readDecryptedSettings(sql, env);
 
-    if (!(section in deobfuscated)) {
+    if (!(section in decrypted)) {
       return c.json({ error: "Unknown settings section" }, 404);
     }
 
-    return c.json(deobfuscated[section as keyof Settings]);
+    return c.json(decrypted[section as keyof Settings]);
   });
 
   // --- Update a specific section --------------------------------------
@@ -397,16 +499,15 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
     const section = c.req.param("section");
     const data = await c.req.json();
 
-    const rows = sql.exec("SELECT value FROM settings WHERE key = 'main'").toArray();
-    const settings = rows.length > 0 ? parseJson(rows[0].value, DEFAULT_SETTINGS) : { ...DEFAULT_SETTINGS };
-    const deobfuscated = deobfuscateSettings(settings);
+    const decryptedBefore = await readDecryptedSettings(sql, env);
+    const decrypted = JSON.parse(JSON.stringify(decryptedBefore));
 
-    if (!(section in deobfuscated)) {
+    if (!(section in decrypted)) {
       return c.json({ error: "Unknown settings section" }, 404);
     }
 
-    deobfuscated[section as keyof Settings] = mergeSettings(
-      deobfuscated[section as keyof Settings],
+    decrypted[section as keyof Settings] = mergeSettings(
+      decrypted[section as keyof Settings],
       data
     );
 
@@ -417,17 +518,36 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
     if (section === "profile") {
       const mergedProfile = mergeSettings(readProfile(sql), data);
       writeProfile(sql, mergedProfile);
-      deobfuscated.profile = mergedProfile;
+      decrypted.profile = mergedProfile;
     }
 
-    const obfuscated = obfuscateSettings(deobfuscated);
+    const encrypted = await encryptSettings(decrypted, env);
     sql.exec(
       `INSERT INTO settings (key, value, updated_at) VALUES ('main', ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`,
-      JSON.stringify(obfuscated), now(), JSON.stringify(obfuscated), now()
+      JSON.stringify(encrypted), now(), JSON.stringify(encrypted), now()
     ).toArray();
 
-    return c.json(deobfuscated[section as keyof Settings]);
+    const sensitiveChanged = changedSensitiveFields(decryptedBefore, decrypted);
+    if (sensitiveChanged.length > 0) {
+      writeAuditLog(sql, {
+        actor: auditActor(c),
+        action: "credentials.updated",
+        resource: "settings",
+        details: { fields: sensitiveChanged },
+        ip: auditIp(c),
+      });
+    }
+    writeAuditLog(sql, {
+      actor: auditActor(c),
+      action: "settings.section.updated",
+      resource: "settings",
+      resource_id: section,
+      details: { fields: Object.keys(data) },
+      ip: auditIp(c),
+    });
+
+    return c.json(decrypted[section as keyof Settings]);
   });
 
   // --- Reset to defaults ----------------------------------------------
@@ -438,13 +558,26 @@ export function registerSettingsRoutes(app: Hono, sql: any) {
     // eligibility engine reads. Clearing only the settings blob would leave
     // the profile behind and the two would disagree.
     sql.exec("DELETE FROM hackathon_profile WHERE id = 'default'");
+    writeAuditLog(sql, {
+      actor: auditActor(c),
+      action: "settings.reset",
+      resource: "settings",
+      ip: auditIp(c),
+    });
     return c.json(DEFAULT_SETTINGS);
+  });
+
+  // --- Audit log ------------------------------------------------------
+
+  app.get("/api/audit/log", (c) => {
+    const limit = Math.min(parseInt(c.req.query("limit") || "250", 10), 1000);
+    return c.json(readAuditLog(sql, limit));
   });
 
   // --- Test the Yahoo application --------------------------------------
 
   app.post("/api/settings/test-yahoo", async (c) => {
-    const settings = readSettings(sql);
+    const settings = await readDecryptedSettings(sql, env);
     const email = settings.email || {};
     const config: YahooConfig = {
       client_id: email.yahoo_client_id || "",

@@ -1,66 +1,564 @@
 openapi: 3.0.3
 info:
-  title: TaskMaster Pro — Developer Portal
+  title: TaskMaster Pro API
   description: |
-    Contract reference for the embedded MCP server (`src/mcp.ts`, 13 tools)
-    and the HTTP routes (`src/index.ts`, `src/email-routes.ts`).
-    The spec is generated from the route handlers; it is not a separate
-    contract — the code is the contract.
-  version: 2.0.0-committed
+    OpenAPI contract for TaskMaster Pro. The canonical versioned base path is
+    `/api/v1`; unversioned `/api/*` paths remain stable during the 1.x lifetime
+    and are rewritten to `/api/v1/*` internally.
+
+    Authentication is via `Authorization: Bearer <token>` or the query
+    parameter `?api_token=<token>`. When `API_TOKEN` is not configured the gate
+    stays open for local development; production deployments must set it with
+    `wrangler secret put API_TOKEN`. The following paths are public or
+    internally authenticated and never require a token:
+
+    - `GET /health`
+    - `POST /api/v1/inbox/fetch` (cron internal)
+    - `POST /api/v1/digest/send` (cron internal)
+    - `POST /api/v1/trash/purge` (cron internal)
+
+    All API responses carry `Cache-Control: no-store, no-cache, must-revalidate,
+    private`. API routes answer CORS preflight with `Access-Control-Allow-Origin`
+    echoing the request `Origin` (or `*`), `Access-Control-Allow-Methods:
+    GET, POST, PUT, PATCH, DELETE, OPTIONS` and
+    `Access-Control-Allow-Headers: Content-Type, Authorization, X-Audit-Actor`.
+  version: 1.5.0
+  contact:
+    name: AK Build / TaskMaster Pro
+    url: https://github.com/andiekobbietks/taskmaster-pro-ultimate-todo-productivity-suite
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+    description: Local dev server
+  - url: /api/v1
+    description: Same-origin production deployment
+security:
+  - bearerAuth: []
+  - queryToken: []
 paths:
   /health:
     get:
-      summary: Health check (all deployments)
-      responses: { 200: { description: OK } }
-  /api/debug/email:
-    get: { summary: Current email provider, responses: { 200: { description: OK } } }
-  /api/debug/mcp:
-    get: { summary: MCP server tools list, responses: { 200: { description: OK } } }
-  /api/debug/push-census:
-    get: { summary: Push subscription census, responses: { 200: { description: OK } } }
-  /api/debug/digest-preview:
-    get: { summary: Digest preview (sample profile), responses: { 200: { description: OK } } }
-  /api/debug/profile:
-    get: { summary: Stored profile, responses: { 200: { description: OK } } }
-  /api/debug/settings-diff:
-    get: { summary: Settings drift from default, responses: { 200: { description: OK } } }
-  /api/debug/reset:
-    post: { summary: Reset to defaults, responses: { 200: { description: OK } } }
-  /api/debug/health:
-    get: { summary: Full system status, responses: { 200: { description: OK } } }
-  /api/email/status:
+      summary: Health check
+      security: []
+      responses:
+        "200": { description: Service is healthy }
+
+  /todos:
     get:
-      summary: Provider configured + missing fields + recipients + credentials present
-      responses: { 200: { description: Status object } }
-  /api/email/test:
+      summary: List todos
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [active, completed] } }
+        - { name: priority, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: listId, in: query, schema: { type: string } }
+      responses: { "200": { description: Array of todos } }
     post:
-      summary: Send one test message (resolves config from env + settings)
-      requestBody: { content: { application/json: { schema: { type: object } } } }
-      responses: { 200: { description: Sent or rejected with reason }, 400: { description: Invalid address or not ready } }
-  /api/email/deliveries:
+      summary: Create a todo
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "201": { description: Created todo }, "400": { description: Validation error } }
+
+  /todos/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    patch:
+      summary: Update a todo
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Updated todo }, "404": { description: Not found } }
+    delete:
+      summary: Delete a todo
+      responses: { "200": { description: Deleted } }
+
+  /lists:
     get:
-      summary: Last 50 delivery attempts (newest first)
-      responses: { 200: { description: Delivery log } }
-  /api/email/subscribers:
-    get: { summary: Active subscribers, responses: { 200: { description: List } } }
+      summary: List task lists
+      responses: { "200": { description: Array of lists } }
     post:
-      summary: Add a subscriber (validates address before storing)
-      requestBody: { content: { application/json: { schema: { type: object, properties: { address: { type: string }, name: { type: string } } } } } }
-      responses: { 200: { description: Added }, 400: { description: Invalid address } }
-  /api/digest/preview:
-    get: { summary: Digest content (without sending), responses: { 200: { description: DigestContent } } }
-  /api/digest/send:
-    post: { summary: Send if due (cron calls this), responses: { 200: { description: Sent or not due } } }
-  /api/digest/send-now:
-    post: { summary: Force send regardless of clock, responses: { 200: { description: Digest sent } } }
-  /api/push/status:
-    get: { summary: Push subscriptions count + health, responses: { 200: { description: OK } } }
-  /api/settings:
-    get: { summary: Full settings (secrets masked via SECRET_MASK), responses: { 200: { description: Settings } } }
+      summary: Create a list
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name] } } } }
+      responses: { "201": { description: Created list }, "400": { description: Name required } }
+
+  /lists/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    delete:
+      summary: Delete a list
+      responses: { "200": { description: Deleted }, "400": { description: Cannot delete default list } }
+
+  /stats:
+    get:
+      summary: Dashboard stats
+      responses: { "200": { description: Counts and totals } }
+
+  /hackathons:
+    get:
+      summary: List hackathons
+      responses: { "200": { description: Array of hackathons } }
+    post:
+      summary: Create a hackathon
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "201": { description: Created } }
+
+  /hackathons/simple:
+    get:
+      summary: Lightweight hackathon list
+      responses: { "200": { description: Array of simplified hackathons } }
+
+  /hackathons/eligibility:
+    get:
+      summary: Eligibility evaluation for all competitions
+      responses: { "200": { description: Eligibility results } }
+
+  /hackathons/profile:
+    get:
+      summary: Read user eligibility profile
+      responses: { "200": { description: Profile object } }
     put:
-      summary: Update settings (merges with stored rather than replacing)
+      summary: Update user eligibility profile
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Updated profile } }
+
+  /hackathons/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: Get one hackathon
+      responses: { "200": { description: Hackathon object }, "404": { description: Not found } }
+    patch:
+      summary: Update a hackathon
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Updated }, "404": { description: Not found } }
+    delete:
+      summary: Delete a hackathon
+      responses: { "200": { description: Deleted } }
+
+  /hackathons/{id}/dossier-data:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: Court-ready dossier payload for a hackathon
+      responses: { "200": { description: Canonical JSON bundle }, "404": { description: Unknown id } }
+
+  /tickets/{id}/attachments:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: List attachments on a hackathon ticket
+      responses: { "200": { description: Attachment list } }
+    post:
+      summary: Upload an attachment to a hackathon ticket
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object } } } }
+      responses: { "201": { description: Uploaded }, "413": { description: Too large } }
+
+  /todos/{id}/attachments:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: List attachments on a todo
+      responses: { "200": { description: Attachment list } }
+    post:
+      summary: Upload an attachment to a todo
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object } } } }
+      responses: { "201": { description: Uploaded }, "413": { description: Too large } }
+
+  /attachments:
+    get:
+      summary: List all attachments
+      responses: { "200": { description: Attachment list } }
+
+  /attachments/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: Download an attachment
+      responses: { "200": { description: File bytes }, "404": { description: Not found } }
+    put:
+      summary: Rename or re-tag an attachment
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Updated } }
+    delete:
+      summary: Soft-delete an attachment to trash
+      responses: { "200": { description: Moved to trash } }
+
+  /trash:
+    get:
+      summary: List soft-deleted attachments
+      responses: { "200": { description: Trashed items } }
+
+  /trash/{id}/restore:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    post:
+      summary: Restore an attachment from trash
+      responses: { "200": { description: Restored } }
+
+  /trash/purge:
+    post:
+      summary: Permanently purge expired trashed attachments
+      responses: { "200": { description: Purge summary } }
+
+  /archive/wacz:
+    post:
+      summary: Ingest a WACZ archive
+      requestBody: { required: true, content: { application/octet-stream: {} } }
+      responses: { "200": { description: Ingested }, "400": { description: Invalid archive } }
+
+  /archive/sources:
+    get:
+      summary: List archive sources
+      responses: { "200": { description: Source list } }
+    post:
+      summary: Add an archive source
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "201": { description: Added } }
+
+  /archive/sources/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    delete:
+      summary: Remove an archive source
+      responses: { "200": { description: Removed } }
+
+  /archive/fetch:
+    post:
+      summary: Trigger archive fetch for a source
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Fetch result } }
+
+  /archive/check:
+    get:
+      summary: Check archive health
+      responses: { "200": { description: Health status } }
+
+  /archive/bulk:
+    post:
+      summary: Bulk archive operation
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Result } }
+
+  /capacity:
+    get:
+      summary: Read capacity settings
+      responses: { "200": { description: Capacity object } }
+    put:
+      summary: Update capacity settings
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Updated } }
+
+  /digest:
+    get:
+      summary: Read digest configuration
+      responses: { "200": { description: Digest config } }
+
+  /digest/weekly:
+    get:
+      summary: Weekly digest content
+      responses: { "200": { description: Digest content } }
+
+  /digest/priority:
+    get:
+      summary: Priority-ranked competitions
+      responses: { "200": { description: Ranked list } }
+
+  /inbox:
+    get:
+      summary: List inbox items
+      responses: { "200": { description: Inbox items } }
+    post:
+      summary: Create an inbox item
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "201": { description: Created } }
+
+  /inbox/fetch:
+    post:
+      summary: Fetch new mail from configured provider
+      responses: { "200": { description: Fetch summary } }
+
+  /inbox/stats:
+    get:
+      summary: Inbox statistics
+      responses: { "200": { description: Stats } }
+
+  /inbox/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: Get one inbox item
+      responses: { "200": { description: Inbox item }, "404": { description: Not found } }
+    patch:
+      summary: Update an inbox item
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Updated } }
+    delete:
+      summary: Delete an inbox item
+      responses: { "200": { description: Deleted } }
+
+  /inbox/{id}/relink:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    post:
+      summary: Relink an inbox item to a hackathon
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Relinked } }
+
+  /capture/manifest:
+    get:
+      summary: Capture manifest
+      responses: { "200": { description: Manifest } }
+
+  /capture/jobs:
+    get:
+      summary: List capture jobs
+      responses: { "200": { description: Job list } }
+    post:
+      summary: Queue a capture job
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "201": { description: Queued } }
+
+  /capture/queue:
+    get:
+      summary: Pending capture queue
+      responses: { "200": { description: Queue } }
+
+  /capture/jobs/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: Get capture job status
+      responses: { "200": { description: Job }, "404": { description: Not found } }
+
+  /capture/jobs/{id}/result:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    post:
+      summary: Submit capture job result
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Accepted } }
+
+  /mcp:
+    post:
+      summary: MCP JSON-RPC endpoint
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: JSON-RPC response } }
+    get:
+      summary: MCP server metadata
+      responses: { "200": { description: Metadata } }
+    delete:
+      summary: Close MCP session
+      responses: { "204": { description: Closed } }
+
+  /feed.xml:
+    get:
+      summary: RSS feed of upcoming hackathons
+      responses: { "200": { description: RSS XML } }
+
+  /feed/fetch:
+    post:
+      summary: Refresh feed from remote
+      responses: { "200": { description: Result } }
+
+  /feed/known:
+    get:
+      summary: Known feed sources
+      responses: { "200": { description: Sources } }
+
+  /devpost/import:
+    get:
+      summary: Devpost import status
+      responses: { "200": { description: Status } }
+    post:
+      summary: Trigger Devpost import
       requestBody: { content: { application/json: { schema: { type: object } } } }
-      responses: { 200: { description: Merged view } }
-servers:
-  - url: http://127.0.0.1:8787
-    description: Local dev server (matches .dev.vars + VAPID keys)
+      responses: { "200": { description: Import result }, "502": { description: Upstream failure } }
+
+  /mlh/import:
+    get:
+      summary: MLH import status
+      responses: { "200": { description: Status } }
+    post:
+      summary: Trigger MLH import
+      requestBody: { content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Import result }, "502": { description: Upstream failure } }
+
+  /hackerearth/import:
+    get:
+      summary: HackerEarth import status
+      responses: { "200": { description: Status } }
+    post:
+      summary: Trigger HackerEarth import
+      responses: { "200": { description: Status }, "501": { description: No keyless feed available } }
+
+  /calendar.ics:
+    get:
+      summary: iCalendar feed
+      responses: { "200": { description: ICS data } }
+
+  /calendar/export.ics:
+    get:
+      summary: Export iCalendar feed
+      responses: { "200": { description: ICS data } }
+
+  /calendar/methods:
+    get:
+      summary: List supported calendar push methods
+      responses: { "200": { description: Methods } }
+
+  /calendar/push:
+    post:
+      summary: Push calendar to external provider
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Pushed }, "400": { description: Unsupported method } }
+
+  /push/key:
+    get:
+      summary: VAPID public key
+      security: []
+      responses: { "200": { description: VAPID key } }
+
+  /push/subscribe:
+    post:
+      summary: Subscribe to push notifications
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "201": { description: Subscribed } }
+
+  /push/unsubscribe:
+    post:
+      summary: Unsubscribe from push notifications
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Unsubscribed } }
+
+  /push/status:
+    get:
+      summary: Push subscription status
+      responses: { "200": { description: Status } }
+
+  /push/test:
+    post:
+      summary: Send a test push notification
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Sent or queued } }
+
+  /digest/preview:
+    get:
+      summary: Preview digest without sending
+      responses: { "200": { description: Digest content } }
+
+  /digest/send:
+    post:
+      summary: Send digest if due
+      responses: { "200": { description: Sent or not due } }
+
+  /digest/send-now:
+    post:
+      summary: Force-send digest now
+      responses: { "200": { description: Sent } }
+
+  /email/status:
+    get:
+      summary: Email provider readiness
+      responses: { "200": { description: Status object } }
+
+  /email/test:
+    post:
+      summary: Send a test email
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Sent or rejected }, "400": { description: Invalid address or not ready } }
+
+  /email/deliveries:
+    get:
+      summary: Recent delivery attempts
+      responses: { "200": { description: Delivery log } }
+
+  /email/subscribers:
+    get:
+      summary: List subscribers
+      responses: { "200": { description: Subscribers } }
+    post:
+      summary: Add a subscriber
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [address] } } } }
+      responses: { "200": { description: Added }, "400": { description: Invalid address } }
+
+  /email/subscribers/{address}:
+    parameters: [{ name: address, in: path, required: true, schema: { type: string } }]
+    delete:
+      summary: Remove a subscriber
+      responses: { "200": { description: Removed } }
+
+  /settings:
+    get:
+      summary: Read settings (secrets masked)
+      responses: { "200": { description: Settings object } }
+    put:
+      summary: Update settings (merges)
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Merged settings } }
+
+  /settings/{section}:
+    parameters: [{ name: section, in: path, required: true, schema: { type: string } }]
+    get:
+      summary: Read one settings section
+      responses: { "200": { description: Section } }
+    patch:
+      summary: Update one settings section
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Updated section } }
+
+  /settings/reset:
+    post:
+      summary: Reset settings to defaults
+      responses: { "200": { description: Reset } }
+
+  /settings/test-yahoo:
+    post:
+      summary: Test Yahoo Mail connectivity
+      responses: { "200": { description: Test result } }
+
+  /settings/test-storage:
+    post:
+      summary: Test configured object storage
+      responses: { "200": { description: Test result } }
+
+  /audit/log:
+    get:
+      summary: Read audit log
+      parameters: [{ name: limit, in: query, schema: { type: integer, maximum: 1000 } }]
+      responses: { "200": { description: Audit entries } }
+
+  /checkpoints:
+    get:
+      summary: List checkpoints
+      responses: { "200": { description: Checkpoints } }
+    post:
+      summary: Create a checkpoint
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "201": { description: Created } }
+
+  /checkpoints/{id}/rollback:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    post:
+      summary: Roll back to a checkpoint
+      responses: { "200": { description: Rolled back } }
+
+  /checkpoints/forward:
+    post:
+      summary: Roll forward to the newest checkpoint
+      responses: { "200": { description: Rolled forward } }
+
+  /checkpoints/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    delete:
+      summary: Delete a checkpoint
+      responses: { "200": { description: Deleted } }
+
+  /diagnostics:
+    get:
+      summary: Read diagnostics log
+      responses: { "200": { description: Diagnostics entries } }
+    post:
+      summary: Submit a client diagnostic event
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Accepted }, "400": { description: Malformed JSON } }
+
+  /demo/seed:
+    post:
+      summary: Seed demo data
+      requestBody: { content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Seeded }, "403": { description: Demo mode disabled } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "Authorization: Bearer <API_TOKEN>"
+    queryToken:
+      type: apiKey
+      in: query
+      name: api_token
+      description: "Pass ?api_token=<API_TOKEN> when header auth is impractical"

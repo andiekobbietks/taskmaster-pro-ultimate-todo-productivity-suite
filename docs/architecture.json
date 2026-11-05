@@ -1,9 +1,9 @@
 {
   "schema": "architecture-inventory/1.0",
   "project": "taskmaster-pro",
-  "version": "0.1.0-alpha",
-  "generated": "2026-10-17",
-  "verification": "Every component below was read from src/index.ts (323 lines), src/app.jsx (854 lines), src/lib/api.js, public/index.html (31 lines), package.json and wrangler.json. Line references are exact.",
+  "version": "1.5.0",
+  "generated": "2026-11-05",
+  "verification": "Every component below was read from src/index.ts, src/settings.ts, src/capture.ts, src/devpost.ts, src/mcp-tools.ts, src/audit.ts, src/settings-crypto.ts, src/app.jsx, public/index.html, public/fonts/, package.json and wrangler.json.",
   "maturityVocabulary": {
     "solid": "Correct, idiomatic, no known defects",
     "adequate": "Works, minor gaps that do not block beta",
@@ -221,18 +221,18 @@
       "id": "COMP-012",
       "name": "Web typography",
       "layer": "styling",
-      "role": "Inter (sans) + JetBrains Mono (mono) loaded from Google Fonts with preconnect",
-      "entry": "public/index.html:8-11",
-      "evidence": "public/index.html:9-10 (preconnect), 11 (css2 stylesheet)",
+      "role": "Inter (sans) + JetBrains Mono (mono) self-hosted as woff2 and loaded via @font-face rules compiled into app.css",
+      "entry": "src/tailwind.css @font-face block; public/fonts/",
+      "evidence": "public/fonts/Inter-{Regular,Medium,SemiBold,Bold}.woff2, public/fonts/JetBrainsMono-{Regular,Medium}.woff2, src/tailwind.css @font-face rules, public/index.html no external stylesheet",
       "dependsOn": [
         "DEP-008",
         "DEP-009"
       ],
       "usedBy": [],
       "dataAtRest": "none",
-      "maturity": "adequate",
+      "maturity": "solid",
       "risk": "low",
-      "notes": "preconnect with crossorigin is correct. External font CSS can be blocked in privacy-strict regions, and there is no font-display:swap fallback guaranteeing text visibility."
+      "notes": "Google Fonts preconnect/stylesheet/<noscript> tags were removed from public/index.html and public/storybook.html. All font files are served from public/fonts/; the CSP was tightened to font-src 'self'. No external CSS executes at page view."
     },
     {
       "id": "COMP-013",
@@ -270,34 +270,34 @@
       "id": "COMP-015",
       "name": "Quality assurance",
       "layer": "process",
-      "role": "Tests and typecheck gate (still absent) plus the CI pipeline that now exists",
-      "entry": ".github/workflows/ci.yml and release.yml (added 2026-10-17)",
-      "evidence": "ci.yml runs the Worker bundle check, a docs-sync gate and seed validation on every push; 0 files match *test*/*spec*",
+      "role": "Automated test suites plus the CI pipeline that runs on every push",
+      "entry": "package.json scripts test, test:routes, test:push, test:timezone; .github/workflows/ci.yml and release.yml",
+      "evidence": "npm test (36 checks), npm run test:routes (270 checks), npm run test:push (26 checks), npm run test:timezone (42 checks); ci.yml builds the Worker, runs docs-sync and seed validation; release.yml publishes a GitHub Release from CHANGELOG.md on a v* tag",
       "dependsOn": [],
       "usedBy": [
         "FEAT-029",
         "FEAT-030"
       ],
       "dataAtRest": "none",
-      "maturity": "missing",
-      "risk": "high",
-      "notes": "CI now gates every push and release.yml publishes a GitHub Release from CHANGELOG.md on a v* tag - but there are still no unit tests and no typecheck job, so none of the 30 features is regression-guarded and any refactor is an unverified gamble. maturity deliberately stays 'missing': G-QUAL-01 asks whether automated tests exist, and counting a pipeline without tests would make the checklist lie. This is still the single largest structural gap between alpha and beta."
+      "maturity": "adequate",
+      "risk": "medium",
+      "notes": "Test coverage is now substantial and exercises the in-process DO, routes, push/VAPID and timezone parsing. The remaining gap is a typecheck job: the project has no tsconfig and relies on platform types, so CI cannot run tsc yet."
     },
     {
       "id": "COMP-016",
       "name": "Authentication & tenancy",
       "layer": "security",
-      "role": "Identity, access control, data isolation between users",
-      "entry": "absent",
-      "evidence": "grep for auth|bearer|token|session|cookie = only a string literal in an alert()",
+      "role": "Bearer-token gate on the whole /api/* surface, plus a /api/v1/* URI-version alias that shares the same gate",
+      "entry": "src/index.ts apiTokenAuth(env); registerAuditRoutes",
+      "evidence": "src/index.ts:38-53 (apiTokenAuth), src/index.ts:141 (mount on /api/*), src/index.ts:147-160 (/api/v1/* alias), src/audit.ts (audit_log writes on settings/credential/reset changes); tests in scripts/test-bugfixes.mjs §21",
       "dependsOn": [],
       "usedBy": [
         "FEAT-027"
       ],
       "dataAtRest": "all application data",
-      "maturity": "missing",
-      "risk": "critical",
-      "notes": "Isolation currently relies entirely on the platform fact that one DO instance serves one deployment. That is single-tenant by architecture, not by access control - it protects a private deploy but cannot support a shared beta."
+      "maturity": "adequate",
+      "risk": "high",
+      "notes": "Accepts Authorization: Bearer <token> or ?api_token=; returns 401 {error:'Unauthorized'} on mismatch. /health and cron-internal routes (/api/inbox/fetch, /api/digest/send, /api/trash/purge) are exempt. When API_TOKEN is unset the gate stays open for local development. The gate is single-tenant: it protects a private deployment but does not provide per-user data partitions, so a shared beta would still need user-scoped authorization."
     },
     {
       "id": "COMP-018",
@@ -365,9 +365,9 @@
       "id": "COMP-021",
       "name": "Settings routes module",
       "layer": "backend",
-      "role": "Configurable backend settings: storage backend (R2/S3/Azure), user profile, notification preferences, email/IMAP. Sensitive values obfuscated before storage.",
-      "entry": "src/settings.ts:1 export function registerSettingsRoutes",
-      "evidence": "src/settings.ts:1-250, src/index.ts:18 (import), src/index.ts:264 (registration)",
+      "role": "Configurable backend settings: storage backend (R2/S3/Azure), user profile, notification preferences, email/IMAP/JMAP. Sensitive values are encrypted at rest, compared in a masked view, and can be revoked immediately.",
+      "entry": "src/settings.ts:1 export function registerSettingsRoutes; src/settings-crypto.ts; src/audit.ts",
+      "evidence": "src/settings.ts:1-350, src/settings-crypto.ts (AES-256-GCM + PBKDF2 with enc:v1: prefix), src/audit.ts (audit_log writes on settings/profile/credential/reset changes), src/index.ts (registration); masked compare shows first 3 alphanumerics; /api/settings/revoke performs immediate break-glass removal",
       "dependsOn": [
         "COMP-002",
         "COMP-003",
@@ -376,10 +376,10 @@
       "usedBy": [
         "FEAT-038"
       ],
-      "dataAtRest": "settings",
+      "dataAtRest": "settings, audit_log",
       "maturity": "adequate",
       "risk": "medium",
-      "notes": "Obfuscation is XOR-based \u2014 prevents casual reading, not a substitute for real secret management. Documented as such."
+      "notes": "AES-256-GCM encryption with PBKDF2(SHA-256, 100000 iterations, fixed salt) from SETTINGS_ENCRYPTION_KEY. Legacy XOR obfuscation is retained as legacyDeobfuscate for backwards compatibility only. The key is an environment secret; rotation requires decrypt-then-re-encrypt. No key configured leaves values in plaintext passthrough."
     },
     {
       "id": "COMP-022",
@@ -503,26 +503,114 @@
     "DO [COMP-002] persists via ctx.storage.sql, surviving redeploys",
     "Static assets [COMP-005] served host-side; only unmatched requests reach the DO",
     "Build [COMP-017] writes public/assets/app.js and app.css before dev, CI and deploy",
-    "Google Fonts [COMP-012] is the only third-party load remaining at page view"
+    "Self-hosted fonts [COMP-012] are the only third-party surface remaining at page view; no external stylesheet or script is loaded"
   ],
-  "summary": {
-    "total": 14,
-    "byMaturity": {
-      "solid": 3,
-      "adequate": 7,
-      "fragile": 2,
-      "missing": 2
+  "moduleTaxonomy": {
+    "description": "Classification of the system into a shared core and pluggable domain modules. The core provides storage, tasks, security, audit, calendar, inbox, MCP and scheduling. Each domain module adds ingest, a rules engine, and an evidence output that reuses the core.",
+    "core": {
+      "name": "TaskMaster Core",
+      "status": "implemented",
+      "responsibilities": [
+        "Edge runtime, routing, CORS, cache headers, URI versioning, rate limiting",
+        "Durable Object SQLite persistence",
+        "Universal tasks, lists, tags, search, pinning",
+        "Attachment vault with soft-delete trash and auto-purge",
+        "Inbound mail parser and inbox linking",
+        "Live RFC 5545 calendar feed publisher",
+        "MCP server and tool surface",
+        "Timezone-aware scheduling and capacity planning",
+        "Bearer-token gate, audit trail, AES-256-GCM settings encryption"
+      ],
+      "components": [
+        "COMP-001",
+        "COMP-002",
+        "COMP-003",
+        "COMP-004",
+        "COMP-005",
+        "COMP-006",
+        "COMP-007",
+        "COMP-010",
+        "COMP-012",
+        "COMP-014",
+        "COMP-015",
+        "COMP-016",
+        "COMP-017",
+        "COMP-019",
+        "COMP-021",
+        "COMP-022",
+        "COMP-023",
+        "COMP-024",
+        "COMP-025",
+        "COMP-026",
+        "COMP-027"
+      ]
     },
-    "criticalRisks": [
+    "modules": [
+      {
+        "id": "MOD-001",
+        "name": "Hackathons",
+        "status": "implemented",
+        "description": "Tech competitions, prizes and deadlines. Adds Devpost/WACZ ingest, a deterministic eligibility engine, and a court-ready ReportLab evidence dossier.",
+        "components": [
+          "COMP-018",
+          "COMP-020"
+        ],
+        "futureComponents": [
+          "src/devpost.ts",
+          "src/capture.ts",
+          "src/digest.ts",
+          "src/dossier-routes.ts",
+          "src/calendar-routes.ts",
+          "src/mlh-routes.ts",
+          "src/hackerearth-routes.ts"
+        ],
+        "evidenceOutput": "Submission Dossier with WACZ hashes and email milestones (PDF)"
+      },
+      {
+        "id": "MOD-002",
+        "name": "Grants & Research Funding",
+        "status": "planned",
+        "description": "UKRI, Horizon Europe, Innovate UK calls. Would add a grant compliance and budget-threshold calculator.",
+        "components": [],
+        "futureComponents": [],
+        "evidenceOutput": "Grant Application Audit Ledger + submission receipts"
+      },
+      {
+        "id": "MOD-003",
+        "name": "Bug Bounties & Security",
+        "status": "planned",
+        "description": "HackerOne, Bugcrowd targets. Would add a scope verification engine distinguishing in-scope from out-of-scope assets.",
+        "components": [],
+        "futureComponents": [],
+        "evidenceOutput": "Vulnerability disclosure chain-of-custody report"
+      },
+      {
+        "id": "MOD-004",
+        "name": "Enterprise Tenders & RFPs",
+        "status": "planned",
+        "description": "Government and corporate procurement. Would add a procurement deadline and mandatory-criteria matcher.",
+        "components": [],
+        "futureComponents": [],
+        "evidenceOutput": "Formal Tender Bid Submission Ledger"
+      }
+    ]
+  },
+  "summary": {
+    "total": 24,
+    "byMaturity": {
+      "solid": 4,
+      "adequate": 18,
+      "fragile": 2,
+      "missing": 0
+    },
+    "criticalRisks": [],
+    "highRisks": [
       "COMP-016"
     ],
-    "highRisks": [
-      "COMP-015"
-    ],
     "structuralDebt": [
-      "COMP-006 - 800 lines in one component, no decomposition (was 821; same shape)",
-      "COMP-015/COMP-016 - no tests and no auth"
+      "COMP-006 - single-file SPA with no component decomposition or router",
+      "COMP-014 - env typed as any; no TypeScript config or environment separation"
     ],
-    "assessment": "The architecture is coherent and uses the platform correctly - the DO/SQLite/Hono pattern is idiomatic and the asset routing is right. The build step that used to be the third absence arrived on 2026-10-17: the browser no longer transpiles JSX or JITs CSS, and every CDN script except Google Fonts is gone. What holds it at alpha now is two absences (auth, tests) plus a single-component frontend that cannot absorb much more growth without decomposition."
+    "assessment": "The architecture is coherent and uses the platform correctly. The 2026-11-05 compliance pass closed the auth, audit, encryption, CORS, cache, versioning, OpenAPI, capture validation, secret management and test gaps documented in docs/COMPLIANCE-GDS.md. All third-party scripts and external stylesheets were removed from page view; fonts are self-hosted. What remains at beta risk is the single-file frontend (COMP-006) and the lack of TypeScript/typed environment bindings (COMP-014); the token gate is single-tenant, so per-user authorization would still be needed for a multi-user deployment."
   }
 }

@@ -166,6 +166,16 @@ export const SCHEMA: string[] = [
     message TEXT NOT NULL,
     payload TEXT DEFAULT '{}'
     )`,
+  `CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts INTEGER NOT NULL,
+    actor TEXT NOT NULL,
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    resource_id TEXT DEFAULT '',
+    details TEXT DEFAULT '{}',
+    ip TEXT DEFAULT ''
+    )`,
 ];
 
 /**

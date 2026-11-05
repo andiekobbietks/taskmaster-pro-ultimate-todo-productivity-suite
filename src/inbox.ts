@@ -222,7 +222,7 @@ export function insertInboxItem(
 
 // ── Route registration ───────────────────────────────────────────────
 
-export function registerInboxRoutes(app: Hono, sql: any) {
+export function registerInboxRoutes(app: Hono, sql: any, env: any = {}) {
   // --- Receive email (from Cloudflare Email Worker) -------------------
 
   app.post("/api/inbox", async (c) => {
@@ -273,7 +273,7 @@ export function registerInboxRoutes(app: Hono, sql: any) {
   // a cron never fires, and lets the Settings screen offer a button.
   app.post("/api/inbox/fetch", async (c) => {
     try {
-      const result = await fetchNewMail(sql);
+      const result = await fetchNewMail(sql, env);
       if (!result.ok) {
         return c.json({ ok: false, fetched: 0, inserted: 0, message: result.message }, 400);
       }

@@ -33,10 +33,42 @@ import os
 import sys
 import time
 import uuid
+import ipaddress
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
+
+
+def _is_private_host(host: str) -> bool:
+    """True for loopback, link-local, private, multicast and reserved hosts."""
+    if ":" in host:
+        host = host.rsplit(":", 1)[0]
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if host.lower() in ("localhost", "localhost.localdomain"):
+        return True
+    try:
+        addr = ipaddress.ip_address(host)
+        return (
+            addr.is_private or addr.is_loopback or addr.is_link_local
+            or addr.is_multicast or addr.is_reserved
+        )
+    except ValueError:
+        return False
+
+
+def validate_capture_url(url: str, label: str = "URL") -> None:
+    """Reject non-http(s) schemes and private/loopback hosts."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        raise ValueError("%s must use http or https: %s" % (label, url))
+    host = parts.netloc
+    if not host:
+        raise ValueError("%s missing host: %s" % (label, url))
+    if _is_private_host(host):
+        raise ValueError("%s points to a private/loopback host: %s" % (label, url))
+
 
 try:
     from playwright.sync_api import sync_playwright
@@ -296,6 +328,12 @@ def main():
                         help="Write the archive but do not post it")
     args = parser.parse_args()
 
+    try:
+        validate_capture_url(args.api, label="--api")
+    except ValueError as e:
+        print("ERROR: %s" % e)
+        sys.exit(1)
+
     if args.from_app:
         # The app holds the manifest. Ask it what it wants done.
         queued = queued_jobs(args.api, 50)
@@ -324,6 +362,12 @@ def main():
         for job in jobs:
             url = job["url"]
             name = job.get("name") or url
+            try:
+                validate_capture_url(url, label="capture URL")
+            except ValueError as e:
+                print("ERROR: %s" % e)
+                failures += 1
+                continue
             print("Capturing %s" % url)
 
             result = capture(page, url, args.settle, args.allow_external)

@@ -983,7 +983,7 @@ console.log("\n=== 17. Devpost, as a data source ===");
     ],
   };
   // parseSubmissionPeriod, on its own: the honest parser.
-  const { parseSubmissionPeriod } = await import("../src/devpost.ts");
+  const { parseSubmissionPeriod, detectDevpostDrift } = await import("../src/devpost.ts");
   check("period 'Aug 31 - Oct 23, 2026' parses",
         JSON.stringify(parseSubmissionPeriod("Aug 31 - Oct 23, 2026"))
         === '{"start":"2026-08-31","end":"2026-10-23"}',
@@ -1004,6 +1004,41 @@ console.log("\n=== 17. Devpost, as a data source ===");
         JSON.stringify(parseSubmissionPeriod("Jul 16, 2026 - Jan 15, 2027"))
         === '{"start":"2026-07-16","end":"2027-01-15"}',
         JSON.stringify(parseSubmissionPeriod("Jul 16, 2026 - Jan 15, 2027")));
+
+  // Drift detector: canonical payloads produce no report.
+  const canonicalRaw = canned.hackathons;
+  const canonicalParsed = canonicalRaw.map((h) => ({
+    start_date: parseSubmissionPeriod(h.submission_period_dates).start,
+    end_date: parseSubmissionPeriod(h.submission_period_dates).end,
+    prize: h.prize_amount,
+  }));
+  check("canonical Devpost payload reports no drift",
+        detectDevpostDrift(canonicalRaw, canonicalParsed) === null,
+        JSON.stringify(detectDevpostDrift(canonicalRaw, canonicalParsed)));
+
+  // Drift detector: missing expected keys surface a report.
+  const brokenRaw = canonicalRaw.map((h) => ({
+    title: h.title,
+    url: h.url,
+    dates: { start: "Aug 31", end: "Oct 23, 2026" },
+    prize_summary: h.prize_amount,
+  }));
+  const brokenParsed = brokenRaw.map(() => ({ start_date: null, end_date: null, prize: "" }));
+  const brokenDrift = detectDevpostDrift(brokenRaw, brokenParsed);
+  check("a shifted schema is detected",
+        brokenDrift !== null && brokenDrift.missing_keys.includes("submission_period_dates"),
+        JSON.stringify(brokenDrift));
+
+  // Drift detector: mass date-parsing failure surfaces a report.
+  const degradedRaw = [
+    { ...canonicalRaw[0], submission_period_dates: "soon" },
+    { ...canonicalRaw[1], submission_period_dates: "soon" },
+  ];
+  const degradedParsed = degradedRaw.map(() => ({ start_date: null, end_date: null, prize: "$1" }));
+  const degradedDrift = detectDevpostDrift(degradedRaw, degradedParsed);
+  check("mass date parsing failure is detected",
+        degradedDrift !== null && degradedDrift.unparsed_dates_count === 2,
+        JSON.stringify(degradedDrift));
 
   const realFetch = globalThis.fetch;
   let asked = 0;
@@ -1052,6 +1087,19 @@ console.log("\n=== 17. Devpost, as a data source ===");
   check("no duplicates were created", count === 2, count + " devpost rows");
   check("import_devpost is advertised as a tool",
         (await rpcListToolNames()).includes("import_devpost"));
+  check("inspect_schema_drift is advertised as a tool",
+        (await rpcListToolNames()).includes("inspect_schema_drift"));
+
+  // The MCP inspection tool reports clean state when no drift events exist.
+  const rpcDrift = await call("POST", "/api/mcp", {
+    jsonrpc: "2.0", id: 101, method: "tools/call",
+    params: { name: "inspect_schema_drift", arguments: { limit: 5 } }
+  });
+  const driftBody = await rpcDrift.json();
+  check("inspect_schema_drift reports no drift initially",
+        driftBody.result?.content?.[0]?.text &&
+        JSON.parse(driftBody.result.content[0].text).has_drift === false,
+        JSON.stringify(driftBody));
 }
 
 // The MCP tools/list helper, for the check above.
@@ -1270,6 +1318,133 @@ console.log("\n=== 20. The reader's time zone ===");
     age: 25, is_student: false, team_size: 1, employed_by_sponsor: false,
     timezone: "Europe/Dublin",
   });
+}
+
+console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache headers ===");
+{
+  const cdb = new DatabaseSync(":memory:");
+  for (const statement of SCHEMA) cdb.exec(statement);
+  const csql = makeSql(cdb);
+  const cEnv = { API_TOKEN: "compliance-test-token" };
+  const cApp = new Hono();
+
+  // Security headers, including cacheability for /api/*.
+  cApp.use("/*", async (c, next) => {
+    await next();
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("X-Frame-Options", "DENY");
+    if (c.req.path.startsWith("/api/")) {
+      c.header("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    }
+  });
+
+  // CORS for API routes, answering preflight before auth or rate limiting.
+  cApp.use("/api/*", async (c, next) => {
+    const origin = c.req.header("Origin") || "*";
+    c.header("Access-Control-Allow-Origin", origin);
+    c.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    c.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Audit-Actor");
+    c.header("Access-Control-Max-Age", "86400");
+    if (c.req.method === "OPTIONS") return c.body(null, 204);
+    await next();
+  });
+
+  function tokenAuth(env) {
+    return async (c, next) => {
+      const path = c.req.path;
+      if (path === "/health") return next();
+      const cronPaths = ["/api/inbox/fetch", "/api/digest/send", "/api/trash/purge"];
+      if (cronPaths.includes(path)) return next();
+      if (!env.API_TOKEN) return next();
+      const header = c.req.header("Authorization") || "";
+      const bearer = header.startsWith("Bearer ") ? header.slice(7) : c.req.query("api_token");
+      if (!bearer || bearer !== env.API_TOKEN) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      return next();
+    };
+  }
+
+  cApp.use("/api/*", tokenAuth(cEnv));
+  cApp.get("/health", (c) => c.json({ ok: true }));
+  registerHackathonRoutes(cApp, csql);
+  registerSettingsRoutes(cApp, csql, cEnv);
+  registerCaptureRoutes(cApp, csql);
+  registerInboxRoutes(cApp, csql, cEnv);
+
+  // URI versioning alias: /api/v1/* forwards to /api/*.
+  cApp.all("/api/v1/*", async (c) => {
+    const url = new URL(c.req.url);
+    url.pathname = url.pathname.replace(/^\/api\/v1/, "/api");
+    return cApp.fetch(new Request(url, c.req.raw));
+  });
+
+  const cCall = (method, path, body, headers) => {
+    const init = { method, headers: headers || {} };
+    if (body !== undefined) {
+      init.body = JSON.stringify(body);
+      init.headers["Content-Type"] = "application/json";
+    }
+    return cApp.request(path, init);
+  };
+
+  // Token gate
+  const noToken = await cCall("GET", "/api/hackathons");
+  check("API without token returns 401", noToken.status === 401, "HTTP " + noToken.status);
+  const badToken = await cCall("GET", "/api/hackathons", undefined, { Authorization: "Bearer wrong" });
+  check("API with bad token returns 401", badToken.status === 401, "HTTP " + badToken.status);
+  const withToken = await cCall("GET", "/api/hackathons", undefined, { Authorization: "Bearer compliance-test-token" });
+  check("API with valid token returns 200", withToken.status === 200, "HTTP " + withToken.status);
+  const health = await cCall("GET", "/health");
+  check("health is exempt from token gate", health.status === 200, "HTTP " + health.status);
+  const cronFetch = await cCall("POST", "/api/inbox/fetch");
+  check("cron fetch route is exempt from token gate", cronFetch.status !== 401, "HTTP " + cronFetch.status);
+
+  // Audit trail
+  const setAudit = await cCall("PATCH", "/api/settings/notifications", {
+    daily_digest: true, digest_time: "08:00",
+  }, { Authorization: "Bearer compliance-test-token", "X-Audit-Actor": "test-suite" });
+  check("settings update with audit actor succeeds", setAudit.status === 200, "HTTP " + setAudit.status);
+  const audit = await cCall("GET", "/api/audit/log?limit=10", undefined, { Authorization: "Bearer compliance-test-token" });
+  const auditBody = await audit.json();
+  check("audit log returns rows", Array.isArray(auditBody) && auditBody.length > 0, auditBody.length + " rows");
+  check("audit log records the actor", auditBody.some((r) => r.actor === "test-suite"), JSON.stringify(auditBody.map((r) => r.actor)));
+  check("audit log records a settings change", auditBody.some((r) => r.action === "settings.section.updated"), JSON.stringify(auditBody.map((r) => r.action)));
+
+  // Capture URL validation
+  const badCapture = await cCall("POST", "/api/capture/jobs", { url: "http://localhost/admin" }, { Authorization: "Bearer compliance-test-token" });
+  check("capture rejects a private/loopback URL", badCapture.status === 400, "HTTP " + badCapture.status);
+  const badScheme = await cCall("POST", "/api/capture/jobs", { url: "ftp://example.com/file" }, { Authorization: "Bearer compliance-test-token" });
+  check("capture rejects a non-http(s) URL", badScheme.status === 400, "HTTP " + badScheme.status);
+  const goodCapture = await cCall("POST", "/api/capture/jobs", { url: "https://example.com/hackathon" }, { Authorization: "Bearer compliance-test-token" });
+  const goodCaptureBody = await goodCapture.json();
+  check("capture accepts a public https URL", goodCapture.status === 201 && goodCaptureBody.queued === 1, "HTTP " + goodCapture.status);
+
+  // URI versioning alias
+  const v1Create = await cCall("POST", "/api/v1/hackathons", {
+    name: "v1 alias hack", platform: "devpost", prize: "$1",
+    eligibility: { eligibility_type: "unrestricted", regions: ["Global"], age_min: 13 },
+  }, { Authorization: "Bearer compliance-test-token" });
+  check("POST through /api/v1/ alias creates a resource", v1Create.status === 201, "HTTP " + v1Create.status);
+  const v1List = await cCall("GET", "/api/v1/hackathons", undefined, { Authorization: "Bearer compliance-test-token" });
+  const v1ListBody = await v1List.json();
+  check("GET through /api/v1/ alias lists resources", v1List.status === 200 && v1ListBody.some((h) => h.name === "v1 alias hack"), JSON.stringify(v1ListBody.map((h) => h.name)).slice(0, 80));
+  const v1NoToken = await cCall("GET", "/api/v1/hackathons");
+  check("alias still requires a token", v1NoToken.status === 401, "HTTP " + v1NoToken.status);
+
+  // CORS preflight
+  const preflight = await cApp.request("/api/hackathons", {
+    method: "OPTIONS",
+    headers: { Origin: "https://example.com", "Access-Control-Request-Method": "GET" },
+  });
+  check("preflight returns 204", preflight.status === 204, "HTTP " + preflight.status);
+  check("preflight echoes Origin", preflight.headers.get("Access-Control-Allow-Origin") === "https://example.com", preflight.headers.get("Access-Control-Allow-Origin"));
+  check("preflight lists allowed methods", (preflight.headers.get("Access-Control-Allow-Methods") || "").includes("GET"), preflight.headers.get("Access-Control-Allow-Methods"));
+  check("preflight sets Max-Age", preflight.headers.get("Access-Control-Max-Age") === "86400", preflight.headers.get("Access-Control-Max-Age"));
+
+  // Cache-Control on API responses
+  const cached = await cCall("GET", "/api/hackathons", undefined, { Authorization: "Bearer compliance-test-token" });
+  check("API response carries no-store Cache-Control", cached.headers.get("Cache-Control") === "no-store, no-cache, must-revalidate, private", cached.headers.get("Cache-Control"));
 }
 
 console.log("\n" + "=".repeat(60));

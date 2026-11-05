@@ -1325,7 +1325,7 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   const cdb = new DatabaseSync(":memory:");
   for (const statement of SCHEMA) cdb.exec(statement);
   const csql = makeSql(cdb);
-  const cEnv = { API_TOKEN: "compliance-test-token" };
+  const cEnv = { API_TOKEN: "compliance-test-token", SETTINGS_ENCRYPTION_KEY: "test-encryption-key", APP_ENV: "production" };
   const cApp = new Hono();
 
   // Security headers, including cacheability for /api/*.
@@ -1349,7 +1349,7 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
     await next();
   });
 
-  const { apiTokenAuth } = await import("../src/auth.ts");
+  const { apiTokenAuth, registerAuthRoutes } = await import("../src/auth.ts");
   cApp.use("/api/*", apiTokenAuth(cEnv));
 
   // Production must fail closed when the secret has not been configured.
@@ -1364,6 +1364,11 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   missingEncryptionApp.get("/api/private", (c) => c.json({ ok: true }));
   const missingEncryption = await missingEncryptionApp.request("/api/private");
   check("production fails closed when settings encryption key is missing", missingEncryption.status === 503, "HTTP " + missingEncryption.status);
+  const unknownModeApp = new Hono();
+  unknownModeApp.use("/api/*", apiTokenAuth({ APP_ENV: "test", API_TOKEN: "configured-token" }));
+  unknownModeApp.get("/api/private", (c) => c.json({ ok: true }));
+  const unknownMode = await unknownModeApp.request("/api/private");
+  check("non-development modes fail closed without the encryption key", unknownMode.status === 503, "HTTP " + unknownMode.status);
 
   // Local development may deliberately run without a secret.
   const localDevApp = new Hono();
@@ -1376,6 +1381,9 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   registerSettingsRoutes(cApp, csql, cEnv);
   registerCaptureRoutes(cApp, csql);
   registerInboxRoutes(cApp, csql, cEnv);
+  registerAttachmentRoutes(cApp, csql);
+  registerDigestRoutes(cApp, csql, cEnv);
+  registerAuthRoutes(cApp, cEnv);
 
   // URI versioning alias: /api/v1/* forwards to /api/*.
   cApp.all("/api/v1/*", async (c) => {
@@ -1393,6 +1401,21 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
     return cApp.request(path, init);
   };
 
+  // Browser login exchanges the shared key for a short-lived HttpOnly session.
+  const badLogin = await cCall("POST", "/api/auth/login", { token: "wrong-token" });
+  check("browser login rejects an incorrect key", badLogin.status === 401, "HTTP " + badLogin.status);
+  const login = await cCall("POST", "/api/auth/login", { token: "compliance-test-token" });
+  const setCookie = login.headers.get("Set-Cookie") || "";
+  const sessionCookie = setCookie.split(";")[0];
+  check("browser login creates a session", login.status === 200 && setCookie.includes("HttpOnly") && setCookie.includes("SameSite=Strict"), setCookie);
+  check("browser session cookie authenticates API calls",
+    (await cCall("GET", "/api/hackathons", undefined, { Cookie: sessionCookie })).status === 200);
+  check("invalid browser session cookie is rejected",
+    (await cCall("GET", "/api/hackathons", undefined, { Cookie: "tm_session=1.invalid" })).status === 401);
+  const logout = await cCall("POST", "/api/auth/logout", undefined, { Cookie: sessionCookie });
+  check("browser logout clears the session cookie",
+    logout.status === 200 && (logout.headers.get("Set-Cookie") || "").includes("Max-Age=0"));
+
   // Token gate
   const noToken = await cCall("GET", "/api/hackathons");
   check("API without token returns 401", noToken.status === 401, "HTTP " + noToken.status);
@@ -1402,11 +1425,17 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   check("API with valid token returns 200", withToken.status === 200, "HTTP " + withToken.status);
   const health = await cCall("GET", "/health");
   check("health is exempt from token gate", health.status === 200, "HTTP " + health.status);
-  for (const path of ["/api/inbox/fetch", "/api/digest/send", "/api/trash/purge"]) {
+  const scheduledRoutes = [
+    ["/api/inbox/fetch", 400],
+    ["/api/digest/send", 200],
+    ["/api/trash/purge", 200],
+  ];
+  for (const [path, expectedStatus] of scheduledRoutes) {
     const denied = await cCall("POST", path);
     check(path + " rejects unauthenticated callers", denied.status === 401, "HTTP " + denied.status);
     const allowed = await cCall("POST", path, undefined, { Authorization: "Bearer compliance-test-token" });
-    check(path + " accepts the bearer token", allowed.status !== 401, "HTTP " + allowed.status);
+    check(path + " reaches its handler with a bearer token",
+      allowed.status === expectedStatus, "HTTP " + allowed.status + " (expected " + expectedStatus + ")");
   }
 
   // Audit trail

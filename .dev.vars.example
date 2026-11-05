@@ -11,3 +11,6 @@
 # deployment starts empty. Set it to true here if you want the four built-in
 # sample todos and lists while developing locally.
 SEED_DEMO_DATA=true
+
+# Local development explicitly opts into the no-token development mode.
+APP_ENV=development

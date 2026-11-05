@@ -142,7 +142,7 @@ npx portless alias taskmaster 8787   # http://taskmaster.localhost
 
 ## Security
 
-This project is **Beta** and now gates `/api/*` with a bearer-token auth layer when `API_TOKEN` is configured. Deployed Workers run with `APP_ENV=production` and fail closed with HTTP 503 unless both `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY` are configured as Worker secrets. Local development explicitly opts into `APP_ENV=development` in `.dev.vars`.
+Deployed Workers run with `APP_ENV=production` and fail closed with HTTP 503 unless both `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY` are configured as Worker secrets. The browser signs in at `/login.html`; the Worker exchanges the access key for a 12-hour signed HttpOnly cookie, never storing the key in browser JavaScript. External API clients use a bearer token. Local development explicitly opts into `APP_ENV=development` in `.dev.vars`.
 
 Key points:
 

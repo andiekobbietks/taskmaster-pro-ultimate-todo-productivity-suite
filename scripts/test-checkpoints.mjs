@@ -75,7 +75,7 @@ const oversized = await call("POST", "/api/checkpoints", { tag: "oversized" });
 assert.equal(oversized.status, 413, "oversized snapshots are rejected before the SQLite INSERT");
 assert.equal(db.prepare("SELECT count(*) AS n FROM checkpoints WHERE tag = 'oversized'").get().n, 0);
 sql.exec("UPDATE attachments SET data = ?, size = ? WHERE id = 'att-1'", binary, binary.length);
-const storedPayload = JSON.parse(checkpointRow.payload);
+const storedPayload = JSON.parse(await decryptSetting(checkpointRow.payload, env));
 assert.equal(storedPayload.version, 2);
 assert.equal(storedPayload.tables.hackathons.length, 1);
 assert.equal(storedPayload.tables.inbox.length, 1);

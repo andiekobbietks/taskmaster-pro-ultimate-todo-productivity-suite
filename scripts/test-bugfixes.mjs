@@ -1351,6 +1351,20 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
 
   const { apiTokenAuth } = await import("../src/auth.ts");
   cApp.use("/api/*", apiTokenAuth(cEnv));
+
+  // Production must fail closed when the secret has not been configured.
+  const missingSecretApp = new Hono();
+  missingSecretApp.use("/api/*", apiTokenAuth({ APP_ENV: "production" }));
+  missingSecretApp.get("/api/private", (c) => c.json({ ok: true }));
+  const missingSecret = await missingSecretApp.request("/api/private");
+  check("production fails closed when API_TOKEN is missing", missingSecret.status === 503, "HTTP " + missingSecret.status);
+
+  // Local development may deliberately run without a secret.
+  const localDevApp = new Hono();
+  localDevApp.use("/api/*", apiTokenAuth({ APP_ENV: "development" }));
+  localDevApp.get("/api/private", (c) => c.json({ ok: true }));
+  const localDev = await localDevApp.request("/api/private");
+  check("development remains open without API_TOKEN", localDev.status === 200, "HTTP " + localDev.status);
   cApp.get("/health", (c) => c.json({ ok: true }));
   registerHackathonRoutes(cApp, csql);
   registerSettingsRoutes(cApp, csql, cEnv);

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { decryptSetting, encryptSetting } from "./settings-crypto";
+import { decryptSetting, encryptSetting } from "./settings-crypto.ts";
 
 const FORMAT = "taskmaster-pro-checkpoint";
 const VERSION = 2;

@@ -176,9 +176,8 @@ jobs:
           echo "::error::the mock API did not start on port 8821"
           exit 1
 
-      # 18 checks: the Add Hackathon form, the populated settings screen,
-      # per-card screenshot upload, bulk selection in both lists, and the
-      # app rendering with every external request blocked.
+      # 21 checks: browser sign-in and session cookies, the Add Hackathon form,
+      # populated settings, screenshot upload, bulk selection, and offline UI.
       - name: Run browser tests
         env:
           TM_BASE: http://127.0.0.1:8821

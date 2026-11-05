@@ -155,7 +155,9 @@ for (const cls of doClasses) {
 if (!cfg.name) {
   report(FAIL, 'WORKER-NAME', 'wrangler.json has no "name" — deploy and preview targets undefined', at('wrangler.json'))
 }
-if (cfg.main && !exists(at(cfg.main))) {
+if (typeof cfg.main !== 'string' || !cfg.main.trim()) {
+  report(FAIL, 'MAIN-MISSING', 'wrangler.json has no "main" entrypoint', at('wrangler.json'))
+} else if (!exists(at(cfg.main))) {
   report(FAIL, 'MAIN-EXISTS', `wrangler.main "${cfg.main}" does not exist on disk`, at('wrangler.json'))
 }
 if (cfg.assets?.directory && !isDir(at(cfg.assets.directory))) {
@@ -203,7 +205,7 @@ for (const [name, file] of bare) {
 }
 
 // ---------------------------------------------------- handler blocks
-const HANDLER = /this\.app\.(get|post|patch|delete|put)\(\s*"([^"]+)"/g
+const HANDLER = /this\.app\.(get|post|patch|delete|put)\(\s*["\x27]([^"\x27]+)["\x27]/g
 const handlers = [...workerSrc.matchAll(HANDLER)]
 function blockAt(i) {
   const start = handlers[i].index
@@ -216,13 +218,13 @@ handlers.forEach((h, i) => {
   const { start, block } = blockAt(i)
 
   // 4. dead query params — the phantom-filter detector
-  const params = [...new Set([...block.matchAll(/c\.req\.query\(\s*"([^"]+)"\s*\)/g)].map(m => m[1]))]
+  const params = [...new Set([...block.matchAll(/c\.req\.query\(\s*["\x27]([^"\x27]+)["\x27]\s*\)/g)].map(m => m[1]))]
   for (const p of params) {
     const decl = new RegExp(`const\\s+${p}\\s*=\\s*c\\.req\\.query\\([^)]*\\)\\s*;?`)
     const without = block.replace(decl, '')
     const uses = (without.match(new RegExp(`\\b${p}\\b`, 'g')) || []).length
     if (uses === 0) {
-      report(WARN, 'DEAD-FILTER',
+      report(FAIL, 'DEAD-FILTER',
         `${verb.toUpperCase()} ${route}: reads query param "${p}" but never uses it — filter is advertised and does nothing`,
         `${at('src/index.ts')}:${lineOf(workerSrc, `const ${p} =`, start)}`)
     }
@@ -232,7 +234,7 @@ handlers.forEach((h, i) => {
   if (/LIKE \?/i.test(block)) {
     const pushes = [...block.matchAll(/params\.push\(\s*`([^`]*)`/g)].map(m => m[1])
     if (pushes.some(s => /\$\{/.test(s))) {
-      report(WARN, 'LIKE-ESCAPE',
+      report(FAIL, 'LIKE-ESCAPE',
         `${verb.toUpperCase()} ${route}: LIKE pattern built from raw user input without escaping % or _ — searching "100%" matches everything`,
         `${at('src/index.ts')}:${lineOf(workerSrc, 'LIKE ?', start)}`)
     }

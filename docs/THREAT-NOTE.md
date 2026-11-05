@@ -130,8 +130,11 @@ Section 5 are the actual instructions — each is a specific, settled choice.
 - **The audit table must be append-only.** If the app exposes any `UPDATE` or
   `DELETE` on audit rows, an authenticated insider can erase their own trail, and
   the audit trail is worse than useless — it is misleading evidence.
-- Cloudflare Access produces its own access logs. Keeping both means edge-level
-  authentication events survive even if the application audit is tampered with.
+- Cloudflare Access produces access logs, but these are short-term telemetry, not a
+  durable audit trail. On the Free plan, dashboard retention is limited to 24 hours.
+  Longer retention depends on configuring and verifying Logpush or API export to a
+  controlled destination; no such export is documented as configured here. Do not
+  rely on Access logs as durable evidence unless that export is in place.
 
 ### Information Disclosure
 

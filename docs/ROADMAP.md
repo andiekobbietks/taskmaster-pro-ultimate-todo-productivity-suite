@@ -76,9 +76,9 @@ Broken chain, or no safety net. In critical-path order.
 
 | | |
 |---|---|
-| **Where** | `src/index.ts:141` — the Durable Object mounts `apiTokenAuth` on `/api/*` |
+| **Where** | `src/auth.ts` — shared bearer-token middleware mounted by the Durable Object on `/api/*` |
 | **Was** | Anyone with the URL had full read and write. No identity check existed. |
-| **Now** | `apiTokenAuth(env)` accepts `Authorization: Bearer <token>` or `?api_token=`. It returns 401 on mismatch. `/health` and internal cron routes (`/api/inbox/fetch`, `/api/digest/send`, `/api/trash/purge`) are exempt. When `env.API_TOKEN` is unset the gate stays open, preserving local dev and the existing test suites. |
+| **Now** | `apiTokenAuth(env)` accepts `Authorization: Bearer <token>` or `?api_token=`. It returns 401 on mismatch. Only `GET /health` is public. Scheduled inbox fetch, digest send and trash purge calls carry the configured bearer token when invoked internally by the Worker. When `env.API_TOKEN` is unset the gate stays open for local development; production must set it in Workers Secrets. |
 | **Still single-user** | Data is not scoped per user; the Durable Object stores one dataset. The auth token gates access to that dataset, not to a user-specific partition. |
 | **Done when** | Every `/api/*` route requires a token when `API_TOKEN` is set, and the token is stored in Workers Secrets, not code. |
 

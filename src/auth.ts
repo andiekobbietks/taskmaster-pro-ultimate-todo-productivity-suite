@@ -8,12 +8,15 @@ import type { MiddlewareHandler } from "hono";
  * Leaving API_TOKEN unset is supported for local development only. Production
  * deployments must configure it with `wrangler secret put API_TOKEN`.
  */
-export function apiTokenAuth(env: { API_TOKEN?: string }): MiddlewareHandler {
+export function apiTokenAuth(env: { API_TOKEN?: string; APP_ENV?: string }): MiddlewareHandler {
   return async (c, next) => {
     if (c.req.path === "/health") return next();
 
     const token = env.API_TOKEN;
-    if (!token) return next();
+    if (!token) {
+      if (env.APP_ENV === "development") return next();
+      return c.json({ error: "Service authentication is not configured" }, 503);
+    }
 
     const header = c.req.header("Authorization") || "";
     const bearer = header.startsWith("Bearer ")

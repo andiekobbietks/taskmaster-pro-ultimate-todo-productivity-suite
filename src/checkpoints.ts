@@ -171,7 +171,7 @@ function restore(sql: Sql, rawPayload: unknown): string[] {
   } catch (error) {
     try {
       execute(sql, `ROLLBACK TO SAVEPOINT ${savepoint}`);
-      sql.exec(`RELEASE SAVEPOINT ${savepoint}`);
+      execute(sql, `RELEASE SAVEPOINT ${savepoint}`);
     } catch {
       // Preserve the original restore error; SQLite will surface a broken
       // transaction on the next operation if rollback itself was impossible.

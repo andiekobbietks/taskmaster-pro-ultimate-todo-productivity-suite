@@ -9,7 +9,7 @@ const db = new DatabaseSync(":memory:");
 for (const statement of SCHEMA) db.exec(statement);
 const sql = makeSql(db);
 const app = new Hono();
-registerCheckpointRoutes(app, sql);
+registerCheckpointRoutes(app, sql, { SETTINGS_ENCRYPTION_KEY: "checkpoint-test-secret" });
 
 const call = (method, path, body) => app.request(path, {
   method,
@@ -47,6 +47,9 @@ const created = await call("POST", "/api/checkpoints", { tag: "recovery", label:
 assert.equal(created.status, 200);
 const checkpoint = await created.json();
 assert.equal(checkpoint.format_version, 2);
+const storedPayload = db.prepare("SELECT payload FROM checkpoints WHERE id = ?").get(checkpoint.id).payload;
+assert.ok(storedPayload.startsWith("enc:v1:"));
+assert.ok(!storedPayload.includes("before checkpoint"));
 assert.deepEqual(Object.keys(checkpoint.table_counts).sort(), [...CHECKPOINT_TABLES].sort());
 assert.ok(Object.values(checkpoint.table_counts).every((count) => count === 1));
 

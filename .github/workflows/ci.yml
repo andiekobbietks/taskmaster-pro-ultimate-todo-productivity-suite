@@ -129,6 +129,9 @@ jobs:
       - name: Run route regression tests
         run: node --experimental-strip-types scripts/test-bugfixes.mjs
 
+      - name: Run todo filter regressions
+        run: node --experimental-strip-types scripts/test-todo-filters.mjs
+
   browser:
     name: Browser tests
     runs-on: ubuntu-latest

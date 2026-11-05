@@ -328,11 +328,15 @@ def main():
                         help="Write the archive but do not post it")
     args = parser.parse_args()
 
-    try:
-        validate_capture_url(args.api, label="--api")
-    except ValueError as e:
-        print("ERROR: %s" % e)
-        sys.exit(1)
+    # A one-off dry run only writes the archive locally; it never contacts
+    # the TaskMaster API, so the default loopback API URL is irrelevant.
+    # --from-app still needs the API to fetch its queue, even in dry-run mode.
+    if not args.dry_run or args.from_app:
+        try:
+            validate_capture_url(args.api, label="--api")
+        except ValueError as e:
+            print("ERROR: %s" % e)
+            sys.exit(1)
 
     if args.from_app:
         # The app holds the manifest. Ask it what it wants done.

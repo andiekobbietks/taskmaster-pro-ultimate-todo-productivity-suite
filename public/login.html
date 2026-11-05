@@ -46,9 +46,15 @@
     const button = document.getElementById("submit");
     const message = document.getElementById("message");
     const requestedNext = new URLSearchParams(location.search).get("next") || "/";
-    const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") && requestedNext !== "/login.html"
-      ? requestedNext
-      : "/";
+    let next = "/";
+    try {
+      const candidate = new URL(requestedNext, location.origin);
+      if (candidate.origin === location.origin && candidate.pathname !== "/login.html") {
+        next = candidate.pathname + candidate.search + candidate.hash;
+      }
+    } catch {
+      next = "/";
+    }
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();

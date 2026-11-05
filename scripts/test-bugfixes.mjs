@@ -1359,6 +1359,12 @@ console.log("\n=== 21. Token gate, audit trail, CORS, versioning and cache heade
   const missingSecret = await missingSecretApp.request("/api/private");
   check("production fails closed when API_TOKEN is missing", missingSecret.status === 503, "HTTP " + missingSecret.status);
 
+  const missingEncryptionApp = new Hono();
+  missingEncryptionApp.use("/api/*", apiTokenAuth({ APP_ENV: "production", API_TOKEN: "configured-token" }));
+  missingEncryptionApp.get("/api/private", (c) => c.json({ ok: true }));
+  const missingEncryption = await missingEncryptionApp.request("/api/private");
+  check("production fails closed when settings encryption key is missing", missingEncryption.status === 503, "HTTP " + missingEncryption.status);
+
   // Local development may deliberately run without a secret.
   const localDevApp = new Hono();
   localDevApp.use("/api/*", apiTokenAuth({ APP_ENV: "development" }));

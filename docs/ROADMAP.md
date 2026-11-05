@@ -76,11 +76,11 @@ Broken chain, or no safety net. In critical-path order.
 
 | | |
 |---|---|
-| **Where** | `src/auth.ts` — shared bearer-token middleware mounted by the Durable Object on `/api/*` |
+| **Where** | `src/auth.ts`, `public/login.html`, `src/lib/api.js` — shared-key login and signed browser sessions |
 | **Was** | Anyone with the URL had full read and write. No identity check existed. |
-| **Now** | `apiTokenAuth(env)` accepts `Authorization: Bearer <token>` or `?api_token=`. It returns 401 on mismatch. Only `GET /health` is public. Scheduled inbox fetch, digest send and trash purge calls carry the configured bearer token when invoked internally by the Worker. When either `API_TOKEN` or `SETTINGS_ENCRYPTION_KEY` is unset, production (`APP_ENV=production`) fails closed with HTTP 503. `wrangler.json` sets production mode and `.dev.vars.example` opts local development in. |
-| **Still single-user** | Data is not scoped per user; the Durable Object stores one dataset. The auth token gates access to that dataset, not to a user-specific partition. |
-| **Done when** | Every `/api/*` route requires a token when `API_TOKEN` is set, and the token is stored in Workers Secrets, not code. |
+| **Now** | The browser exchanges the shared access key for a 12-hour HMAC-signed HttpOnly cookie; the key is never stored in browser JavaScript. Unsafe cookie-authenticated requests require a same-origin `Origin` header. External clients and scheduled jobs use bearer tokens. Only `GET /health` and login/logout are public. The Worker routes `/health` to the Durable Object. Non-development deployments fail closed with HTTP 503 unless both `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY` are set. |
+| **Still single-user** | Data is not scoped per user; the Durable Object stores one dataset. The shared key gates access to that dataset, not to a user-specific partition. |
+| **Done when** | Browser sign-in, bearer clients, scheduled calls, production secret checks and the public health route are all covered by regression tests. |
 
 ---
 

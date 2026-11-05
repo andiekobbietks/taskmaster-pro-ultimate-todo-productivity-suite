@@ -47,9 +47,9 @@ it says so.
 shared bearer-token middleware in `src/auth.ts` protects the API. Only
 `GET /health` is public. The scheduled inbox fetch, digest send and trash
 purge operations also require the token; the Worker supplies it when it
-invokes those routes inside the Durable Object. If `API_TOKEN` is unset,
-the gate is intentionally open for local development, so an exposed
-deployment without the secret is unauthenticated. The token is shared by
+invokes those routes inside the Durable Object. If either `API_TOKEN` or `SETTINGS_ENCRYPTION_KEY` is unset, only
+`APP_ENV=development` remains open; production is configured as
+`APP_ENV=production` and fails closed with HTTP 503. The token is shared by
 all callers and does not establish individual identity or tenant isolation.
 
 *Residual risk: configure a strong Worker secret before deployment, rotate
@@ -219,10 +219,10 @@ before it is stored.
 
 | | Finding | Severity |
 |---|---|---|
-| 1 | **No authentication on any `/api/*` route.** Anyone with the URL has full read and write, including the storage credentials. | **Critical** |
-| 2 | **No audit trail.** Nothing records who changed the profile, the mail server or the credentials. | **High** |
-| 3 | **The capture runner does not validate the URL it is given.** It will drive a browser to an internal address and write what it sees to disk. | **High** |
-| 4 | **Secrets are XOR-obfuscated, not encrypted.** The key is in the source. | **Medium**, and it is a placeholder, not a design |
+| 1 | **Shared-token authentication, not individual identity.** Production requires `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY`; missing configuration fails closed with HTTP 503. Callers sharing the token still share the same data and permissions. | **Medium residual risk** |
+| 2 | **Incomplete actor attribution.** Selected settings and credential changes are audited, but a shared token cannot identify an individual and not every action is logged. | **Medium residual risk** |
+| 3 | **Capture URL validation is implemented.** Keep regression coverage for private, loopback and non-HTTP targets as capture code evolves. | **Reduced; regression risk** |
+| 4 | **Encryption depends on a deployment secret.** Sensitive settings use AES-256-GCM when `SETTINGS_ENCRYPTION_KEY` is configured; production now refuses API requests without it. Legacy XOR values remain a migration concern. | **Medium residual risk** |
 | 5 | **The Durable Object is a single thread.** One slow request, one large capture or one hung archive fetch stalls everything. | **Medium** |
 | 6 | **Captured pages and mail are untrusted input to an agent.** That is a prompt-injection path. | **Medium**, and inherent |
 | 7 | **The rate limit is per IP, in one shared object.** One attacker spends everyone's budget. | **Low** for personal use |
@@ -268,19 +268,18 @@ Workers Secrets for the deployment secrets, Web Crypto for the per-user
 credentials at rest, and a token on the routes. The first is an hour's
 work, the second is half a day, the third is the critical finding above.
 
-## 6. What to do, in order
+## 6. Remaining work, in priority order
 
-1. **Put a token on the routes.** One shared secret, checked before the
-   routes run, would take finding 1 from critical to acceptable for a
-   self-hosted personal deployment. Per-user identity is the upgrade after
-   that.
-2. **Validate the URL in the capture runner.** Reject anything that is
-   not `http` or `https`, and warn about private address ranges. Half a
-   dozen lines, and it closes finding 3 properly.
-3. **Move the deployment secrets to Workers Secrets.** `wrangler secret put`
-   for the Yahoo client id, the client secret and the refresh token.
-4. **Encrypt the per-user credentials with Web Crypto**, with the key in a
-   Worker secret.
-5. **Write the audit trail** when there is more than one person using it.
-   Until then it is a single-user app and the trail has one author, which
-   is the easier case to fix later.
+1. **Per-user identity and data isolation.** Replace the shared bearer token
+   before offering this as a multi-user service. Scope every record and
+   authorization decision to a verified user or organisation.
+2. **CORS allowlist.** Replace reflected origins with an explicit allowlist
+   appropriate to the deployed frontend. CORS is not a substitute for auth.
+3. **Independent backups and recovery tests.** Checkpoints are useful
+   application snapshots, not an off-platform backup. Export data and rehearse
+   restoration from a separate copy.
+4. **Complete audit coverage.** Record security-relevant changes consistently
+   and attribute them to authenticated identities once per-user auth exists.
+5. **Operational hardening.** Review the shared per-IP rate-limit budget,
+   Durable Object single-thread latency, retention, alerting and dependency
+   updates before increasing the user or workload count.

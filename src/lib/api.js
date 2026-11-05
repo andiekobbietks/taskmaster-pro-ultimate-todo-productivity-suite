@@ -46,7 +46,7 @@ export function describeError(err) {
 export async function api(path, options) {
   let res;
   try {
-    res = await fetch(path, options);
+    res = await fetch(path, { ...options, credentials: options?.credentials ?? "same-origin" });
   } catch (networkErr) {
     // fetch only rejects on genuine transport problems (offline, DNS, CORS).
     throw new ApiError(
@@ -67,6 +67,17 @@ export async function api(path, options) {
   }
 
   if (!res.ok) {
+    // A 401 means the browser session has expired or is not established.
+    // Redirect to the login page; the shared API secret is never stored in JS.
+    if (
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login.html"
+    ) {
+      const next = window.location.pathname + window.location.search + window.location.hash;
+      window.location.replace(`/login.html?next=${encodeURIComponent(next)}`);
+    }
+
     // The Worker answers errors as `{ error: "…" }` — surface that verbatim.
     const serverMessage =
       body && typeof body === "object" && typeof body.error === "string"

@@ -28,7 +28,7 @@ had existed on 27 September, the very first attempt would have failed immediatel
 and none of the six intervening commits would have been needed.
 
 **Where things stand now:** zero known problems of this kind. First working
-release is `v1.0.1`.
+release is pending publication as `v1.0.1`.
 
 ---
 
@@ -70,7 +70,7 @@ done
 | tag | commit | state at tag | notes |
 |---|---|---|---|
 | `v1.0.0` | `373e321` | **3 FAIL, 2 WARN — the app could not serve its own API** | Published 2026-10-16. No attached assets. Superseded. |
-| `v1.0.1` | `40cb715` | 0 FAIL, 0 WARN | First tag that contains the Durable Object binding fix. |
+| Planned: `v1.0.1` | TBD | 0 FAIL, 0 WARN | Intended first tag to contain the Durable Object binding fix. |
 
 `v1.0.0` shipped `src/index.ts` exporting `App extends DurableObject` next to a
 `wrangler.json` with no `name`, no `durable_objects` binding and no `migrations`

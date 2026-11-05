@@ -76,8 +76,14 @@ None of these is a marketing quote on its own. Together they form the strongest 
 - **Progressive Web App (PWA)** support — installable on desktop and mobile
 - **Web push notifications** for reminders and digests
 - **Settings** with masked secrets, progressive disclosure, collapsible JMAP/IMAP sections, and revoke controls
-- **Diagnostics / checkpoint CLI** for endpoint failure logging and rollback snapshots, gated behind an Advanced settings toggle
+- **Diagnostics / checkpoint CLI** for endpoint failure logging and versioned SQLite recovery snapshots, gated behind an Advanced settings toggle
 - **Multi-source hackathon importers** (Devpost, MLH, HackerEarth)
+
+### Checkpoints and recovery boundary
+
+Checkpoints are versioned application-database snapshots. They include lists, todos, hackathons and profile data, attachments (including their original BLOB bytes), archive-source configuration, settings, capacity, inbox messages, capture-job metadata, push subscriptions, and email subscription/delivery records. Restore validates the complete table and column inventory before changing data, then replaces those application tables in one Durable Object SQLite transaction.
+
+A restore deliberately does **not** rewind the checkpoint catalogue, rate-limit counters, diagnostics, or audit history. WACZ files and other capture output held on the capture runner's filesystem are outside the Durable Object database and are not included. This is a same-object recovery point, not an independent backup. SQLite-backed Durable Objects also provide Cloudflare [Point-in-Time Recovery](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/) for database state up to 30 days in the past; this application checkpoint feature does not configure PITR. Enable and rehearse provider-level recovery separately, and keep an off-platform export for disaster recovery. Individual snapshots are limited to 1 MiB.
 
 ## Architecture
 
@@ -87,7 +93,7 @@ None of these is a marketing quote on its own. Together they form the strongest 
 - **Web Push** (`src/push.ts`) — hand-rolled VAPID delivery
 - **MCP server** (`src/mcp.ts`) — Streamable HTTP transport for the TaskMaster tool surface
 - **Scheduled function** (`scheduled()`) — cron-based digest and hackathon refresh hooks
-- **Stateless diagnostics** (`src/diagnostics.ts`, `src/checkpoints.ts`) — endpoint failure logging and full-table snapshots
+- **Stateless diagnostics** (`src/diagnostics.ts`, `src/checkpoints.ts`) — endpoint failure logging and versioned application-data snapshots
 
 ### Platform model
 
@@ -147,7 +153,7 @@ Deployed Workers run with `APP_ENV=production` and fail closed with HTTP 503 unl
 Key points:
 
 - Only `GET /health` and the login/logout endpoints are public. The browser signs in at `/login.html`; the Worker exchanges the access key for a 12-hour signed `HttpOnly; SameSite=Strict` cookie. The key is not stored in browser JavaScript or browser storage. External API clients use `Authorization: Bearer <token>` (the `api_token` query parameter remains for compatibility).
-- The checkpoint/diagnostics UI widget is gated by an **Advanced** settings toggle, and the matching API routes are only enabled when `DEBUG_ROUTES_ENABLED=true`.
+- The checkpoint/diagnostics UI widget is gated by an **Advanced** settings toggle. Its API routes are registered but require authentication; the separate `/api/debug/*` endpoints are disabled unless `DEBUG_ROUTES_ENABLED=true`.
 - New or rewritten sensitive settings use AES-256-GCM when `SETTINGS_ENCRYPTION_KEY` is configured, and are compared in a masked view. Existing legacy XOR-obfuscated values are not automatically migrated; rewrite or migrate them before relying on AES-256-GCM protection. Non-development deployments refuse API requests without the key. `/api/settings/revoke` provides break-glass removal.
 - The token gate is single-tenant: it protects a private deployment, but does not provide per-user data partitions. Do not treat it as multi-user authorization.
 

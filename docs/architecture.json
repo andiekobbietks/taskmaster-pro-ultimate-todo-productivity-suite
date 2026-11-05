@@ -289,7 +289,7 @@
       "layer": "security",
       "role": "Bearer-token gate on the whole /api/* surface, plus a /api/v1/* URI-version alias that shares the same gate",
       "entry": "src/index.ts apiTokenAuth(env); registerAuditRoutes",
-      "evidence": "src/index.ts:38-53 (apiTokenAuth), src/index.ts:141 (mount on /api/*), src/index.ts:147-160 (/api/v1/* alias), src/audit.ts (audit_log writes on settings/credential/reset changes); tests in scripts/test-bugfixes.mjs §21",
+      "evidence": "src/auth.ts (apiTokenAuth), src/index.ts (mount on /api/*), src/index.ts:147-160 (/api/v1/* alias), src/audit.ts (audit_log writes on settings/credential/reset changes); tests in scripts/test-bugfixes.mjs §21",
       "dependsOn": [],
       "usedBy": [
         "FEAT-027"
@@ -297,7 +297,7 @@
       "dataAtRest": "all application data",
       "maturity": "adequate",
       "risk": "high",
-      "notes": "Accepts Authorization: Bearer <token> or ?api_token=; returns 401 {error:'Unauthorized'} on mismatch. /health and cron-internal routes (/api/inbox/fetch, /api/digest/send, /api/trash/purge) are exempt. When API_TOKEN is unset the gate stays open for local development. The gate is single-tenant: it protects a private deployment but does not provide per-user data partitions, so a shared beta would still need user-scoped authorization."
+      "notes": "Accepts Authorization: Bearer <token> or ?api_token=; returns 401 {error:'Unauthorized'} on mismatch. Only GET /health is public. Scheduled inbox fetch, digest send and trash purge calls carry the configured bearer token when invoked internally by the Worker. When API_TOKEN is unset the gate stays open for local development; production must configure it in Workers Secrets. The gate is single-tenant: it protects a private deployment but does not provide per-user data partitions."
     },
     {
       "id": "COMP-018",

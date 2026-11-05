@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { decryptSetting, encryptSetting } from "./settings-crypto";
 
 function randomUUID() {
   return globalThis.crypto.randomUUID();
@@ -78,6 +79,10 @@ function decodeValue(value: unknown): unknown {
   return value;
 }
 
+function execute(sql: Sql, query: string, ...bindings: unknown[]) {
+  sql.exec(query, ...bindings).toArray();
+}
+
 function snapshot(sql: Sql, createdAt: number) {
   const tables: Record<string, unknown[]> = {};
   const tableCounts: Record<string, number> = {};
@@ -144,27 +149,28 @@ function restore(sql: Sql, rawPayload: unknown): string[] {
   // SAVEPOINT makes the restore all-or-nothing even when a later insert fails.
   // It also composes safely if a caller already has an outer transaction.
   const savepoint = "taskmaster_checkpoint_restore";
-  sql.exec(`SAVEPOINT ${savepoint}`);
+  execute(sql, `SAVEPOINT ${savepoint}`);
   try {
     for (const table of selected) {
       const rows = tables[table] as Record<string, unknown>[];
-      sql.exec(`DELETE FROM ${table}`);
+      execute(sql, `DELETE FROM ${table}`);
       for (const row of rows) {
         const keys = Object.keys(row);
         if (keys.length === 0) throw new Error(`Empty row in table: ${table}`);
         const columns = keys.join(", ");
         const placeholders = keys.map(() => "?").join(", ");
         const values = keys.map((key) => decodeValue(row[key]));
-        sql.exec(
+        execute(
+          sql,
           `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`,
           ...values,
         );
       }
     }
-    sql.exec(`RELEASE SAVEPOINT ${savepoint}`);
+    execute(sql, `RELEASE SAVEPOINT ${savepoint}`);
   } catch (error) {
     try {
-      sql.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      execute(sql, `ROLLBACK TO SAVEPOINT ${savepoint}`);
       sql.exec(`RELEASE SAVEPOINT ${savepoint}`);
     } catch {
       // Preserve the original restore error; SQLite will surface a broken
@@ -175,7 +181,7 @@ function restore(sql: Sql, rawPayload: unknown): string[] {
   return selected;
 }
 
-export function registerCheckpointRoutes(app: Hono, sql: Sql) {
+export function registerCheckpointRoutes(app: Hono, sql: Sql, env: any = {}) {
   app.get("/api/checkpoints", (c) => {
     try {
       const rows = sql.exec(
@@ -198,7 +204,7 @@ export function registerCheckpointRoutes(app: Hono, sql: Sql) {
       const payload = snapshot(sql, createdAt);
       sql.exec(
         "INSERT INTO checkpoints (id, tag, label, kind, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)",
-        id, tag, label, kind, createdAt, JSON.stringify(payload),
+        id, tag, label, kind, createdAt, await encryptSetting(JSON.stringify(payload), env),
       );
       return c.json({
         ok: true, id, tag, label, kind, created_at: createdAt,
@@ -210,12 +216,13 @@ export function registerCheckpointRoutes(app: Hono, sql: Sql) {
     }
   });
 
-  app.post("/api/checkpoints/:id/rollback", (c) => {
+  app.post("/api/checkpoints/:id/rollback", async (c) => {
     try {
       const id = c.req.param("id");
       const row = sql.exec("SELECT payload FROM checkpoints WHERE id = ?", id).one();
       if (!row) return c.json({ ok: false, error: "checkpoint not found" }, 404);
-      const restoredTables = restore(sql, JSON.parse(row.payload as string));
+      const plaintext = await decryptSetting(row.payload as string, env);
+      const restoredTables = restore(sql, JSON.parse(plaintext));
       return c.json({ ok: true, id, restored_tables: restoredTables });
     } catch (e) {
       return c.json({ ok: false, error: String(e) }, 500);
@@ -231,7 +238,8 @@ export function registerCheckpointRoutes(app: Hono, sql: Sql) {
         tag,
       ).one();
       if (!row) return c.json({ ok: false, error: "no checkpoint with tag: " + tag }, 404);
-      const restoredTables = restore(sql, JSON.parse(row.payload as string));
+      const plaintext = await decryptSetting(row.payload as string, env);
+      const restoredTables = restore(sql, JSON.parse(plaintext));
       return c.json({ ok: true, id: row.id, tag, restored_tables: restoredTables });
     } catch (e) {
       return c.json({ ok: false, error: String(e) }, 500);

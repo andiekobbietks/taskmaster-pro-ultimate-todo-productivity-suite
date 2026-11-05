@@ -11,6 +11,14 @@
 
 const PREFIX = "enc:v1:";
 
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
 function getSecret(env: any): string | null {
   return env?.SETTINGS_ENCRYPTION_KEY || null;
 }
@@ -62,7 +70,7 @@ export async function encryptSetting(value: string, env: any): Promise<string> {
   const combined = new Uint8Array(iv.length + ct.byteLength);
   combined.set(iv);
   combined.set(new Uint8Array(ct), iv.length);
-  const b64 = btoa(String.fromCharCode(...combined));
+  const b64 = toBase64(combined);
   return PREFIX + b64;
 }
 

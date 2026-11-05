@@ -76,7 +76,7 @@ None of these is a marketing quote on its own. Together they form the strongest 
 - **Progressive Web App (PWA)** support — installable on desktop and mobile
 - **Web push notifications** for reminders and digests
 - **Settings** with masked secrets, progressive disclosure, collapsible JMAP/IMAP sections, and revoke controls
-- **Diagnostics / checkpoint CLI** for endpoint failure logging and rollback snapshots, gated behind an Advanced settings toggle
+- **Diagnostics / checkpoint CLI** for endpoint failure logging and versioned rollback snapshots, gated behind an Advanced settings toggle
 - **Multi-source hackathon importers** (Devpost, MLH, HackerEarth)
 
 ## Architecture
@@ -87,7 +87,7 @@ None of these is a marketing quote on its own. Together they form the strongest 
 - **Web Push** (`src/push.ts`) — hand-rolled VAPID delivery
 - **MCP server** (`src/mcp.ts`) — Streamable HTTP transport for the TaskMaster tool surface
 - **Scheduled function** (`scheduled()`) — cron-based digest and hackathon refresh hooks
-- **Stateless diagnostics** (`src/diagnostics.ts`, `src/checkpoints.ts`) — endpoint failure logging and full-table snapshots
+- **Stateless diagnostics** (`src/diagnostics.ts`, `src/checkpoints.ts`) — endpoint failure logging and versioned application-data recovery snapshots
 
 ### Platform model
 

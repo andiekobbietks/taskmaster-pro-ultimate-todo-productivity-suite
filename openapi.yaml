@@ -12,8 +12,8 @@ info:
     `wrangler secret put API_TOKEN`. Only `GET /health` is public.
     Scheduled inbox fetch, digest send and trash purge calls are made by the
     Worker with the configured bearer token; direct HTTP callers must also
-    authenticate. Leaving `API_TOKEN` unset disables the gate for local
-    development only and is unsafe for production.
+    authenticate. Leaving `API_TOKEN` unset in production causes API requests to fail closed
+    with HTTP 503. Local development opts into `APP_ENV=development`.
 
     All API responses carry `Cache-Control: no-store, no-cache, must-revalidate,
     private`. API routes answer CORS preflight with `Access-Control-Allow-Origin`

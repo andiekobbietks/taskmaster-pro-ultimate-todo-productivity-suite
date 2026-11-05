@@ -142,13 +142,13 @@ npx portless alias taskmaster 8787   # http://taskmaster.localhost
 
 ## Security
 
-This project is **Beta** and now gates `/api/*` with a bearer-token auth layer when `API_TOKEN` is configured. Deployed Workers run with `APP_ENV=production` and fail closed with HTTP 503 if the secret is missing. Local development explicitly opts into `APP_ENV=development` in `.dev.vars`.
+This project is **Beta** and now gates `/api/*` with a bearer-token auth layer when `API_TOKEN` is configured. Deployed Workers run with `APP_ENV=production` and fail closed with HTTP 503 unless both `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY` are configured as Worker secrets. Local development explicitly opts into `APP_ENV=development` in `.dev.vars`.
 
 Key points:
 
 - When `API_TOKEN` is set, every `/api/*` route (except `GET /health`) requires `Authorization: Bearer <token>` or `?api_token=<token>`.
 - The checkpoint/diagnostics UI widget is gated by an **Advanced** settings toggle, and the matching API routes are only enabled when `DEBUG_ROUTES_ENABLED=true`.
-- Sensitive settings are encrypted at rest with AES-256-GCM (`SETTINGS_ENCRYPTION_KEY`) and compared in a masked view; `/api/settings/revoke` provides break-glass removal.
+- Sensitive settings use AES-256-GCM when `SETTINGS_ENCRYPTION_KEY` is configured, and are compared in a masked view; production refuses API requests without that key. `/api/settings/revoke` provides break-glass removal.
 - The token gate is single-tenant: it protects a private deployment, but does not provide per-user data partitions. Do not treat it as multi-user authorization.
 
 ## License

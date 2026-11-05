@@ -117,7 +117,7 @@ keystroke is a full table scan.
 
 ---
 
-## Slice D — Scheduling & prioritisation · shippable, one phantom
+## Slice D — Scheduling & prioritisation · shippable, one planned gap
 
 | layer | implementation |
 |---|---|
@@ -125,12 +125,11 @@ keystroke is a full table scan.
 | API | `is_pinned`, `priority`, `due_date` on the todo row |
 | storage | three columns; sort is `is_pinned DESC, due_date ASC, created_at DESC` |
 
-`FEAT-006` implemented · `FEAT-007` implemented · `FEAT-008` partial, 3 gaps · `FEAT-018` implemented · `FEAT-019` **planned — phantom**
+`FEAT-006` implemented · `FEAT-007` implemented · `FEAT-008` partial, 3 gaps · `FEAT-018` implemented · `FEAT-019` **planned — not counted as a phantom**
 
-**`FEAT-019` "Upcoming"** renders as a tab and has a title ternary, but no
-`setActiveTab('upcoming')` call exists anywhere in the codebase. Clicking it
-does nothing. This is the second phantom and it survives because no gate can see
-a control that is present in the DOM but wired to nothing.
+**`FEAT-019` "Upcoming"** is only referenced in a state comment and a title
+ternary; there is no reachable tab or `setActiveTab('upcoming')` call. It is a
+planned, unimplemented view, not a phantom control exposed to users.
 
 ---
 

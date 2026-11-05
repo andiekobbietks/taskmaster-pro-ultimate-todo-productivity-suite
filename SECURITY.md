@@ -46,3 +46,4 @@ If private reporting is unavailable, open a regular issue asking for a secure ch
 - Whether the issue has already been shared publicly.
 
 Security findings are triaged against [the readiness checklist](docs/READINESS.md). Any issue that permits unauthenticated data access or destructive operations is release-blocking.
+

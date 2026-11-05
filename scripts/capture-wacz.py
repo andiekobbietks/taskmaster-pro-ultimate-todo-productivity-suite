@@ -42,8 +42,9 @@ from urllib.parse import urlsplit
 
 def _is_private_host(host: str) -> bool:
     """True for loopback, link-local, private, multicast and reserved hosts."""
-    if ":" in host:
-        host = host.rsplit(":", 1)[0]
+    # urlsplit().hostname supplies a port-free hostname, including an
+    # unbracketed IPv6 literal. Do not split on ":" here: that would turn
+    # IPv6 loopback (::1) into an empty string and bypass the private check.
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
     if host.lower() in ("localhost", "localhost.localdomain"):
@@ -65,7 +66,7 @@ def validate_capture_url(
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https"):
         raise ValueError("%s must use http or https: %s" % (label, url))
-    host = parts.netloc
+    host = parts.hostname or ""
     if not host:
         raise ValueError("%s missing host: %s" % (label, url))
     if _is_private_host(host) and not allow_private:

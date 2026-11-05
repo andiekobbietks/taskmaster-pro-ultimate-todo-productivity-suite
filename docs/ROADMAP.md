@@ -78,7 +78,7 @@ Broken chain, or no safety net. In critical-path order.
 |---|---|
 | **Where** | `src/auth.ts` — shared bearer-token middleware mounted by the Durable Object on `/api/*` |
 | **Was** | Anyone with the URL had full read and write. No identity check existed. |
-| **Now** | `apiTokenAuth(env)` accepts `Authorization: Bearer <token>` or `?api_token=`. It returns 401 on mismatch. Only `GET /health` is public. Scheduled inbox fetch, digest send and trash purge calls carry the configured bearer token when invoked internally by the Worker. When `env.API_TOKEN` is unset, only `APP_ENV=development` remains open; production fails closed with HTTP 503. `wrangler.json` sets production mode and `.dev.vars.example` opts local development in. |
+| **Now** | `apiTokenAuth(env)` accepts `Authorization: Bearer <token>` or `?api_token=`. It returns 401 on mismatch. Only `GET /health` is public. Scheduled inbox fetch, digest send and trash purge calls carry the configured bearer token when invoked internally by the Worker. When either `API_TOKEN` or `SETTINGS_ENCRYPTION_KEY` is unset, production (`APP_ENV=production`) fails closed with HTTP 503. `wrangler.json` sets production mode and `.dev.vars.example` opts local development in. |
 | **Still single-user** | Data is not scoped per user; the Durable Object stores one dataset. The auth token gates access to that dataset, not to a user-specific partition. |
 | **Done when** | Every `/api/*` route requires a token when `API_TOKEN` is set, and the token is stored in Workers Secrets, not code. |
 

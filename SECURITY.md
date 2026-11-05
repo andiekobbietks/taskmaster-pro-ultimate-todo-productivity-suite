@@ -18,9 +18,9 @@ If private reporting is unavailable, open a regular issue asking for a secure ch
 
 ## Deployment security requirements
 
-- Configure a strong, unique `API_TOKEN` secret before exposing a deployment: `npx wrangler secret put API_TOKEN`.
+- Configure strong, unique `API_TOKEN` and `SETTINGS_ENCRYPTION_KEY` secrets before exposing a deployment: `npx wrangler secret put API_TOKEN` and `npx wrangler secret put SETTINGS_ENCRYPTION_KEY`.
 - The token is a shared-secret access gate, not per-user identity, role-based access control, or tenant isolation.
-- Do not deploy with `API_TOKEN` unset. `wrangler.json` marks deployed Workers as `APP_ENV=production`; without `API_TOKEN`, API requests fail closed with HTTP 503. Local development opts into `APP_ENV=development` in `.dev.vars`.
+- Do not deploy without both secrets. `wrangler.json` marks deployed Workers as `APP_ENV=production`; if either `API_TOKEN` or `SETTINGS_ENCRYPTION_KEY` is missing, API requests fail closed with HTTP 503. Local development opts into `APP_ENV=development` in `.dev.vars`.
 - The public `GET /health` endpoint exposes only service health and version metadata.
 - Scheduled inbox fetch, digest send and trash purge operations require the same bearer token as other API routes. The Worker cron handler supplies it when invoking the Durable Object internally.
 - Prefer the `Authorization: Bearer` header. The documented `api_token` query parameter is retained for compatibility but can expose credentials in URLs, browser history, analytics and logs.

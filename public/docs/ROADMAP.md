@@ -69,8 +69,8 @@ Broken chain, or no safety net. In critical-path order.
 | | |
 |---|---|
 | **Was** | `.github/workflows/ci.yml` ran `npm test` only. The route regression suite and the browser suite ran nowhere but one machine, so 52 of the checks could rot silently. |
-| **Now** | A `browser` job installs Playwright, starts the mock API, and runs the 18 browser checks; the `test` job also runs the route regression suite. Screenshots go to the runner's temp directory, not `docs/`, so the docs drift gate is unaffected. |
-| **Proof** | 36 + 42 route checks and 18 browser checks now run on every push |
+| **Now** | A `browser` job installs Playwright, starts the mock API, and runs the 21 browser checks; the `test` job also runs the route regression suite. Screenshots go to the runner's temp directory, not `docs/`, so the docs drift gate is unaffected. |
+| **Proof** | 36 + 42 route checks and 21 browser checks now run on every push |
 
 ### M4 — Authentication, before any public deployment — DONE
 

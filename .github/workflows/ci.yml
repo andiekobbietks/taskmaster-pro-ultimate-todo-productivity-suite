@@ -198,7 +198,8 @@ jobs:
             --url "http://127.0.0.1:8821/" \
             --name "CI Capture" \
             --output-dir "$RUNNER_TEMP/captures" \
-            --dry-run
+            --dry-run \
+            --allow-private-capture
           python scripts/validate-wacz.py "$RUNNER_TEMP/captures/CI-Capture.wacz"
 
       - name: Stop the mock API

@@ -511,6 +511,7 @@ export class App extends DurableObject {
 interface Env {
   APP: DurableObjectNamespace;
   ASSETS: Fetcher;
+  API_TOKEN?: string;
   SEED_DEMO_DATA?: string;
 }
 

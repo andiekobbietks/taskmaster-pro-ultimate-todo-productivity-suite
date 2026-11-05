@@ -159,12 +159,14 @@ invisible.
 **Information disclosure — the real one.** The runner drives a browser
 to whatever URL it is given, with the person's cookies, on the person's
 machine. It records the responses it sees, and it writes them to disk.
-`scripts/capture-wacz.py` does **not** validate the URL: there is no
-scheme check, and no check against internal addresses. Pointed at
-`http://192.168.1.1/` it would capture the router's admin page, and the
-archive would be written to `captures/`. The default is same-origin only,
-which bounds what a *page* pulls in, but it does not bound what the
-*runner* is pointed at.
+`scripts/capture-wacz.py` validates the URL scheme and accepts only
+HTTP or HTTPS. It rejects localhost and private, loopback, link-local,
+multicast and reserved **IP literals** unless the explicit dry-run-only
+override is used. It does not resolve DNS names before navigation, however:
+a hostname that resolves to a private address can still pass this check.
+Run the capture runner with network egress restrictions and do not treat
+the URL validator as a complete SSRF boundary. DNS resolution and address
+pinning remain hardening work.
 
 **Denial of service — partly bounded.** A page that never settles is
 capped by the navigation timeout and the settle time.
@@ -230,13 +232,11 @@ before it is stored.
 Findings 3 and the size caps in section 3 were **fixed on 2026-10-21**, during
 this assessment. Findings 1, 2, 4, 5, 6 and 7 are open.
 
-**Finding 3 is only half fixed.** The upload size and the decompressed
-size are now capped, so a large or expanding archive cannot stall the
-Durable Object. But `scripts/capture-wacz.py` still does not check the
-scheme of the URL it is given, and it still does not refuse a private
-address range. Pointed at `http://192.168.1.1/` it would drive the
-browser to the router's admin page and write what it saw to disk. That
-check is a dozen lines and it is the next thing to do.
+**Capture validation is partial.** The runner rejects non-HTTP(S) schemes,
+localhost and private/loopback/link-local/multicast/reserved IP literals.
+It does not resolve hostnames before navigation, so a hostname resolving
+to a private address may pass. Restrict runner egress at the network layer;
+DNS resolution and address pinning remain open hardening work.
 
 ## 5. About Vault and Supabase
 

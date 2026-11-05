@@ -524,15 +524,15 @@ interface Env {
  * export, so Wrangler fails with "No matching export ... for import 'default'"
  * and every /api/* path is unreachable.
  *
- * Traffic is split here: /api/* goes to the single App instance, everything
- * else is served from static assets. `run_worker_first` in wrangler.json keeps
- * SPA fallback from swallowing /api/* before the Worker sees it.
+ * Traffic is split here: /api/* and /health go to the single App instance;
+ * everything else is served from static assets. `run_worker_first` in
+ * wrangler.json keeps the SPA fallback from swallowing these routes.
  */
 const worker = {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url);
 
-    if (pathname.startsWith("/api/")) {
+    if (pathname.startsWith("/api/") || pathname === "/health") {
       const id = env.APP.idFromName("taskmaster");
       return env.APP.get(id).fetch(request);
     }

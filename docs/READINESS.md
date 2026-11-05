@@ -48,7 +48,7 @@ Highest-leverage unmet gates, ordered by stage then effort — the smallest chan
 
 *Current state:* 2 phantom feature(s)
 
-Target: `FEAT-010` **Filter by tag** — partial (`src/index.ts:24 (declared), 49-52 (clause), 27-60 (query builder); guarded by scripts/tier1-check.mjs DEAD-FILTER`)
+Target: `FEAT-017` **Estimated pomodoros** — stub (`src/index.ts:67, 86, 254; src/app.jsx:94 (newPomodoros state) - absent from the New Task form at 680-786`)
 
 ### `G-SCOPE-01` The product works on the device it is used on
 

@@ -43,7 +43,7 @@ export function buildTodoQuery(filters: TodoFilters = {}): { query: string; para
 
   if (filters.search) {
     const pattern = `%${escapeLike(filters.search)}%`;
-    query += " AND (title LIKE ? ESCAPE '\\\\' OR description LIKE ? ESCAPE '\\\\')";
+    query += " AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')";
     params.push(pattern, pattern);
   }
 
